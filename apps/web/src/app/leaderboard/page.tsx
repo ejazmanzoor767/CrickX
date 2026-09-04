@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../../components/auth-provider';
+import { useAuth } from '../../lib/auth-context';
 import { api } from '../../lib/api';
 import styles from './leaderboard.module.css';
 
