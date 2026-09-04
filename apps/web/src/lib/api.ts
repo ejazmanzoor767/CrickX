@@ -100,13 +100,28 @@ export const api = {
 
 export const adminApi = {
   dashboard: () => apiFetch('/admin/dashboard'),
-  setCredits: (credits: unknown[]) => apiFetch('/admin/player-credits', { method: 'POST', body: JSON.stringify({ credits })),
+  setCredits: (credits: unknown[]) => apiFetch('/admin/player-credits', {
+    method: 'POST',
+    body: JSON.stringify({ credits }),
+  }),
   creditsForFixture: (fixtureId: number) => apiFetch(`/admin/player-credits/${fixtureId}`),
-  createRuleSet: (payload: unknown) => apiFetch('/admin/scoring-rule-sets', { method: 'POST', body: JSON.stringify(payload) }),
+  createRuleSet: (payload: unknown) => apiFetch('/admin/scoring-rule-sets', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
   ruleSets: () => apiFetch('/admin/scoring-rule-sets'),
   pendingKyc: () => apiFetch('/admin/kyc/pending'),
-  reviewKyc: (kycId: string, status: string, note?: string) => apiFetch(`/admin/kyc/${kycId}/review`, { method: 'PUT', body: JSON.stringify({ status, note }) }),
+  reviewKyc: (kycId: string, status: string, note?: string) => apiFetch(`/admin/kyc/${kycId}/review`, {
+    method: 'PUT',
+    body: JSON.stringify({ status, note }),
+  }),
   pendingWithdrawals: () => apiFetch('/admin/withdrawals/pending'),
-  reviewWithdrawal: (id: string, status: string, note?: string, payoutReference?: string) => apiFetch(`/admin/withdrawals/${id}/review`, { method: 'PUT', body: JSON.stringify({ status, note, payoutReference }) }),
-  createContest: (payload: unknown) => apiFetch('/fantasy/contests', { method: 'POST', body: JSON.stringify(payload) }),
+  reviewWithdrawal: (id: string, status: string, note?: string, payoutReference?: string) => apiFetch(`/admin/withdrawals/${id}/review`, {
+    method: 'PUT',
+    body: JSON.stringify({ status, note, payoutReference }),
+  }),
+  createContest: (payload: unknown) => apiFetch('/fantasy/contests', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
 };
