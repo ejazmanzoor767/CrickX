@@ -1,0 +1,11 @@
+{
+  "name": "fantasy-cricket",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "web:build": "npm run build --workspace @fantasy-cricket/web"
+  }
+}
