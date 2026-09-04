@@ -47,6 +47,13 @@ function normalizeSquadPlayer(entry: any, teamId: number) {
   };
 }
 
+function normalizeFixture(fixture: SportmonksFixture): SportmonksFixture {
+  if (Array.isArray(fixture.lineup)) {
+    fixture.lineup = fixture.lineup.map(normalizeLineupPlayer);
+  }
+  return fixture;
+}
+
 @Injectable()
 export class SportmonksDataService {
   constructor(
@@ -74,7 +81,6 @@ export class SportmonksDataService {
     });
   }
 
-  /** Current in-play feed. Sportmonks exposes livescores as the dedicated live endpoint. */
   async listLiveFixtures() {
     return this.client.get<SportmonksFixture[]>('/livescores', {
       include: LIVE_FIXTURE_INCLUDES,
@@ -84,17 +90,12 @@ export class SportmonksDataService {
   async getFixture(fixtureId: number, opts: { forceLive?: boolean } = {}): Promise<SportmonksFixture> {
     const cached = await this.prisma.cachedFixture.findUnique({ where: { sportmonksFixtureId: fixtureId } });
     if (cached && cached.expiresAt > new Date() && !opts.forceLive) {
-      return cached.payload as unknown as SportmonksFixture;
+      return normalizeFixture(cached.payload as unknown as SportmonksFixture);
     }
 
     const includes = opts.forceLive ? LIVE_FIXTURE_INCLUDES : FIXTURE_INCLUDES;
     const envelope = await this.client.get<SportmonksFixture>(`/fixtures/${fixtureId}`, { include: includes });
-    const fixture = envelope.data;
-
-    if (Array.isArray(fixture.lineup)) {
-      fixture.lineup = fixture.lineup.map(normalizeLineupPlayer);
-    }
-
+    const fixture = normalizeFixture(envelope.data);
     const ttlMs = fixture.live === 1 ? TTL_LIVE_MS : TTL_UPCOMING_MS;
 
     await this.prisma.cachedFixture.upsert({
@@ -138,20 +139,13 @@ export class SportmonksDataService {
     return fixture.lineup ?? [];
   }
 
-  /**
-   * Return the complete season squads for both teams and overlay the official
-   * match XI from the fixture. Before the XI is announced, every squad player
-   * is retained with isPlayingXI=false. Once Sportmonks publishes the lineup,
-   * exactly the announced players are marked isPlayingXI=true; the remaining
-   * squad stays in the response and is marked false.
-   */
   async getFixtureSquads(fixtureId: number) {
-    const fixture = await this.getFixture(fixtureId, { forceLive: fixture.live === 1 });
+    const fixture = await this.getFixture(fixtureId, { forceLive: false });
     const localTeamId = fixture.localteam_id ?? fixture.localteam?.id;
     const visitorTeamId = fixture.visitorteam_id ?? fixture.visitorteam?.id;
 
     if (!localTeamId || !visitorTeamId) {
-      return { fixtureId, seasonId: fixture.season_id, lineupAnnounced: false, teams: [] };
+      return { fixtureId, seasonId: fixture.season_id, lineupAnnounced: false, announcementComplete: false, teams: [] };
     }
 
     const [localEnvelope, visitorEnvelope] = await Promise.all([
@@ -168,7 +162,7 @@ export class SportmonksDataService {
     const lineup = (fixture.lineup ?? []).map(normalizeLineupPlayer).filter((p) => !p.substitution);
     const lineupByPlayer = new Map<number, SportmonksLineupPlayer>();
     for (const player of lineup) {
-      if (!Number.isNaN(player.player_id)) lineupByPlayer.set(player.player_id, player);
+      if (Number.isFinite(player.player_id)) lineupByPlayer.set(player.player_id, player);
     }
 
     const buildTeam = (team: SportmonksTeam, teamId: number) => {
@@ -178,7 +172,6 @@ export class SportmonksDataService {
         .filter((player) => Number.isFinite(player.player_id));
 
       const teamLineup = lineup.filter((player) => player.team_id === teamId);
-      const idsFromLineup = new Set(teamLineup.map((player) => player.player_id));
       const merged = players.map((player) => {
         const xi = lineupByPlayer.get(player.player_id);
         return {
@@ -189,9 +182,6 @@ export class SportmonksDataService {
         };
       });
 
-      // Some competition/team squad feeds omit a player from squad but still
-      // return them in the fixture lineup. Keep those announced XI players so
-      // the fantasy selector never loses an official player.
       for (const xi of teamLineup) {
         if (!merged.some((p) => p.player_id === xi.player_id)) {
           merged.push({
@@ -216,7 +206,7 @@ export class SportmonksDataService {
         code: team.code,
         image_path: team.image_path,
         playerCount: merged.length,
-        playingXICount: idsFromLineup.size,
+        playingXICount: teamLineup.length,
         players: merged,
       };
     };
@@ -224,6 +214,7 @@ export class SportmonksDataService {
     const localTeam = buildTeam(localEnvelope.data, localTeamId);
     const visitorTeam = buildTeam(visitorEnvelope.data, visitorTeamId);
     const lineupAnnounced = localTeam.playingXICount > 0 || visitorTeam.playingXICount > 0;
+    const announcementComplete = localTeam.playingXICount >= 11 && visitorTeam.playingXICount >= 11;
 
     return {
       fixtureId,
@@ -233,7 +224,7 @@ export class SportmonksDataService {
       tossWonTeamId: fixture.toss_won_team_id,
       elected: fixture.elected,
       lineupAnnounced,
-      announcementComplete: localTeam.playingXICount >= 11 && visitorTeam.playingXICount >= 11,
+      announcementComplete,
       teams: [localTeam, visitorTeam],
     };
   }
