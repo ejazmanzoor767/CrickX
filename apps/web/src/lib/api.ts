@@ -40,11 +40,30 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     },
   });
 
+  // Read the body once. Some successful NestJS handlers/proxies can return
+  // an empty body; calling response.json() directly then throws
+  // "Unexpected end of JSON input" even though the request succeeded.
+  const rawBody = await res.text();
+
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
+    let body: any = {};
+    if (rawBody.trim()) {
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        body = { message: rawBody };
+      }
+    }
     throw new Error(errorMessage(body, `Request failed: ${res.status}`));
   }
-  return res.json();
+
+  if (!rawBody.trim()) return undefined as T;
+
+  try {
+    return JSON.parse(rawBody) as T;
+  } catch {
+    throw new Error(`Invalid JSON response from ${path}`);
+  }
 }
 
 const feed = (path: string, params?: Record<string, string | number>) => {
@@ -81,7 +100,7 @@ export const api = {
 
 export const adminApi = {
   dashboard: () => apiFetch('/admin/dashboard'),
-  setCredits: (credits: unknown[]) => apiFetch('/admin/player-credits', { method: 'POST', body: JSON.stringify({ credits }) }),
+  setCredits: (credits: unknown[]) => apiFetch('/admin/player-credits', { method: 'POST', body: JSON.stringify({ credits })),
   creditsForFixture: (fixtureId: number) => apiFetch(`/admin/player-credits/${fixtureId}`),
   createRuleSet: (payload: unknown) => apiFetch('/admin/scoring-rule-sets', { method: 'POST', body: JSON.stringify(payload) }),
   ruleSets: () => apiFetch('/admin/scoring-rule-sets'),
