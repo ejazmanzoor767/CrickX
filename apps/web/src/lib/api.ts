@@ -66,9 +66,9 @@ export const api = {
   wallet: () => apiFetch('/wallet'),
   transactions: () => apiFetch('/wallet/transactions'),
   deposit: (amount: number, paymentGateway: string) =>
-    apiFetch('/wallet/deposits', { method: 'POST', body: JSON.stringify({ amount, paymentGateway) }),
+    apiFetch('/wallet/deposits', { method: 'POST', body: JSON.stringify({ amount, paymentGateway }) }),
   withdraw: (amount: number, bankAccountLast4: string) =>
-    apiFetch('/wallet/withdrawals', { method: 'POST', body: JSON.stringify({ amount, bankAccountLast4) }),
+    apiFetch('/wallet/withdrawals', { method: 'POST', body: JSON.stringify({ amount, bankAccountLast4 }) }),
 
   profile: () => apiFetch('/profile'),
   updateProfile: (payload: unknown) => apiFetch('/profile', { method: 'PUT', body: JSON.stringify(payload) }),
