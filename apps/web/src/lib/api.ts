@@ -19,9 +19,7 @@ function waitForAuthReady() {
 function errorMessage(body: any, fallback: string) {
   const message = body?.message ?? body?.error;
   if (typeof message === 'string') return message;
-  if (Array.isArray(message)) {
-    return message.map((item) => typeof item === 'string' ? item : JSON.stringify(item)).join(', ');
-  }
+  if (Array.isArray(message)) return message.map((item) => typeof item === 'string' ? item : JSON.stringify(item)).join(', ');
   if (message && typeof message === 'object') return message.message ?? JSON.stringify(message);
   return fallback;
 }
@@ -51,9 +49,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
 const feed = (path: string, params?: Record<string, string | number>) => {
   const query = params
-    ? `?${new URLSearchParams(
-        Object.entries(params).map(([key, value]) => [key, String(value)]),
-      )}`
+    ? `?${new URLSearchParams(Object.entries(params).map(([key, value]) => [key, String(value)]))}`
     : '';
   return apiFetch(`/matches${path}${query}`);
 };
@@ -69,58 +65,29 @@ export const api = {
 
   contestsForFixture: (fixtureId: number) => apiFetch(`/fantasy/contests/fixture/${fixtureId}`),
   myFantasyTeams: () => apiFetch('/fantasy/teams'),
-  createFantasyTeam: (payload: unknown) => apiFetch('/fantasy/teams', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }),
-  joinContest: (contestId: string, fantasyTeamId: string) => apiFetch('/fantasy/contests/join', {
-    method: 'POST',
-    body: JSON.stringify({ contestId, fantasyTeamId }),
-  }),
+  createFantasyTeam: (payload: unknown) => apiFetch('/fantasy/teams', { method: 'POST', body: JSON.stringify(payload) }),
+  joinContest: (contestId: string, fantasyTeamId: string) => apiFetch('/fantasy/contests/join', { method: 'POST', body: JSON.stringify({ contestId, fantasyTeamId }) }),
   myEntries: () => apiFetch('/fantasy/contests/mine/entries'),
+  fantasyDraft: (fixtureId: number) => apiFetch(`/fantasy/teams/draft/${fixtureId}`),
+  saveFantasyDraft: (fixtureId: number, payload: unknown) => apiFetch(`/fantasy/teams/draft/${fixtureId}`, { method: 'PUT', body: JSON.stringify(payload) }),
 
   wallet: () => apiFetch('/wallet'),
   transactions: () => apiFetch('/wallet/transactions'),
-  deposit: (amount: number, paymentGateway: string) => apiFetch('/wallet/deposits', {
-    method: 'POST',
-    body: JSON.stringify({ amount, paymentGateway }),
-  }),
-  withdraw: (amount: number, bankAccountLast4: string) => apiFetch('/wallet/withdrawals', {
-    method: 'POST',
-    body: JSON.stringify({ amount, bankAccountLast4 }),
-  }),
-
+  deposit: (amount: number, paymentGateway: string) => apiFetch('/wallet/deposits', { method: 'POST', body: JSON.stringify({ amount, paymentGateway }) }),
+  withdraw: (amount: number, bankAccountLast4: string) => apiFetch('/wallet/withdrawals', { method: 'POST', body: JSON.stringify({ amount, bankAccountLast4 }) }),
   profile: () => apiFetch('/profile'),
-  updateProfile: (payload: unknown) => apiFetch('/profile', {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  }),
+  updateProfile: (payload: unknown) => apiFetch('/profile', { method: 'PUT', body: JSON.stringify(payload) }),
 };
 
 export const adminApi = {
   dashboard: () => apiFetch('/admin/dashboard'),
-  setCredits: (credits: unknown[]) => apiFetch('/admin/player-credits', {
-    method: 'POST',
-    body: JSON.stringify({ credits }),
-  }),
+  setCredits: (credits: unknown[]) => apiFetch('/admin/player-credits', { method: 'POST', body: JSON.stringify({ credits }) }),
   creditsForFixture: (fixtureId: number) => apiFetch(`/admin/player-credits/${fixtureId}`),
-  createRuleSet: (payload: unknown) => apiFetch('/admin/scoring-rule-sets', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }),
+  createRuleSet: (payload: unknown) => apiFetch('/admin/scoring-rule-sets', { method: 'POST', body: JSON.stringify(payload) }),
   ruleSets: () => apiFetch('/admin/scoring-rule-sets'),
   pendingKyc: () => apiFetch('/admin/kyc/pending'),
-  reviewKyc: (kycId: string, status: string, note?: string) => apiFetch(`/admin/kyc/${kycId}/review`, {
-    method: 'PUT',
-    body: JSON.stringify({ status, note }),
-  }),
+  reviewKyc: (kycId: string, status: string, note?: string) => apiFetch(`/admin/kyc/${kycId}/review`, { method: 'PUT', body: JSON.stringify({ status, note }) }),
   pendingWithdrawals: () => apiFetch('/admin/withdrawals/pending'),
-  reviewWithdrawal: (id: string, status: string, note?: string, payoutReference?: string) => apiFetch(`/admin/withdrawals/${id}/review`, {
-    method: 'PUT',
-    body: JSON.stringify({ status, note, payoutReference }),
-  }),
-  createContest: (payload: unknown) => apiFetch('/fantasy/contests', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }),
+  reviewWithdrawal: (id: string, status: string, note?: string, payoutReference?: string) => apiFetch(`/admin/withdrawals/${id}/review`, { method: 'PUT', body: JSON.stringify({ status, note, payoutReference }) }),
+  createContest: (payload: unknown) => apiFetch('/fantasy/contests', { method: 'POST', body: JSON.stringify(payload) }),
 };
