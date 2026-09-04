@@ -1,34 +1,11 @@
-# Firebase Hosting (Spark) deployment
+# Frontend deployment
 
-This frontend is configured for Next.js static export so it can be deployed with Firebase Hosting on the Spark plan.
+Backend API: https://pitchxi-secure.onrender.com/api/v1
 
-## Backend
+This app is intended for Firebase App Hosting (Next.js server rendering), not static Firebase Hosting, because the match pages fetch live API data on the server.
 
-Production API base URL:
+## Firebase App Hosting
 
-`https://pitchxi-secure.onrender.com/api/v1`
+Connect the GitHub repository/branch containing this project in Firebase App Hosting and set the app root directory to `apps/web` if prompted.
 
-## Local build
-
-From the repository root:
-
-```bash
-npm install
-npm run web:build
-```
-
-The static site is generated at:
-
-`apps/web/out`
-
-## Firebase Hosting
-
-From the repository root:
-
-```bash
-firebase login
-firebase use crickx-3d806
-firebase deploy --only hosting
-```
-
-The match list and match detail pages use browser-side API calls because classic Firebase Hosting does not run a Next.js server. Match details are opened with `/matches?fixtureId=<ID>`.
+`apphosting.yaml` supplies `NEXT_PUBLIC_API_BASE_URL` for build/runtime.

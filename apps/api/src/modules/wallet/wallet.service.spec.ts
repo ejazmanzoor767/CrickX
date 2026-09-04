@@ -1,5 +1,4 @@
 import { BadRequestException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { WalletService } from './wallet.service';
 
 /**
@@ -80,8 +79,8 @@ describe('WalletService.mutateBalance', () => {
       userId: 'u1', bucket: 'DEPOSIT', delta: 250, type: 'DEPOSIT', idempotencyKey: 'dep-3',
     });
 
-    expect(tx.amount).toEqual(new Prisma.Decimal(250));
-    expect(tx.balanceAfter).toEqual(new Prisma.Decimal(250));
+    expect(Number(tx.amount)).toEqual(250);
+    expect(Number(tx.balanceAfter)).toEqual(250);
     expect(wallet.depositBalance).toBe(250);
   });
 });

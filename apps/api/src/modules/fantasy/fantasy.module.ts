@@ -4,11 +4,11 @@ import { WalletModule } from '../wallet/wallet.module';
 import { FantasyTeamService } from './fantasy-team.service';
 import { ContestService } from './contest.service';
 import { FantasyTeamController, ContestController } from './fantasy.controller';
-import { PrismaService } from '../../common/prisma.service';
+import { FirestoreService } from '../../common/firestore.service';
 
 @Module({
   imports: [SportmonksModule, WalletModule],
-  providers: [FantasyTeamService, ContestService, PrismaService],
+  providers: [FantasyTeamService, ContestService, FirestoreService],
   controllers: [FantasyTeamController, ContestController],
   exports: [FantasyTeamService, ContestService],
 })

@@ -20,7 +20,7 @@ packages/shared/  Shared TS types used by web + mobile
 ### 1. Backend
 ```
 cd apps/api
-cp .env.example .env      # fill in DATABASE_URL, SPORTMONKS_API_TOKEN, JWT secrets
+cp .env.example .env      # fill in SPORTMONKS_API_TOKEN, JWT secrets, Firestore/GCP authentication
 npm install
 npm run prisma:migrate    # creates tables from schema.prisma
 npm run start:dev         # http://localhost:4000/api/v1
@@ -97,3 +97,7 @@ npm run start:dev
 npm test                      # runs the unit test suite
 ```
 Then log into the web app's `/admin/login` with the seeded admin account.
+
+## Firebase / Firestore backend
+
+The production backend can run on Google Cloud Run and use Firestore. See `FIRESTORE_CLOUD_RUN.md`. PostgreSQL/Prisma are no longer required for the Firestore runtime path.

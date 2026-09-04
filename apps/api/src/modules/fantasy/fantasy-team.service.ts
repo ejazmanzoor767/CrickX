@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma.service';
+import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { CreateFantasyTeamDto } from './dto';
 
@@ -10,7 +10,7 @@ const MAX_PLAYERS_PER_REAL_TEAM = 7; // standard fantasy constraint: can't pick 
 @Injectable()
 export class FantasyTeamService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: FirestoreService,
     private readonly sportmonks: SportmonksDataService,
   ) {}
 

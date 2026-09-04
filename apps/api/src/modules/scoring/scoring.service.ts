@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../../common/prisma.service';
+import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
+import { WalletService } from '../wallet/wallet.service';
 import { DEFAULT_RULES, ScoringRules, computePlayerPoints, applyCaptaincy } from './scoring.rules';
 
 /**
@@ -15,8 +16,9 @@ export class ScoringService {
   private readonly logger = new Logger(ScoringService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: FirestoreService,
     private readonly sportmonks: SportmonksDataService,
+    private readonly wallet: WalletService,
   ) {}
 
   /** Recomputes and persists totalPoints for every ContestEntry tied to a given fixture. */
@@ -101,16 +103,15 @@ export class ScoringService {
 
       await this.prisma.contestEntry.update({ where: { id: entry.id }, data: { prizeWon: tier.amount } });
 
-      // Credit winnings idempotently, keyed by contest+entry so re-runs never double-pay.
-      await this.prisma.$executeRawUnsafe(
-        `INSERT INTO "Transaction" (id, "userId", type, status, amount, "balanceType", "balanceAfter", "idempotencyKey", "referenceType", "referenceId", "createdAt")
-         SELECT gen_random_uuid(), $1, 'CONTEST_WINNING_CREDIT', 'SUCCESS', $2, 'WINNINGS', 0, $3, 'CONTEST_ENTRY', $4, now()
-         WHERE NOT EXISTS (SELECT 1 FROM "Transaction" WHERE "idempotencyKey" = $3)`,
-        entry.userId, tier.amount, `contest-payout:${entry.id}`, entry.id,
-      );
-      await this.prisma.wallet.update({
-        where: { userId: entry.userId },
-        data: { winningsBalance: { increment: tier.amount } },
+      // Credit winnings idempotently through the Firestore wallet primitive.
+      await this.wallet.mutateBalance({
+        userId: entry.userId,
+        bucket: 'WINNINGS',
+        delta: tier.amount,
+        type: 'CONTEST_WINNING_CREDIT',
+        idempotencyKey: `contest-payout:${entry.id}`,
+        referenceType: 'CONTEST_ENTRY',
+        referenceId: entry.id,
       });
     }
 

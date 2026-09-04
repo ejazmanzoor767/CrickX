@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { PrismaService } from '../../common/prisma.service';
+import { FirestoreService } from '../../common/firestore.service';
 import { RegisterDto, LoginDto } from './dto';
 
 const REFRESH_TOKEN_BYTES = 48;
@@ -11,7 +11,7 @@ const REFRESH_TOKEN_BYTES = 48;
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: FirestoreService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
   ) {}

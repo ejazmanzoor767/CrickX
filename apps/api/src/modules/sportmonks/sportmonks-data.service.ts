@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma.service';
+import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksClientService } from './sportmonks-client.service';
 import {
   SportmonksFixture,
@@ -31,7 +31,7 @@ const TTL_PLAYER_MS = 60 * 60 * 1000;
 export class SportmonksDataService {
   constructor(
     private readonly client: SportmonksClientService,
-    private readonly prisma: PrismaService,
+    private readonly prisma: FirestoreService,
   ) {}
 
   /** List fixtures, optionally filtered by league/date — used by Matches tab. */

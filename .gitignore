@@ -1,4 +1,3 @@
-# See https://git-scm.com/docs/gitignore for more about ignoring files.
 node_modules/
 dist/
 .next/
@@ -6,7 +5,3 @@ dist/
 *.env
 .env.local
 coverage/
-
-# Firebase local files
-.firebase/
-firebase-debug.log

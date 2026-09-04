@@ -4,10 +4,10 @@ import { WalletController } from './wallet.controller';
 import { RazorpayWebhookController } from './webhook.controller';
 import { RazorpayService } from './razorpay.service';
 import { PayoutService } from './payout.service';
-import { PrismaService } from '../../common/prisma.service';
+import { FirestoreService } from '../../common/firestore.service';
 
 @Module({
-  providers: [WalletService, RazorpayService, PayoutService, PrismaService],
+  providers: [WalletService, RazorpayService, PayoutService, FirestoreService],
   controllers: [WalletController, RazorpayWebhookController],
   exports: [WalletService, PayoutService],
 })

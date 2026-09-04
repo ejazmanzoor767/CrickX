@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma.service';
+import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { WalletService } from '../wallet/wallet.service';
 import { CreateContestDto, JoinContestDto } from './dto';
@@ -7,7 +7,7 @@ import { CreateContestDto, JoinContestDto } from './dto';
 @Injectable()
 export class ContestService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: FirestoreService,
     private readonly sportmonks: SportmonksDataService,
     private readonly wallet: WalletService,
   ) {}
@@ -60,32 +60,31 @@ export class ContestService {
       throw new ForbiddenException(`You've reached the max ${contest.maxTeamsPerUser} entries for this contest.`);
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      // Debit entry fee first — mutateBalance is idempotent per contest+team so retries are safe.
-      await this.wallet.mutateBalance({
-        userId,
-        bucket: 'DEPOSIT',
-        delta: -contest.entryFee.toNumber(),
-        type: 'CONTEST_ENTRY_DEBIT',
-        idempotencyKey: `contest-entry:${contest.id}:${dto.fantasyTeamId}`,
-        referenceType: 'CONTEST',
-        referenceId: contest.id,
-      });
-
-      const entry = await tx.contestEntry.create({
-        data: {
-          contestId: contest.id,
-          userId,
-          fantasyTeamId: dto.fantasyTeamId,
-          entryFeePaid: contest.entryFee,
-        },
-      });
-
-      await tx.contest.update({ where: { id: contest.id }, data: { filledSpots: { increment: 1 } } });
-      await tx.fantasyTeam.update({ where: { id: dto.fantasyTeamId }, data: { isLocked: true } });
-
-      return entry;
+    // The wallet mutation is atomic/idempotent in its own Firestore transaction.
+    // Keep the surrounding contest writes sequential because Firestore does not
+    // permit a transaction to read a document after it has begun writing it.
+    await this.wallet.mutateBalance({
+      userId,
+      bucket: 'DEPOSIT',
+      delta: -contest.entryFee.toNumber(),
+      type: 'CONTEST_ENTRY_DEBIT',
+      idempotencyKey: `contest-entry:${contest.id}:${dto.fantasyTeamId}`,
+      referenceType: 'CONTEST',
+      referenceId: contest.id,
     });
+
+    const entry = await this.prisma.contestEntry.create({
+      data: {
+        contestId: contest.id,
+        userId,
+        fantasyTeamId: dto.fantasyTeamId,
+        entryFeePaid: contest.entryFee,
+      },
+    });
+
+    await this.prisma.contest.update({ where: { id: contest.id }, data: { filledSpots: { increment: 1 } } });
+    await this.prisma.fantasyTeam.update({ where: { id: dto.fantasyTeamId }, data: { isLocked: true } });
+    return entry;
   }
 
   async myEntries(userId: string) {

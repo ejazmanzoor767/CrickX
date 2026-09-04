@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma.service';
+import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { BulkSetCreditsDto, CreateScoringRuleSetDto, ReviewKycDto, ReviewWithdrawalDto } from './dto';
 
@@ -12,7 +12,7 @@ import { BulkSetCreditsDto, CreateScoringRuleSetDto, ReviewKycDto, ReviewWithdra
 @Injectable()
 export class AdminService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: FirestoreService,
     private readonly sportmonks: SportmonksDataService,
   ) {}
 

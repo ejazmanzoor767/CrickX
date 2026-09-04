@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma.service';
-import { Prisma } from '@prisma/client';
+import { FirestoreService } from '../../common/firestore.service';
+import { FirestoreDecimal } from '../../common/firestore.service';
 import { RazorpayService } from './razorpay.service';
 
 export type BalanceBucket = 'DEPOSIT' | 'WINNINGS' | 'BONUS';
@@ -15,7 +15,7 @@ export type BalanceBucket = 'DEPOSIT' | 'WINNINGS' | 'BONUS';
 @Injectable()
 export class WalletService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: FirestoreService,
     private readonly razorpay: RazorpayService,
   ) {}
 
@@ -29,7 +29,7 @@ export class WalletService {
   async mutateBalance(params: {
     userId: string;
     bucket: BalanceBucket;
-    delta: Prisma.Decimal | number; // positive = credit, negative = debit
+    delta: FirestoreDecimal | number; // positive = credit, negative = debit
     type:
       | 'DEPOSIT'
       | 'WITHDRAWAL'
@@ -52,9 +52,9 @@ export class WalletService {
 
       const field = params.bucket === 'DEPOSIT' ? 'depositBalance' : params.bucket === 'WINNINGS' ? 'winningsBalance' : 'bonusBalance';
       const current = wallet[field];
-      const next = new Prisma.Decimal(current).plus(params.delta);
+      const next = new FirestoreDecimal(Number(current) + Number(params.delta));
 
-      if (next.isNegative()) {
+      if (next.toNumber() < 0) {
         throw new BadRequestException('Insufficient balance for this operation.');
       }
 
@@ -71,13 +71,13 @@ export class WalletService {
           userId: params.userId,
           type: params.type,
           status: 'SUCCESS',
-          amount: new Prisma.Decimal(params.delta).abs(),
+          amount: Math.abs(Number(params.delta)),
           balanceType: params.bucket,
-          balanceAfter: next,
+          balanceAfter: next.toNumber(),
           idempotencyKey: params.idempotencyKey,
           referenceType: params.referenceType,
           referenceId: params.referenceId,
-          metadata: params.metadata as Prisma.InputJsonValue,
+          metadata: params.metadata,
         },
       });
     });

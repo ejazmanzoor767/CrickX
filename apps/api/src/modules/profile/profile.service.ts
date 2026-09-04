@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma.service';
+import { FirestoreService } from '../../common/firestore.service';
 import { UpdateProfileDto } from './dto';
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: FirestoreService) {}
 
   async get(userId: string) {
     const profile = await this.prisma.profile.findUnique({ where: { userId } });
