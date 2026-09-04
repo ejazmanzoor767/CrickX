@@ -43,7 +43,10 @@ export class MatchesService {
     const end = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
     const envelope = await this.sportmonks.listFixtures({
       startsBetween: { start: sportmonksDate(now), end: sportmonksDate(end) },
-      include: 'localteam,visitorteam,venue,lineup.player',
+      // Sportmonks Cricket API v2.0 allows `lineup` on fixtures, but the
+      // current plan does not allow the nested `lineup.player` include.
+      // The `lineup` response already contains player details needed by the app.
+      include: 'localteam,visitorteam,venue,lineup',
     });
     const data = this.filterAllowed(envelope.data)
       .filter((f) => new Date(f.starting_at) > now)
