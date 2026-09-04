@@ -8,7 +8,7 @@ import {
   SportmonksTeam,
 } from './sportmonks.types';
 
-const FIXTURE_INCLUDES = 'localteam,visitorteam,venue,runs,batting,bowling,lineup.player,scoreboards';
+const FIXTURE_INCLUDES = 'localteam,visitorteam,venue,runs,batting,bowling,lineup,scoreboards';
 const LIVE_FIXTURE_INCLUDES = `${FIXTURE_INCLUDES},balls`;
 
 const TTL_LIVE_MS = 15 * 1000;
@@ -48,9 +48,7 @@ function normalizeSquadPlayer(entry: any, teamId: number) {
 }
 
 function normalizeFixture(fixture: SportmonksFixture): SportmonksFixture {
-  if (Array.isArray(fixture.lineup)) {
-    fixture.lineup = fixture.lineup.map(normalizeLineupPlayer);
-  }
+  if (Array.isArray(fixture.lineup)) fixture.lineup = fixture.lineup.map(normalizeLineupPlayer);
   return fixture;
 }
 
@@ -71,14 +69,19 @@ export class SportmonksDataService {
     const filter: Record<string, string> = {};
     if (params.leagueId) filter['filter[league_id]'] = String(params.leagueId);
     if (params.status) filter['filter[status]'] = params.status;
-    if (params.startsBetween) filter['filter[starts_between]'] = `${params.startsBetween.start},${params.startsBetween.end}`;
+    if (params.startsBetween) {
+      filter['filter[starts_between]'] = `${params.startsBetween.start},${params.startsBetween.end}`;
+    }
 
-    return this.client.get<SportmonksFixture[]>('/fixtures', {
+    const requestParams: Record<string, string | number> = {
       include: params.include ?? 'localteam,visitorteam,venue',
-      sort: 'starting_at',
-      page: params.page,
       ...filter,
-    });
+    };
+    if (params.page !== undefined) requestParams.page = params.page;
+
+    // Keep this request minimal and close to Sportmonks' documented v2.0
+    // fixture examples. Sorting is performed locally by MatchesService.
+    return this.client.get<SportmonksFixture[]>('/fixtures', requestParams);
   }
 
   async listLiveFixtures() {
@@ -144,9 +147,6 @@ export class SportmonksDataService {
     const startMs = new Date(fixture.starting_at).getTime();
     const nearTossWindow = Number.isFinite(startMs) && Date.now() >= startMs - 2 * 60 * 60 * 1000 && Date.now() <= startMs + 30 * 60 * 1000;
 
-    // The official XI is normally published around the toss. Bypass the
-    // general 5-minute fixture cache during that window so the UI can mark
-    // both XIs without waiting for cache expiry.
     if (nearTossWindow || fixture.live === 1) {
       fixture = await this.getFixture(fixtureId, { forceLive: true });
     }
@@ -223,8 +223,6 @@ export class SportmonksDataService {
 
     const localTeam = buildTeam(localEnvelope.data, localTeamId);
     const visitorTeam = buildTeam(visitorEnvelope.data, visitorTeamId);
-    const lineupAnnounced = localTeam.playingXICount > 0 || visitorTeam.playingXICount > 0;
-    const announcementComplete = localTeam.playingXICount >= 11 && visitorTeam.playingXICount >= 11;
 
     return {
       fixtureId,
@@ -233,8 +231,8 @@ export class SportmonksDataService {
       status: fixture.status,
       tossWonTeamId: fixture.toss_won_team_id,
       elected: fixture.elected,
-      lineupAnnounced,
-      announcementComplete,
+      lineupAnnounced: localTeam.playingXICount > 0 || visitorTeam.playingXICount > 0,
+      announcementComplete: localTeam.playingXICount >= 11 && visitorTeam.playingXICount >= 11,
       teams: [localTeam, visitorTeam],
     };
   }
