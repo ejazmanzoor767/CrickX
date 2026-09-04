@@ -4,7 +4,7 @@ import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { WalletService } from '../wallet/wallet.service';
 import { LeaderboardService } from './leaderboard.service';
-import { DEFAULT_RULES, ScoringRules, applyCaptaincy, computePlayerPoints, rulesForFormat } from './scoring.rules';
+import { ScoringRules, applyCaptaincy, computePlayerPoints, rulesForFormat } from './scoring.rules';
 
 function isFinished(status: string | null | undefined, live: 0 | 1) {
   if (live === 1) return false;
@@ -23,17 +23,39 @@ export class ScoringService {
     private readonly leaderboard: LeaderboardService,
   ) {}
 
-  async scoreFixture(fixtureId: number) {
-    const contests = await this.prisma.contest.findMany({
-      where: { sportmonksFixtureId: fixtureId, status: { in: ['UPCOMING', 'LIVE'] } },
-      include: { scoringRuleSet: true, entries: { include: { fantasyTeam: { include: { players: true } } } } },
-    });
-    if (contests.length === 0) return { scored: false, reason: 'NO_CONTESTS' };
+  private calculateTeamPoints(
+    team: any,
+    battingByPlayer: Map<number, any>,
+    bowlingByPlayer: Map<number, any>,
+    fieldingByPlayer: Map<number, { catches: number; stumpings: number; runOuts: number }>,
+    rules: ScoringRules,
+  ) {
+    let total = 0;
+    for (const player of team.players ?? []) {
+      let points = computePlayerPoints(
+        rules,
+        battingByPlayer.get(player.sportmonksPlayerId),
+        bowlingByPlayer.get(player.sportmonksPlayerId),
+        fieldingByPlayer.get(player.sportmonksPlayerId),
+      );
+      points = applyCaptaincy(
+        points,
+        player.sportmonksPlayerId,
+        team.captainSportmonksPlayerId,
+        team.viceCaptainSportmonksPlayerId,
+        rules,
+      );
+      total += points;
+    }
+    return Math.round(total * 10) / 10;
+  }
 
+  async scoreFixture(fixtureId: number) {
     const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
     const batting = fixture.batting ?? [];
     const bowling = fixture.bowling ?? [];
-    if (batting.length === 0 && bowling.length === 0) {
+    const hasPlayerStats = batting.length > 0 || bowling.length > 0;
+    if (!hasPlayerStats) {
       this.logger.debug(`No batting/bowling data yet from Sportmonks for fixture ${fixtureId}`);
       return { scored: false, reason: 'NO_PLAYER_STATS' };
     }
@@ -41,7 +63,6 @@ export class ScoringService {
     const battingByPlayer = new Map(batting.map((row) => [row.player_id, row]));
     const bowlingByPlayer = new Map(bowling.map((row) => [row.player_id, row]));
     const fieldingByPlayer = new Map<number, { catches: number; stumpings: number; runOuts: number }>();
-
     for (const row of batting) {
       if (!row.catch_stump_player_id) continue;
       const current = fieldingByPlayer.get(row.catch_stump_player_id) ?? { catches: 0, stumpings: 0, runOuts: 0 };
@@ -50,42 +71,44 @@ export class ScoringService {
     }
 
     const formatRules = rulesForFormat(fixture.type);
-    const userFixtureScores = new Map<string, number>();
     const final = isFinished(fixture.status, fixture.live);
+    const userFixtureScores = new Map<string, number>();
+
+    // Score every saved fantasy team for this real fixture, not only contest entries.
+    // This makes the global leaderboard reflect real-match performance for all players
+    // who saved an XI before lock.
+    const fantasyTeams = await this.prisma.fantasyTeam.findMany({
+      where: { sportmonksFixtureId: fixtureId },
+      include: { players: true },
+    });
+
+    for (const team of fantasyTeams) {
+      const total = this.calculateTeamPoints(team, battingByPlayer, bowlingByPlayer, fieldingByPlayer, formatRules);
+      const previous = userFixtureScores.get(team.userId) ?? -Infinity;
+      if (total > previous) userFixtureScores.set(team.userId, total);
+    }
+
+    const contests = await this.prisma.contest.findMany({
+      where: { sportmonksFixtureId: fixtureId, status: { in: ['UPCOMING', 'LIVE'] } },
+      include: { scoringRuleSet: true, entries: { include: { fantasyTeam: { include: { players: true } } } } },
+    });
 
     for (const contest of contests) {
       const configuredRules = contest.scoringRuleSet?.rules as Partial<ScoringRules> | undefined;
       const rules: ScoringRules = { ...formatRules, ...(configuredRules ?? {}) };
 
       for (const entry of contest.entries) {
-        let total = 0;
-        for (const player of entry.fantasyTeam.players) {
-          let points = computePlayerPoints(
-            rules,
-            battingByPlayer.get(player.sportmonksPlayerId),
-            bowlingByPlayer.get(player.sportmonksPlayerId),
-            fieldingByPlayer.get(player.sportmonksPlayerId),
-          );
-          points = applyCaptaincy(
-            points,
-            player.sportmonksPlayerId,
-            entry.fantasyTeam.captainSportmonksPlayerId,
-            entry.fantasyTeam.viceCaptainSportmonksPlayerId,
-            rules,
-          );
-          total += points;
-        }
-
-        total = Math.round(total * 10) / 10;
+        const total = this.calculateTeamPoints(entry.fantasyTeam, battingByPlayer, bowlingByPlayer, fieldingByPlayer, rules);
         await this.prisma.contestEntry.update({ where: { id: entry.id }, data: { totalPoints: total } });
 
-        // The global leaderboard counts each user's best fantasy score once per real fixture,
-        // so entering multiple contests does not multiply their career points.
         const previous = userFixtureScores.get(entry.userId) ?? -Infinity;
         if (total > previous) userFixtureScores.set(entry.userId, total);
       }
 
-      const ranked = await this.prisma.contestEntry.findMany({ where: { contestId: contest.id }, orderBy: { totalPoints: 'desc' } });
+      const ranked = await this.prisma.contestEntry.findMany({
+        where: { contestId: contest.id },
+        orderBy: { totalPoints: 'desc' },
+      });
       await this.prisma.$transaction(
         ranked.map((entry, index) => this.prisma.contestEntry.update({ where: { id: entry.id }, data: { rank: index + 1 } })),
       );
@@ -109,14 +132,16 @@ export class ScoringService {
       if (final) await this.settleContest(contest.id);
     }
 
-    await this.leaderboard.recordFixtureScores(
-      [...userFixtureScores.entries()].map(([userId, points]) => ({
-        userId,
-        fixtureId,
-        format: fixture.type,
-        points,
-      })),
-    );
+    if (userFixtureScores.size) {
+      await this.leaderboard.recordFixtureScores(
+        [...userFixtureScores.entries()].map(([userId, points]) => ({
+          userId,
+          fixtureId,
+          format: fixture.type,
+          points,
+        })),
+      );
+    }
 
     return { scored: true, fixtureId, format: fixture.type, final, users: userFixtureScores.size };
   }
