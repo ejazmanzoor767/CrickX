@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 
+function sportmonksDate(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
 @Injectable()
 export class MatchesService {
   private readonly allowedLeagueIds: Set<number>;
@@ -38,7 +42,7 @@ export class MatchesService {
     const now = new Date();
     const end = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
     const envelope = await this.sportmonks.listFixtures({
-      startsBetween: { start: now.toISOString(), end: end.toISOString() },
+      startsBetween: { start: sportmonksDate(now), end: sportmonksDate(end) },
       include: 'localteam,visitorteam,venue,lineup.player',
     });
     const data = this.filterAllowed(envelope.data)
@@ -51,7 +55,7 @@ export class MatchesService {
     const now = new Date();
     const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
     const envelope = await this.sportmonks.listFixtures({
-      startsBetween: { start: start.toISOString(), end: now.toISOString() },
+      startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) },
       include: 'localteam,visitorteam,venue,runs,scoreboards',
     });
     const data = this.filterAllowed(envelope.data)
@@ -74,7 +78,6 @@ export class MatchesService {
   }
 
   async getFixtureSquads(fixtureId: number) {
-    const squads = await this.sportmonks.getFixtureSquads(fixtureId);
-    return squads;
+    return this.sportmonks.getFixtureSquads(fixtureId);
   }
 }
