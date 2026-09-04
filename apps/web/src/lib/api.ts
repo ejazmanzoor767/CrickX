@@ -65,6 +65,7 @@ export const api = {
   completedMatches: (days = 14) => feed('/completed', { days }),
   matchDetail: (fixtureId: number) => apiFetch(`/matches/${fixtureId}`),
   liveMatchDetail: (fixtureId: number) => apiFetch(`/matches/${fixtureId}/live`),
+  fixtureSquads: (fixtureId: number) => apiFetch(`/matches/${fixtureId}/squad`),
 
   contestsForFixture: (fixtureId: number) => apiFetch(`/fantasy/contests/fixture/${fixtureId}`),
   myFantasyTeams: () => apiFetch('/fantasy/teams'),
