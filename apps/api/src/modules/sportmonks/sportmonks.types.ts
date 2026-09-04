@@ -1,11 +1,5 @@
 /**
- * Types mirroring the ACTUAL Sportmonks Cricket API v2.0 response shapes.
- * Base URL: https://cricket.sportmonks.com/api/v2.0
- *
- * These are intentionally close to the raw API — we do not invent fields.
- * Anything not confirmed against docs.sportmonks.com is left as `unknown`
- * rather than guessed, and should be filled in once verified against a
- * live response for your specific plan/includes.
+ * Types mirroring the Sportmonks Cricket API v2.0 response shapes.
  */
 
 export interface SportmonksEnvelope<T> {
@@ -33,10 +27,10 @@ export interface SportmonksFixture {
   round: string | null;
   localteam_id: number;
   visitorteam_id: number;
-  starting_at: string; // ISO timestamp
-  type: string; // "T20I" | "ODI" | "Test" | ...
+  starting_at: string;
+  type: string;
   live: 0 | 1;
-  status: string; // "NS" | "Live" | "Finished" | "Innings Break" | etc — see statuses doc
+  status: string;
   last_period: string | null;
   note: string | null;
   venue_id: number | null;
@@ -54,7 +48,6 @@ export interface SportmonksFixture {
   super_over: boolean;
   follow_on: boolean;
 
-  // Present only when requested via `include=`
   localteam?: SportmonksTeam;
   visitorteam?: SportmonksTeam;
   venue?: SportmonksVenue;
@@ -74,6 +67,7 @@ export interface SportmonksTeam {
   image_path: string | null;
   country_id: number | null;
   national_team: boolean;
+  squad?: SportmonksSquadEntry[];
 }
 
 export interface SportmonksPlayer {
@@ -84,10 +78,31 @@ export interface SportmonksPlayer {
   fullname: string;
   image_path: string | null;
   country_id: number | null;
-  position_id: number | null; // maps to /positions (Batsman/Bowler/All-rounder/WK)
+  position_id: number | null;
+  position?: { id: number; name: string };
   battingstyle: string | null;
   bowlingstyle: string | null;
   dateofbirth: string | null;
+}
+
+export interface SportmonksSquadEntry {
+  player_id?: number;
+  player?: SportmonksPlayer;
+  position_id?: number | null;
+  number?: number | null;
+  captain?: boolean | number;
+  injured?: boolean;
+}
+
+export interface SportmonksLineupPlayer extends Partial<SportmonksPlayer> {
+  resource?: 'players' | 'lineup';
+  id?: number;
+  player_id: number;
+  team_id: number;
+  captain: boolean;
+  wicketkeeper: boolean;
+  substitution?: boolean;
+  player?: SportmonksPlayer;
 }
 
 export interface SportmonksVenue {
@@ -118,13 +133,12 @@ export interface SportmonksBatting {
   six_x: number;
   rate: number;
   catch_stump_player_id: number | null;
-  bowling_player_id: number | null; // dismissal bowler
+  bowling_player_id: number | null;
   active: boolean;
 }
 
 export interface SportmonksBowling {
   resource: 'bowlings';
-  fixture_id: number;
   team_id: number;
   player_id: number;
   overs: number;
@@ -135,19 +149,10 @@ export interface SportmonksBowling {
   noball: number;
 }
 
-export interface SportmonksLineupPlayer {
-  resource: 'lineup';
-  fixture_id: number;
-  team_id: number;
-  player_id: number;
-  captain: boolean;
-  wicketkeeper: boolean;
-}
-
 export interface SportmonksBall {
   resource: 'balls';
   ball: number;
-  score_id: number; // FK into /scores dictionary (run type, wicket flag, extras, etc.)
+  score_id: number;
   fixture_id: number;
   inning: number;
   batsman_id: number;
@@ -166,7 +171,7 @@ export interface SportmonksBall {
 }
 
 export type SportmonksFixtureStatus =
-  | 'NS' // Not Started
+  | 'NS'
   | 'Live'
   | 'Innings Break'
   | 'Lunch'
