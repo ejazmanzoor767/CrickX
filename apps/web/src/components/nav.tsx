@@ -28,6 +28,7 @@ export default function Nav() {
         <nav className="nav-links">
           {item('/matches', 'Matches')}
           {item('/fantasy', 'Fantasy')}
+          {item('/leaderboard', 'Leaderboard')}
           {item('/wallet', 'Wallet')}
           {item('/profile', 'Profile')}
         </nav>
