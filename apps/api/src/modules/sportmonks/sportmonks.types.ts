@@ -94,8 +94,8 @@ export interface SportmonksSquadEntry {
   injured?: boolean;
 }
 
-export interface SportmonksLineupPlayer extends Partial<SportmonksPlayer> {
-  resource?: 'players' | 'lineup';
+export interface SportmonksLineupPlayer {
+  resource?: 'players';
   id?: number;
   player_id: number;
   team_id: number;
@@ -103,6 +103,15 @@ export interface SportmonksLineupPlayer extends Partial<SportmonksPlayer> {
   wicketkeeper: boolean;
   substitution?: boolean;
   player?: SportmonksPlayer;
+  firstname?: string;
+  lastname?: string;
+  fullname?: string;
+  image_path?: string | null;
+  position_id?: number | null;
+  position?: { id: number; name: string };
+  battingstyle?: string | null;
+  bowlingstyle?: string | null;
+  dateofbirth?: string | null;
 }
 
 export interface SportmonksVenue {
