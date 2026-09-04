@@ -17,7 +17,7 @@ export default async function MatchesPage() {
       <p style={{ color: '#8b8fa3' }}>Live from Sportmonks — nothing here is hardcoded.</p>
       {fixtures.length === 0 && <p>No matches available right now (check API auth / Sportmonks plan coverage).</p>}
       {fixtures.map((f) => (
-        <Link key={f.id} href={`/matches/${f.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Link key={f.id} href={`/matches/detail?fixtureId=${encodeURIComponent(String(f.id))}`} style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <strong>{f.localteam?.name ?? 'TBD'} vs {f.visitorteam?.name ?? 'TBD'}</strong>
