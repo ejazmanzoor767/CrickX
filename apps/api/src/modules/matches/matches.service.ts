@@ -39,7 +39,7 @@ export class MatchesService {
     const end = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
     const envelope = await this.sportmonks.listFixtures({
       startsBetween: { start: now.toISOString(), end: end.toISOString() },
-      include: 'localteam,visitorteam,venue,lineup',
+      include: 'localteam,visitorteam,venue,lineup.player',
     });
     const data = this.filterAllowed(envelope.data)
       .filter((f) => new Date(f.starting_at) > now)
@@ -71,5 +71,10 @@ export class MatchesService {
 
   async getLiveDetail(fixtureId: number) {
     return this.sportmonks.getFixture(fixtureId, { forceLive: true });
+  }
+
+  async getFixtureSquads(fixtureId: number) {
+    const squads = await this.sportmonks.getFixtureSquads(fixtureId);
+    return squads;
   }
 }
