@@ -27,6 +27,11 @@ export class MatchesController {
     return this.matches.listCompleted(Number.isNaN(value) ? 14 : value);
   }
 
+  @Get(':fixtureId/squad')
+  squad(@Param('fixtureId', ParseIntPipe) fixtureId: number) {
+    return this.matches.getFixtureSquads(fixtureId);
+  }
+
   @Get(':fixtureId/live')
   liveDetail(@Param('fixtureId', ParseIntPipe) fixtureId: number) {
     return this.matches.getLiveDetail(fixtureId);
