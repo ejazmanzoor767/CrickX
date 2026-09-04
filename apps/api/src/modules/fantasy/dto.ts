@@ -1,5 +1,7 @@
 import { IsArray, IsInt, IsString, ArrayMinSize, ArrayMaxSize, Min } from 'class-validator';
 
+export const DEMO_ENTRY_FEE_GEMS = 4;
+
 export class CreateFantasyTeamDto {
   @IsInt() sportmonksFixtureId!: number;
   @IsString() name!: string;
