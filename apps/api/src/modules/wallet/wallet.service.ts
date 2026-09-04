@@ -11,6 +11,9 @@ export type BalanceBucket = 'DEPOSIT' | 'WINNINGS' | 'BONUS';
  *   2. requires a caller-supplied idempotencyKey so retried requests (client
  *      timeouts, payment webhooks firing twice) never double-credit/debit
  *   3. writes a Transaction row as an immutable audit trail
+ *
+ * The web demo treats balances as virtual Gems. 1 Gem = PKR 5.
+ * No real-money payment processing is performed by the demo wallet.
  */
 @Injectable()
 export class WalletService {
@@ -22,7 +25,7 @@ export class WalletService {
   async getWallet(userId: string) {
     const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
     if (!wallet) throw new NotFoundException('Wallet not found.');
-    return wallet;
+    return { ...wallet, currency: 'GEM' };
   }
 
   /** Core primitive: credit or debit a specific balance bucket atomically & idempotently. */
@@ -44,7 +47,7 @@ export class WalletService {
     metadata?: Record<string, unknown>;
   }) {
     const existing = await this.prisma.transaction.findUnique({ where: { idempotencyKey: params.idempotencyKey } });
-    if (existing) return existing; // already applied — return prior result, do not reapply
+    if (existing) return existing;
 
     return this.prisma.$transaction(async (tx) => {
       const wallet = await tx.wallet.findUnique({ where: { userId: params.userId } });
@@ -93,30 +96,45 @@ export class WalletService {
   }
 
   // --- Deposits ---
-  /** Creates our Deposit record AND a real Razorpay order the client's checkout SDK will open. */
+  /**
+   * Demo wallet deposit. The demo accepts Gems directly and credits the virtual
+   * deposit balance immediately. No payment gateway is contacted.
+   */
   async initiateDeposit(userId: string, amount: number, gateway: string) {
-    const deposit = await this.prisma.deposit.create({
-      data: { userId, amount, paymentGateway: gateway, status: 'INITIATED' },
-    });
-
-    if (gateway === 'razorpay') {
-      const order = await this.razorpay.createOrder(amount, deposit.id);
-      const updated = await this.prisma.deposit.update({
-        where: { id: deposit.id },
-        data: { gatewayOrderId: order.id },
-      });
-      return { ...updated, razorpayOrder: order };
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Enter a positive Gem amount.');
     }
 
-    return deposit;
+    const demoDeposit = await this.prisma.deposit.create({
+      data: {
+        userId,
+        amount,
+        paymentGateway: gateway || 'demo',
+        status: 'INITIATED',
+      },
+    });
+
+    await this.mutateBalance({
+      userId,
+      bucket: 'DEPOSIT',
+      delta: amount,
+      type: 'DEPOSIT',
+      idempotencyKey: `demo-deposit:${demoDeposit.id}`,
+      referenceType: 'DEPOSIT',
+      referenceId: demoDeposit.id,
+      metadata: { mode: 'DEMO', unit: 'GEM', conversionPkr: Number(amount) * 5 },
+    });
+
+    return this.prisma.deposit.update({
+      where: { id: demoDeposit.id },
+      data: {
+        status: 'SUCCESS',
+        gatewayPaymentId: `DEMO-${demoDeposit.id.slice(0, 8)}`,
+        completedAt: new Date(),
+      },
+    });
   }
 
-  /**
-   * Confirms a deposit ONLY from a signature-verified source: either the
-   * Razorpay webhook (preferred — see WebhookController) or, as a fallback,
-   * a client-submitted checkout signature that we re-verify server-side.
-   * Never trust a bare "payment succeeded" flag from the client alone.
-   */
   async confirmDeposit(depositId: string, gatewayPaymentId: string) {
     const deposit = await this.prisma.deposit.findUnique({ where: { id: depositId } });
     if (!deposit) throw new NotFoundException('Deposit not found.');
@@ -150,7 +168,6 @@ export class WalletService {
     await this.prisma.deposit.update({ where: { id: deposit.id }, data: { status: 'FAILED', failureReason: reason } });
   }
 
-  /** Client-side checkout confirm path (in addition to the webhook) — re-verifies the signature itself. */
   async confirmDepositFromCheckout(userId: string, depositId: string, razorpayPaymentId: string, razorpayOrderId: string, razorpaySignature: string) {
     const deposit = await this.prisma.deposit.findUnique({ where: { id: depositId } });
     if (!deposit || deposit.userId !== userId) throw new NotFoundException('Deposit not found.');
@@ -164,17 +181,25 @@ export class WalletService {
 
   // --- Withdrawals ---
   async requestWithdrawal(userId: string, amount: number, bankAccountLast4: string) {
-    const wallet = await this.getWallet(userId);
-    if (Number(wallet.winningsBalance) + Number(wallet.depositBalance) < amount) {
-      throw new BadRequestException('Insufficient withdrawable balance.');
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Enter a positive Gem amount.');
     }
 
-    // Reserve funds immediately by debiting, tracked against the withdrawal request.
+    const wallet = await this.getWallet(userId);
+    if (Number(wallet.winningsBalance) + Number(wallet.depositBalance) < amount) {
+      throw new BadRequestException('Insufficient withdrawable Gems.');
+    }
+
     const withdrawal = await this.prisma.withdrawal.create({
-      data: { userId, amount, bankAccountLast4, status: 'REQUESTED' },
+      data: {
+        userId,
+        amount,
+        bankAccountLast4: bankAccountLast4 || 'DEMO',
+        status: 'REQUESTED',
+        metadata: { mode: 'DEMO', unit: 'GEM', conversionPkr: Number(amount) * 5 },
+      },
     });
 
-    // Prefer withdrawing from winnings first, then deposit balance (bonus is non-withdrawable).
     const fromWinnings = Math.min(Number(wallet.winningsBalance), amount);
     const fromDeposit = amount - fromWinnings;
 
@@ -191,6 +216,9 @@ export class WalletService {
       });
     }
 
-    return withdrawal;
+    return this.prisma.withdrawal.update({
+      where: { id: withdrawal.id },
+      data: { status: 'APPROVED', reviewedAt: new Date(), reviewNote: 'Demo withdrawal — no real money transferred.' },
+    });
   }
 }
