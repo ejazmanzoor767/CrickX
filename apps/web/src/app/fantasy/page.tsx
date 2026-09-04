@@ -128,6 +128,16 @@ function FantasyContent() {
         captainSportmonksPlayerId: captain,
         viceCaptainSportmonksPlayerId: viceCaptain,
       };
+
+      // Before the official XI is announced, persist the selection as the
+      // user's editable fantasy draft. The backend validates the final XI
+      // against Sportmonks once the lineup is available.
+      if (!announced) {
+        await api.saveFantasyDraft(fixtureId, payload);
+        setMessage('Fantasy Team saved as draft. You can edit it until match scoring begins. The official lineup will be checked when it is announced.');
+        return;
+      }
+
       const result = unwrap(editingTeamId
         ? await api.editFantasyTeam(editingTeamId, payload)
         : await api.createFantasyTeam(payload));
@@ -160,7 +170,7 @@ function FantasyContent() {
       <div className="page-heading-row"><div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Build your XI</h1><p className="section-subtitle">Select and save your XI. You may edit an unlocked team any time until match scoring begins.</p></div><div className="match-rules-pill"><strong>{selected.length}/11</strong><span>{totalCredits.toFixed(1)} / 100 credits</span></div></div>
 
       {!hasFixture ? <div className="card"><h2>Choose a match first</h2><p className="section-subtitle">Open an upcoming match and select Create XI.</p><Link className="primary-button" href="/matches">Go to matches</Link></div> : <>
-        <div className="card"><div className="section-mini-row"><div><p className="eyebrow">MATCH SQUADS</p><h2>{announced ? 'Official XI confirmed' : 'Waiting for toss XI'}</h2></div><span className={announced ? 'badge-live' : 'demo-pill'}>{announced ? 'XI CONFIRMED' : 'SQUAD MODE'}</span></div><p className="section-subtitle">{announced ? 'Only players marked PLAYING XI are selectable. Other squad members remain visible but are locked.' : 'You can build and save your draft now; the backend re-checks the official lineup before saving the final XI.'}</p></div>
+        <div className="card"><div className="section-mini-row"><div><p className="eyebrow">MATCH SQUADS</p><h2>{announced ? 'Official XI confirmed' : 'Squad not announced yet'}</h2></div><span className={announced ? 'badge-live' : 'demo-pill'}>{announced ? 'XI CONFIRMED' : 'PRE-TOSS'}</span></div><p className="section-subtitle">{announced ? 'Only players marked PLAYING XI are selectable. Other squad members remain visible but are locked.' : 'You can save your fantasy team now. It remains editable, and the final XI will be checked against the official Sportmonks lineup when announced.'}</p></div>
 
         {teamsForFixture.map((team: any) => <section className="match-section" key={team.id}><div className="section-mini-row"><div><p className="eyebrow">{team.name}</p><h2>{team.playingXICount}/11 playing · {team.playerCount} squad</h2></div><span className="demo-pill">{selectedPlayers.filter((p) => p.team_id === team.id).length}/7 selected</span></div><div className="match-list">{(team.players ?? []).map((player: any) => {
           const isSelected = selected.includes(player.player_id);
