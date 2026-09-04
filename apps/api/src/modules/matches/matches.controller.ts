@@ -1,9 +1,12 @@
-import { Controller, Get, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { MatchesService } from './matches.service';
 
+/**
+ * Match browsing is intentionally public. Authentication is still required
+ * by fantasy, wallet, profile and admin actions, but users can explore the
+ * Sportmonks-powered match centre before signing in.
+ */
 @Controller('matches')
-@UseGuards(JwtAuthGuard)
 export class MatchesController {
   constructor(private readonly matches: MatchesService) {}
 
