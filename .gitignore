@@ -4,4 +4,6 @@ dist/
 .expo/
 *.env
 .env.local
+.env.production
+.env.development
 coverage/
