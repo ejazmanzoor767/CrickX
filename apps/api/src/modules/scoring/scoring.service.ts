@@ -54,8 +54,7 @@ export class ScoringService {
     const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
     const batting = fixture.batting ?? [];
     const bowling = fixture.bowling ?? [];
-    const hasPlayerStats = batting.length > 0 || bowling.length > 0;
-    if (!hasPlayerStats) {
+    if (batting.length === 0 && bowling.length === 0) {
       this.logger.debug(`No batting/bowling data yet from Sportmonks for fixture ${fixtureId}`);
       return { scored: false, reason: 'NO_PLAYER_STATS' };
     }
@@ -74,14 +73,12 @@ export class ScoringService {
     const final = isFinished(fixture.status, fixture.live);
     const userFixtureScores = new Map<string, number>();
 
-    // Score every saved fantasy team for this real fixture, not only contest entries.
-    // This makes the global leaderboard reflect real-match performance for all players
-    // who saved an XI before lock.
+    // Every saved fantasy XI participates in the global leaderboard. When a user
+    // has multiple teams for the same fixture, only their best score is counted once.
     const fantasyTeams = await this.prisma.fantasyTeam.findMany({
       where: { sportmonksFixtureId: fixtureId },
       include: { players: true },
     });
-
     for (const team of fantasyTeams) {
       const total = this.calculateTeamPoints(team, battingByPlayer, bowlingByPlayer, fieldingByPlayer, formatRules);
       const previous = userFixtureScores.get(team.userId) ?? -Infinity;
@@ -171,17 +168,26 @@ export class ScoringService {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async pollLiveContests() {
-    const activeFixtures = await this.prisma.contest.findMany({
-      where: { status: { in: ['UPCOMING', 'LIVE'] }, lineupLockAt: { lte: new Date() } },
-      select: { sportmonksFixtureId: true },
-      distinct: ['sportmonksFixtureId'],
-    });
+    const [contests, teams] = await Promise.all([
+      this.prisma.contest.findMany({
+        where: { status: { in: ['UPCOMING', 'LIVE'] }, lineupLockAt: { lte: new Date() } },
+        select: { sportmonksFixtureId: true },
+      }),
+      this.prisma.fantasyTeam.findMany({
+        where: { isLocked: true },
+        select: { sportmonksFixtureId: true },
+      }),
+    ]);
 
-    for (const { sportmonksFixtureId } of activeFixtures) {
+    const fixtureIds = new Set<number>();
+    for (const row of contests) fixtureIds.add(row.sportmonksFixtureId);
+    for (const row of teams) fixtureIds.add(row.sportmonksFixtureId);
+
+    for (const fixtureId of fixtureIds) {
       try {
-        await this.scoreFixture(sportmonksFixtureId);
+        await this.scoreFixture(fixtureId);
       } catch (err) {
-        this.logger.error(`Scoring failed for fixture ${sportmonksFixtureId}`, err instanceof Error ? err.stack : String(err));
+        this.logger.error(`Scoring failed for fixture ${fixtureId}`, err instanceof Error ? err.stack : String(err));
       }
     }
   }
