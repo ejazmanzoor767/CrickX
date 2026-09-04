@@ -1,11 +1,6 @@
 import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { MatchesService } from './matches.service';
 
-/**
- * Match browsing is intentionally public. Authentication is still required
- * by fantasy, wallet, profile and admin actions, but users can explore the
- * Sportmonks-powered match centre before signing in.
- */
 @Controller('matches')
 export class MatchesController {
   constructor(private readonly matches: MatchesService) {}
@@ -20,13 +15,25 @@ export class MatchesController {
     return this.matches.listLive();
   }
 
-  @Get(':fixtureId')
-  detail(@Param('fixtureId', ParseIntPipe) fixtureId: number) {
-    return this.matches.getDetail(fixtureId);
+  @Get('upcoming')
+  upcoming(@Query('days') days?: string) {
+    const value = days ? Math.min(Math.max(parseInt(days, 10), 1), 7) : 4;
+    return this.matches.listUpcoming(Number.isNaN(value) ? 4 : value);
+  }
+
+  @Get('completed')
+  completed(@Query('days') days?: string) {
+    const value = days ? Math.min(Math.max(parseInt(days, 10), 1), 30) : 14;
+    return this.matches.listCompleted(Number.isNaN(value) ? 14 : value);
   }
 
   @Get(':fixtureId/live')
   liveDetail(@Param('fixtureId', ParseIntPipe) fixtureId: number) {
     return this.matches.getLiveDetail(fixtureId);
+  }
+
+  @Get(':fixtureId')
+  detail(@Param('fixtureId', ParseIntPipe) fixtureId: number) {
+    return this.matches.getDetail(fixtureId);
   }
 }
