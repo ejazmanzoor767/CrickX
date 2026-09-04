@@ -39,7 +39,7 @@ export class ContestService {
     return this.prisma.contest.findMany({ where: { sportmonksFixtureId: fixtureId }, orderBy: { entryFee: 'asc' } });
   }
 
-  /** Joins a contest: validates the fantasy team belongs to the same fixture, debits entry fee atomically. */
+  /** Joins a contest and debits entry fee atomically. The team remains editable until match lock/scoring begins. */
   async join(userId: string, dto: JoinContestDto) {
     const contest = await this.prisma.contest.findUnique({ where: { id: dto.contestId } });
     if (!contest) throw new NotFoundException('Contest not found.');
@@ -60,9 +60,6 @@ export class ContestService {
       throw new ForbiddenException(`You've reached the max ${contest.maxTeamsPerUser} entries for this contest.`);
     }
 
-    // The wallet mutation is atomic/idempotent in its own Firestore transaction.
-    // Keep the surrounding contest writes sequential because Firestore does not
-    // permit a transaction to read a document after it has begun writing it.
     await this.wallet.mutateBalance({
       userId,
       bucket: 'DEPOSIT',
@@ -83,7 +80,6 @@ export class ContestService {
     });
 
     await this.prisma.contest.update({ where: { id: contest.id }, data: { filledSpots: { increment: 1 } } });
-    await this.prisma.fantasyTeam.update({ where: { id: dto.fantasyTeamId }, data: { isLocked: true } });
     return entry;
   }
 
