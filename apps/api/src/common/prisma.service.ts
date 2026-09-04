@@ -1,12 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-
-@Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
-  async onModuleInit() {
-    await this.$connect();
-  }
-  async onModuleDestroy() {
-    await this.$disconnect();
-  }
-}
+// Backward-compatible alias for the Firestore-backed data service.
+// Existing application modules still import PrismaService, so keep this
+// symbol while routing all persistence through FirestoreService.
+export { FirestoreService as PrismaService } from './firestore.service';
