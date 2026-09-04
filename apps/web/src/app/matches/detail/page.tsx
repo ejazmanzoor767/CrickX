@@ -25,7 +25,7 @@ function MatchDetailContent() {
     };
     load();
     const timer = window.setInterval(async () => {
-      if (fixture?.live === 1) {
+      if (active && fixture?.live === 1) {
         try { const result: any = await api.liveMatchDetail(Number(fixtureId)); if (active) setFixture(result?.data ?? result); } catch {}
       }
     }, 15000);
@@ -41,6 +41,7 @@ function MatchDetailContent() {
   const runs = Array.isArray(fixture.runs) ? fixture.runs : [];
   const batting = Array.isArray(fixture.batting) ? fixture.batting : [];
   const bowling = Array.isArray(fixture.bowling) ? fixture.bowling : [];
+  const lineup = Array.isArray(fixture.lineup) ? fixture.lineup : [];
   const localScore = runs.find((r: any) => r.team_id === fixture.localteam_id || r.team_id === fixture.localteam?.id);
   const visitorScore = runs.find((r: any) => r.team_id === fixture.visitorteam_id || r.team_id === fixture.visitorteam?.id);
   const live = fixture.live === 1;
@@ -58,10 +59,12 @@ function MatchDetailContent() {
         <div className="score-card card"><small>{visitorName}</small><strong>{visitorScore ? `${visitorScore.score}/${visitorScore.wickets}` : '—'}</strong><span>{visitorScore?.overs ?? '—'} overs</span></div>
       </div>
 
-      {live && <div className="card"><div className="section-mini-row"><div><p className="eyebrow">LIVE SCORECARD</p><h2>Match action</h2></div><span className="demo-pill">AUTO REFRESH · 15s</span></div>{batting.length === 0 ? <p className="section-subtitle">Live batting figures are not available yet.</p> : batting.slice(0, 12).map((b: any, i: number) => <div className="score-row" key={i}><span>Player {b.player_id}</span><strong>{b.score ?? 0} ({b.ball ?? 0}) · {b.four_x ?? 0}×4 · {b.six_x ?? 0}×6</strong></div>)}</div>}
-      {live && bowling.length > 0 && <div className="card"><p className="eyebrow">BOWLING CARD</p>{bowling.slice(0, 10).map((b: any, i: number) => <div className="score-row" key={i}><span>Player {b.player_id}</span><strong>{b.overs ?? 0} ov · {b.runs ?? 0} runs · {b.wickets ?? 0} wkts</strong></div>)}</div>}
+      {live && <div className="card"><div className="section-mini-row"><div><p className="eyebrow">LIVE SCORECARD</p><h2>Batting</h2></div><span className="demo-pill">AUTO REFRESH · 15s</span></div>{batting.length === 0 ? <p className="section-subtitle">Live batting figures are not available yet.</p> : batting.slice(0, 12).map((b: any, i: number) => <div className="score-row" key={i}><span>{b.batsman?.fullname ?? `Player ${b.player_id}`}</span><strong>{b.score ?? 0} ({b.ball ?? 0}) · {b.four_x ?? 0}×4 · {b.six_x ?? 0}×6</strong></div>)}</div>}
+      {live && bowling.length > 0 && <div className="card"><p className="eyebrow">BOWLING CARD</p>{bowling.slice(0, 10).map((b: any, i: number) => <div className="score-row" key={i}><span>{b.bowler?.fullname ?? `Player ${b.player_id}`}</span><strong>{b.overs ?? 0} ov · {b.runs ?? 0} runs · {b.wickets ?? 0} wkts</strong></div>)}</div>}
 
-      <div className="card match-actions"><div><p className="eyebrow">FANTASY</p><h2>{live ? 'Entries closed' : 'Build your XI'}</h2><p className="section-subtitle">{live ? 'The match has started, so fantasy entries are locked.' : 'Create your fantasy team before the match starts. Entry: 4 Gems.'}</p></div>{!live && <Link className="primary-button" href={`/fantasy?fixtureId=${fixture.id}`}>Build XI · 4 ◆</Link>}</div>
+      <div className="card"><div className="section-mini-row"><div><p className="eyebrow">SQUADS</p><h2>Playing XI</h2></div><span className="demo-pill">SPORTMONKS</span></div>{lineup.length === 0 ? <p className="section-subtitle">The official lineup has not been announced yet.</p> : <div className="score-grid">{[localName, visitorName].map((teamName, ti) => <div className="card" key={teamName}><strong>{teamName}</strong>{lineup.filter((p: any) => p.team_id === (ti === 0 ? fixture.localteam_id : fixture.visitorteam_id)).map((p: any, i: number) => <div className="score-row" key={p.player_id ?? i}><span>{p.player?.fullname ?? p.fullname ?? `Player ${p.player_id}`}</span><span>{p.captain ? 'Captain' : p.wicketkeeper ? 'WK' : ''}</span></div>)}</div>)}</div>}</div>
+
+      <div className="card match-actions"><div><p className="eyebrow">FANTASY</p><h2>{live ? 'Entries closed' : 'Build your XI'}</h2><p className="section-subtitle">{live ? 'The match has started, so new entries are locked.' : 'Create your fantasy team before the match starts. Entry: 4 Gems.'}</p></div>{!live && <Link className="primary-button" href={`/fantasy?fixtureId=${fixture.id}`}>Build XI · 4 ◆</Link>}</div>
     </section>
   );
 }
