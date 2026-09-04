@@ -5,37 +5,17 @@ import { useRouter } from 'next/navigation';
 import { WalletDto } from '@fantasy-cricket/shared';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
+import styles from './wallet.module.css';
 
 const PKR_PER_GEM = 5;
 const QUICK_AMOUNTS = [25, 50, 100, 250, 500];
 
 type WalletAction = 'deposit' | 'withdraw';
+type Transaction = { id: string; type?: string; amount?: number | string; balanceType?: string; createdAt: string };
 
-type Transaction = {
-  id: string;
-  type?: string;
-  amount?: number | string;
-  balanceType?: string;
-  createdAt: string;
-};
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(value);
-}
-
-function initials(value: string) {
-  return value
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase() || 'CX';
-}
-
-function transactionLabel(type?: string) {
-  return (type || 'TRANSACTION').replaceAll('_', ' ');
-}
+function formatNumber(value: number) { return new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(value); }
+function initials(value: string) { return value.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'CX'; }
+function transactionLabel(type?: string) { return (type || 'TRANSACTION').replaceAll('_', ' '); }
 
 export default function WalletPage() {
   const { user, loading: authLoading } = useAuth();
@@ -58,14 +38,9 @@ export default function WalletPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      router.push('/login');
-      return;
-    }
+    if (!user) { router.push('/login'); return; }
     setLoading(true);
-    loadWallet()
-      .catch((err) => setError(err instanceof Error ? err.message : 'Unable to load your wallet.'))
-      .finally(() => setLoading(false));
+    loadWallet().catch((err) => setError(err instanceof Error ? err.message : 'Unable to load your wallet.')).finally(() => setLoading(false));
   }, [authLoading, user, router]);
 
   const balances = useMemo(() => ({
@@ -73,11 +48,9 @@ export default function WalletPage() {
     winnings: Number(wallet?.winningsBalance ?? 0),
     bonus: Number(wallet?.bonusBalance ?? 0),
   }), [wallet]);
-
   const totalGems = balances.deposit + balances.winnings + balances.bonus;
   const withdrawableGems = balances.deposit + balances.winnings;
   const totalPkr = totalGems * PKR_PER_GEM;
-  const withdrawablePkr = withdrawableGems * PKR_PER_GEM;
 
   const filteredTransactions = useMemo(() => {
     if (filter === 'ALL') return transactions;
@@ -88,44 +61,21 @@ export default function WalletPage() {
 
   async function deposit() {
     const gems = Number(amount);
-    if (!Number.isFinite(gems) || gems <= 0) {
-      setError('Enter a positive Gem amount.');
-      return;
-    }
-    setBusy('deposit');
-    setError('');
-    try {
-      await api.deposit(gems, 'demo');
-      await loadWallet();
-      setAmount('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to add demo Gems.');
-    } finally {
-      setBusy(null);
-    }
+    if (!Number.isFinite(gems) || gems <= 0) { setError('Enter a positive Gem amount.'); return; }
+    setBusy('deposit'); setError('');
+    try { await api.deposit(gems, 'demo'); await loadWallet(); setAmount(''); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Unable to add demo Gems.'); }
+    finally { setBusy(null); }
   }
 
   async function withdraw() {
     const gems = Number(withdrawAmount);
-    if (!Number.isFinite(gems) || gems <= 0) {
-      setError('Enter a positive Gem amount.');
-      return;
-    }
-    if (gems > withdrawableGems) {
-      setError(`You can withdraw up to ${formatNumber(withdrawableGems)} Gems.`);
-      return;
-    }
-    setBusy('withdraw');
-    setError('');
-    try {
-      await api.withdraw(gems, 'DEMO');
-      await loadWallet();
-      setWithdrawAmount('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to withdraw demo Gems.');
-    } finally {
-      setBusy(null);
-    }
+    if (!Number.isFinite(gems) || gems <= 0) { setError('Enter a positive Gem amount.'); return; }
+    if (gems > withdrawableGems) { setError(`You can withdraw up to ${formatNumber(withdrawableGems)} Gems.`); return; }
+    setBusy('withdraw'); setError('');
+    try { await api.withdraw(gems, 'DEMO'); await loadWallet(); setWithdrawAmount(''); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Unable to withdraw demo Gems.'); }
+    finally { setBusy(null); }
   }
 
   function selectQuickAmount(value: number) {
@@ -133,109 +83,43 @@ export default function WalletPage() {
     else setWithdrawAmount(String(Math.min(value, withdrawableGems)));
   }
 
-  if (authLoading || loading) {
-    return <section className="wallet-page"><div className="wallet-skeleton card">Loading your Gem vault…</div></section>;
-  }
-
-  if (!wallet) {
-    return <section className="wallet-page"><div className="card wallet-error"><p className="eyebrow">WALLET ERROR</p><h1 className="section-title">Gem vault unavailable</h1><p className="error-text">{error || 'Unable to load your virtual wallet.'}</p></div></section>;
-  }
+  if (authLoading || loading) return <section className={styles.walletPage}><div className={`card ${styles.walletSkeleton}`}>Loading your Gem vault…</div></section>;
+  if (!wallet) return <section className={styles.walletPage}><div className={`card ${styles.walletError}`}><p className="eyebrow">WALLET ERROR</p><h1>Gem vault unavailable</h1><p className="error-text">{error || 'Unable to load your virtual wallet.'}</p></div></section>;
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'CrickX Player';
 
   return (
-    <section className="wallet-page">
-      <div className="wallet-topline">
-        <div>
-          <p className="eyebrow">CRICKX WALLET</p>
-          <h1 className="wallet-heading">THE GEM VAULT<span>.</span></h1>
-          <p className="wallet-subheading">Your virtual balance for demo contests. <strong>1 Gem = PKR 5</strong>.</p>
-        </div>
-        <div className="wallet-user-chip">
-          <div className="wallet-mini-avatar">{initials(displayName)}</div>
-          <div><strong>{displayName}</strong><span>Demo player</span></div>
+    <section className={styles.walletPage}>
+      <div className={styles.walletTopline}>
+        <div><p className="eyebrow">CRICKX WALLET</p><h1 className={styles.walletHeading}>THE GEM VAULT<span>.</span></h1><p className={styles.walletSubheading}>Your virtual balance for demo contests. <strong>1 Gem = PKR 5</strong>.</p></div>
+        <div className={styles.walletUserChip}><div className={styles.walletMiniAvatar}>{initials(displayName)}</div><div><strong>{displayName}</strong><span>Demo player</span></div></div>
+      </div>
+
+      <div className={styles.demoBanner}><div className={styles.demoBannerIcon}>◆</div><div><strong>DEMO CURRENCY ONLY</strong><span>No bank, card or real-money payment is involved. All Gem movements are simulated.</span></div><div className={styles.demoRate}>1 ◆ = PKR 5</div></div>
+
+      <div className={styles.walletHeroGrid}>
+        <div className={styles.walletBalanceHero}><span className={styles.walletKicker}>TOTAL BALANCE</span><div className={styles.walletGemNumber}><span>◆</span>{formatNumber(totalGems)}</div><div className={styles.walletPkr}>≈ PKR {formatNumber(totalPkr)}</div><div className={styles.walletAvailable}><span>Withdrawable</span><strong>{formatNumber(withdrawableGems)} ◆</strong></div><div className={styles.gemOrbit}><div>◆</div><span>GEMS</span></div></div>
+        <div className={`card ${styles.walletSplitCard}`}><div className={styles.walletSplitHead}><div><span className={styles.walletKicker}>BALANCE BREAKDOWN</span><h2>Where your Gems live</h2></div><span className={styles.walletLiveDot}>LIVE</span></div>
+          <div className={styles.walletBreakdownRow}><div><span className={`${styles.walletDot} ${styles.depositDot}`} />Deposit</div><strong>{formatNumber(balances.deposit)} ◆</strong><small>PKR {formatNumber(balances.deposit * PKR_PER_GEM)}</small></div>
+          <div className={styles.walletBreakdownRow}><div><span className={`${styles.walletDot} ${styles.winningsDot}`} />Winnings</div><strong>{formatNumber(balances.winnings)} ◆</strong><small>PKR {formatNumber(balances.winnings * PKR_PER_GEM)}</small></div>
+          <div className={styles.walletBreakdownRow}><div><span className={`${styles.walletDot} ${styles.bonusDot}`} />Bonus</div><strong>{formatNumber(balances.bonus)} ◆</strong><small>PKR {formatNumber(balances.bonus * PKR_PER_GEM)}</small></div>
         </div>
       </div>
 
-      <div className="demo-banner">
-        <div className="demo-banner-icon">◆</div>
-        <div><strong>DEMO CURRENCY ONLY</strong><span>No bank, card or real-money payment is involved. All Gem movements are simulated.</span></div>
-        <div className="demo-rate">1 ◆ = PKR 5</div>
-      </div>
-
-      <div className="wallet-hero-grid">
-        <div className="wallet-balance-hero">
-          <div className="wallet-balance-copy">
-            <span className="wallet-kicker">TOTAL BALANCE</span>
-            <div className="wallet-gem-number"><span>◆</span>{formatNumber(totalGems)}</div>
-            <div className="wallet-pkr">≈ PKR {formatNumber(totalPkr)}</div>
-            <div className="wallet-available"><span>Withdrawable</span><strong>{formatNumber(withdrawableGems)} ◆</strong></div>
-          </div>
-          <div className="gem-orbit"><div>◆</div><span>GEMS</span></div>
+      <div className={styles.walletWorkspace}>
+        <div className={`card ${styles.walletActionCard}`}>
+          <div className={styles.walletTabs}><button className={`${styles.walletTab} ${activeAction === 'deposit' ? styles.active : ''}`} onClick={() => setActiveAction('deposit')}>Add Gems</button><button className={`${styles.walletTab} ${activeAction === 'withdraw' ? styles.active : ''}`} onClick={() => setActiveAction('withdraw')}>Withdraw</button></div>
+          {activeAction === 'deposit' ? <div className={styles.walletActionBody}><p className="eyebrow">VIRTUAL TOP-UP</p><h2>Add Gems to your vault</h2><p className={styles.walletMuted}>Instant demo credit. Nothing is charged.</p><div className={styles.walletAmountBox}><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Gem deposit amount"/><span>GEMS</span></div><div className={styles.quickAmounts}>{QUICK_AMOUNTS.map((value) => <button key={value} className={`${styles.quickChip} ${Number(amount) === value ? styles.active : ''}`} onClick={() => selectQuickAmount(value)}>+{value}</button>)}</div><div className={styles.conversionLine}><span>Estimated demo value</span><strong>PKR {amount && Number.isFinite(Number(amount)) ? formatNumber(Number(amount) * PKR_PER_GEM) : '0'}</strong></div><button className="primary-button full" style={{marginTop:11,minHeight:50}} onClick={deposit} disabled={busy !== null}>{busy === 'deposit' ? 'Adding Gems…' : 'Add Gems →'}</button></div>
+          : <div className={styles.walletActionBody}><p className="eyebrow">VIRTUAL CASH-OUT</p><h2>Withdraw demo Gems</h2><p className={styles.walletMuted}>Moves virtual Gems out of your demo wallet. No external payout happens.</p><div className={styles.walletAmountBox}><input inputMode="decimal" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} aria-label="Gem withdrawal amount"/><span>GEMS</span></div><div className={styles.quickAmounts}>{QUICK_AMOUNTS.map((value) => <button key={value} className={`${styles.quickChip} ${Number(withdrawAmount) === value ? styles.active : ''}`} onClick={() => selectQuickAmount(value)}>{value}</button>)}</div><div className={styles.conversionLine}><span>Available to withdraw</span><strong>{formatNumber(withdrawableGems)} ◆</strong></div><button className="secondary-button full" style={{marginTop:11,minHeight:50}} onClick={withdraw} disabled={busy !== null || withdrawableGems <= 0}>{busy === 'withdraw' ? 'Processing…' : 'Withdraw Gems →'}</button></div>}
+          {error && <div className={styles.walletInlineError}>{error}</div>}
         </div>
 
-        <div className="wallet-split-card card">
-          <div className="wallet-split-head"><div><span className="wallet-kicker">BALANCE BREAKDOWN</span><h2>Where your Gems live</h2></div><span className="wallet-live-dot">LIVE</span></div>
-          <div className="wallet-breakdown-row"><div><span className="wallet-dot deposit-dot" />Deposit</div><strong>{formatNumber(balances.deposit)} ◆</strong><small>PKR {formatNumber(balances.deposit * PKR_PER_GEM)}</small></div>
-          <div className="wallet-breakdown-row"><div><span className="wallet-dot winnings-dot" />Winnings</div><strong>{formatNumber(balances.winnings)} ◆</strong><small>PKR {formatNumber(balances.winnings * PKR_PER_GEM)}</small></div>
-          <div className="wallet-breakdown-row"><div><span className="wallet-dot bonus-dot" />Bonus</div><strong>{formatNumber(balances.bonus)} ◆</strong><small>PKR {formatNumber(balances.bonus * PKR_PER_GEM)}</small></div>
+        <div className={`card ${styles.walletHistoryCard}`}><div className={styles.walletHistoryHead}><div><p className="eyebrow">LEDGER</p><h2>Transaction history</h2></div><span className={styles.historyCount}>{transactions.length}</span></div><div className={styles.historyFilters}><button className={`${styles.historyFilter} ${filter === 'ALL' ? styles.active : ''}`} onClick={() => setFilter('ALL')}>All</button><button className={`${styles.historyFilter} ${filter === 'CREDIT' ? styles.active : ''}`} onClick={() => setFilter('CREDIT')}>Credits</button><button className={`${styles.historyFilter} ${filter === 'DEBIT' ? styles.active : ''}`} onClick={() => setFilter('DEBIT')}>Debits</button></div>
+          <div className={styles.walletHistoryList}>{filteredTransactions.length === 0 ? <div className={styles.historyEmpty}><span>◆</span><strong>No transactions yet</strong><small>Your virtual wallet activity will appear here.</small></div> : filteredTransactions.map((tx) => { const gems = Number(tx.amount ?? 0); const credit = ['DEPOSIT','CONTEST_WINNING_CREDIT','CONTEST_ENTRY_REFUND','BONUS_CREDIT'].includes(tx.type ?? ''); return <div className={styles.historyItem} key={tx.id}><div className={`${styles.historyIcon} ${credit ? styles.credit : styles.debit}`}>{credit ? '+' : '−'}</div><div className={styles.historyMain}><strong>{transactionLabel(tx.type)}</strong><span>{tx.balanceType || 'GEM'} · {new Date(tx.createdAt).toLocaleString('en-PK')}</span></div><div className={`${styles.historyAmount} ${credit ? styles.credit : styles.debit}`}><strong>{credit ? '+' : '-'}{formatNumber(gems)} ◆</strong><span>PKR {formatNumber(gems * PKR_PER_GEM)}</span></div></div>; })}</div>
         </div>
       </div>
 
-      <div className="wallet-workspace">
-        <div className="card wallet-action-card">
-          <div className="wallet-tabs">
-            <button className={activeAction === 'deposit' ? 'wallet-tab active' : 'wallet-tab'} onClick={() => setActiveAction('deposit')}>Add Gems</button>
-            <button className={activeAction === 'withdraw' ? 'wallet-tab active' : 'wallet-tab'} onClick={() => setActiveAction('withdraw')}>Withdraw</button>
-          </div>
-
-          {activeAction === 'deposit' ? (
-            <div className="wallet-action-body">
-              <p className="eyebrow">VIRTUAL TOP-UP</p>
-              <h2>Add Gems to your vault</h2>
-              <p className="wallet-muted">Instant demo credit. Nothing is charged.</p>
-              <div className="wallet-amount-box"><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Gem deposit amount" /><span>GEMS</span></div>
-              <div className="quick-amounts">{QUICK_AMOUNTS.map((value) => <button key={value} className={Number(amount) === value ? 'quick-chip active' : 'quick-chip'} onClick={() => selectQuickAmount(value)}>+{value}</button>)}</div>
-              <div className="conversion-line"><span>Estimated demo value</span><strong>PKR {amount && Number.isFinite(Number(amount)) ? formatNumber(Number(amount) * PKR_PER_GEM) : '0'}</strong></div>
-              <button className="primary-button full wallet-action-button" onClick={deposit} disabled={busy !== null}>{busy === 'deposit' ? 'Adding Gems…' : 'Add Gems →'}</button>
-            </div>
-          ) : (
-            <div className="wallet-action-body">
-              <p className="eyebrow">VIRTUAL CASH-OUT</p>
-              <h2>Withdraw demo Gems</h2>
-              <p className="wallet-muted">Moves virtual Gems out of your demo wallet. No external payout happens.</p>
-              <div className="wallet-amount-box"><input inputMode="decimal" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} aria-label="Gem withdrawal amount" /><span>GEMS</span></div>
-              <div className="quick-amounts">{QUICK_AMOUNTS.map((value) => <button key={value} className={Number(withdrawAmount) === value ? 'quick-chip active' : 'quick-chip'} onClick={() => selectQuickAmount(value)}>{value}</button>)}</div>
-              <div className="conversion-line"><span>Available to withdraw</span><strong>{formatNumber(withdrawableGems)} ◆</strong></div>
-              <button className="secondary-button full wallet-action-button" onClick={withdraw} disabled={busy !== null || withdrawableGems <= 0}>{busy === 'withdraw' ? 'Processing…' : 'Withdraw Gems →'}</button>
-            </div>
-          )}
-
-          {error && <div className="wallet-inline-error">{error}</div>}
-        </div>
-
-        <div className="card wallet-history-card">
-          <div className="wallet-history-head"><div><p className="eyebrow">LEDGER</p><h2>Transaction history</h2></div><span className="history-count">{transactions.length}</span></div>
-          <div className="history-filters"><button className={filter === 'ALL' ? 'history-filter active' : 'history-filter'} onClick={() => setFilter('ALL')}>All</button><button className={filter === 'CREDIT' ? 'history-filter active' : 'history-filter'} onClick={() => setFilter('CREDIT')}>Credits</button><button className={filter === 'DEBIT' ? 'history-filter active' : 'history-filter'} onClick={() => setFilter('DEBIT')}>Debits</button></div>
-          <div className="wallet-history-list">
-            {filteredTransactions.length === 0 ? (
-              <div className="history-empty"><span>◆</span><strong>No transactions yet</strong><small>Your virtual wallet activity will appear here.</small></div>
-            ) : filteredTransactions.map((tx) => {
-              const gems = Number(tx.amount ?? 0);
-              const credit = ['DEPOSIT', 'CONTEST_WINNING_CREDIT', 'CONTEST_ENTRY_REFUND', 'BONUS_CREDIT'].includes(tx.type ?? '');
-              return (
-                <div className="history-item" key={tx.id}>
-                  <div className={credit ? 'history-icon credit' : 'history-icon debit'}>{credit ? '+' : '−'}</div>
-                  <div className="history-main"><strong>{transactionLabel(tx.type)}</strong><span>{tx.balanceType || 'GEM'} · {new Date(tx.createdAt).toLocaleString('en-PK')}</span></div>
-                  <div className={credit ? 'history-amount credit' : 'history-amount debit'}><strong>{credit ? '+' : '-'}{formatNumber(gems)} ◆</strong><span>PKR {formatNumber(gems * PKR_PER_GEM)}</span></div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="wallet-footer-note"><span>◆</span><div><strong>Built for CrickX demo mode</strong><p>Gems are a presentation and testing currency. They have no cash value and are not redeemable for real funds.</p></div></div>
+      <div className={styles.footerNote}><span>◆</span><div><strong>Built for CrickX demo mode</strong><p>Gems are a presentation and testing currency. They have no cash value and are not redeemable for real funds.</p></div></div>
     </section>
   );
 }
