@@ -3,6 +3,7 @@ import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/guards/roles.decorator';
+import { FantasyDraftService } from './fantasy-draft.service';
 import { FantasyTeamService } from './fantasy-team.service';
 import { ContestService } from './contest.service';
 import { CreateFantasyTeamDto, CreateContestDto, JoinContestDto } from './dto';
@@ -14,7 +15,10 @@ function uid(req: Request) {
 @Controller('fantasy/teams')
 @UseGuards(JwtAuthGuard)
 export class FantasyTeamController {
-  constructor(private readonly teams: FantasyTeamService) {}
+  constructor(
+    private readonly teams: FantasyTeamService,
+    private readonly drafts: FantasyDraftService,
+  ) {}
 
   @Post()
   create(@Req() req: Request, @Body() dto: CreateFantasyTeamDto) {
@@ -29,6 +33,16 @@ export class FantasyTeamController {
   @Get()
   mine(@Req() req: Request) {
     return this.teams.listMine(uid(req));
+  }
+
+  @Get('draft/:fixtureId')
+  draft(@Req() req: Request, @Param('fixtureId') fixtureId: string) {
+    return this.drafts.get(uid(req), parseInt(fixtureId, 10));
+  }
+
+  @Put('draft/:fixtureId')
+  saveDraft(@Req() req: Request, @Param('fixtureId') fixtureId: string, @Body() body: any) {
+    return this.drafts.save(uid(req), parseInt(fixtureId, 10), body);
   }
 
   @Get(':teamId')
