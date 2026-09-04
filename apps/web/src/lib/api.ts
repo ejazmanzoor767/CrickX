@@ -1,10 +1,6 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 
-/**
- * Single fetch client for the web app. Firebase Auth supplies the bearer ID token;
- * the NestJS backend verifies it and uses the Firebase user's identity.
- */
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
 
 let authReady: Promise<void> | null = null;
@@ -51,10 +47,18 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   return res.json();
 }
 
+const feed = (path: string, params?: Record<string, string | number>) => {
+  const query = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}` : '';
+  return apiFetch(`/matches${path}${query}`);
+};
+
 export const api = {
   matches: () => apiFetch('/matches'),
-  liveMatches: () => apiFetch('/matches/live'),
+  liveMatches: () => feed('/live'),
+  upcomingMatches: (days = 4) => feed('/upcoming', { days }),
+  completedMatches: (days = 14) => feed('/completed', { days }),
   matchDetail: (fixtureId: number) => apiFetch(`/matches/${fixtureId}`),
+  liveMatchDetail: (fixtureId: number) => apiFetch(`/matches/${fixtureId}/live`),
 
   contestsForFixture: (fixtureId: number) => apiFetch(`/fantasy/contests/fixture/${fixtureId}`),
   myFantasyTeams: () => apiFetch('/fantasy/teams'),
@@ -76,7 +80,7 @@ export const api = {
 
 export const adminApi = {
   dashboard: () => apiFetch('/admin/dashboard'),
-  setCredits: (credits: unknown[]) => apiFetch('/admin/player-credits', { method: 'POST', body: JSON.stringify({ credits }) }),
+  setCredits: (credits: unknown[]) => apiFetch('/admin/player-credits', { method: 'POST', body: JSON.stringify({ credits })),
   creditsForFixture: (fixtureId: number) => apiFetch(`/admin/player-credits/${fixtureId}`),
   createRuleSet: (payload: unknown) => apiFetch('/admin/scoring-rule-sets', { method: 'POST', body: JSON.stringify(payload) }),
   ruleSets: () => apiFetch('/admin/scoring-rule-sets'),
