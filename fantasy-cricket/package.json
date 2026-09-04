@@ -1,5 +1,0 @@
-{
-  "name": "fantasy-cricket",
-  "private": true,
-  "workspaces": ["apps/*", "packages/*"]
-}
