@@ -44,6 +44,21 @@ export class SportmonksClientService {
     }
   }
 
+  private describeProviderError(data: unknown, fallback: string) {
+    if (typeof data === 'string' && data.trim()) return data;
+    if (data && typeof data === 'object') {
+      const body = data as Record<string, unknown>;
+      if (typeof body.message === 'string' && body.message.trim()) return body.message;
+      if (typeof body.error === 'string' && body.error.trim()) return body.error;
+      try {
+        return JSON.stringify(body);
+      } catch {
+        return fallback;
+      }
+    }
+    return fallback;
+  }
+
   async get<T>(
     path: string,
     params: Record<string, string | number | undefined> = {},
@@ -56,9 +71,9 @@ export class SportmonksClientService {
       const response = await this.http.get<SportmonksEnvelope<T>>(path, { params });
       return response.data;
     } catch (err) {
-      const axiosErr = err as AxiosError<any>;
+      const axiosErr = err as AxiosError<unknown>;
       const status = axiosErr.response?.status;
-      const providerMessage = axiosErr.response?.data?.message ?? axiosErr.response?.data?.error ?? axiosErr.message;
+      const providerMessage = this.describeProviderError(axiosErr.response?.data, axiosErr.message);
 
       if (status === 429 && attempt <= 3) {
         const backoffMs = 500 * attempt * attempt;
@@ -75,7 +90,8 @@ export class SportmonksClientService {
       }
 
       if (status === 400) {
-        throw new HttpException(`Sportmonks rejected ${path}: ${String(providerMessage)}`, HttpStatus.BAD_REQUEST);
+        this.logger.error(`Sportmonks 400 on ${path}: ${providerMessage}`);
+        throw new HttpException(`Sportmonks rejected ${path}: ${providerMessage}`, HttpStatus.BAD_REQUEST);
       }
       if (status === 401) {
         throw new HttpException('Sportmonks API token is invalid or missing.', HttpStatus.UNAUTHORIZED);
@@ -94,7 +110,7 @@ export class SportmonksClientService {
       }
 
       this.logger.error(`Sportmonks request failed: ${path}`, providerMessage);
-      throw new HttpException(`Upstream cricket data provider error: ${String(providerMessage)}`, HttpStatus.BAD_GATEWAY);
+      throw new HttpException(`Upstream cricket data provider error: ${providerMessage}`, HttpStatus.BAD_GATEWAY);
     }
   }
 }
