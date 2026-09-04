@@ -5,6 +5,11 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '../../../lib/api';
 
+function unwrap<T>(value: unknown): T {
+  const result = value as { data?: unknown } | null;
+  return (result?.data ?? result) as T;
+}
+
 function MatchDetailContent() {
   const params = useSearchParams();
   const fixtureId = params.get('fixtureId');
@@ -23,11 +28,6 @@ function MatchDetailContent() {
     let active = true;
     const id = Number(fixtureId);
 
-    const unwrap = (value: unknown) => {
-      const result = value as { data?: unknown };
-      return result?.data ?? result;
-    };
-
     const load = async () => {
       try {
         const [matchResult, squadResult] = await Promise.all([
@@ -35,8 +35,8 @@ function MatchDetailContent() {
           api.fixtureSquads(id),
         ]);
         if (!active) return;
-        setFixture(unwrap(matchResult));
-        setSquadData(unwrap(squadResult));
+        setFixture(unwrap<any>(matchResult));
+        setSquadData(unwrap<any>(squadResult));
         setError('');
         setSquadError('');
       } catch (err) {
@@ -44,7 +44,7 @@ function MatchDetailContent() {
         setError(err instanceof Error ? err.message : 'Unable to load this match.');
         try {
           const squadResult = await api.fixtureSquads(id);
-          if (active) setSquadData(unwrap(squadResult));
+          if (active) setSquadData(unwrap<any>(squadResult));
         } catch (squadErr) {
           if (active) setSquadError(squadErr instanceof Error ? squadErr.message : 'Squads are temporarily unavailable.');
         }
@@ -57,12 +57,12 @@ function MatchDetailContent() {
     const timer = window.setInterval(async () => {
       try {
         const matchResult = await api.matchDetail(id);
-        if (active) setFixture(unwrap(matchResult));
+        if (active) setFixture(unwrap<any>(matchResult));
       } catch {}
 
       try {
         const squadResult = await api.fixtureSquads(id);
-        if (active) setSquadData(unwrap(squadResult));
+        if (active) setSquadData(unwrap<any>(squadResult));
       } catch {}
     }, 30000);
 
