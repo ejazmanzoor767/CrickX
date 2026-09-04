@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "Fantasy Cricket",
+    "slug": "fantasy-cricket",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": ["ios", "android"]
+  }
+}

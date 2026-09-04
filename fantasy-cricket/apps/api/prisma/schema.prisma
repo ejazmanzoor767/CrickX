@@ -1,0 +1,438 @@
+// ============================================================================
+// Fantasy Cricket — Application Database Schema
+//
+// SOURCE OF TRUTH RULE:
+//   This database owns USER data only: accounts, auth, fantasy teams,
+//   contests, entries, wallet, transactions, scoring config, leaderboards.
+//
+//   Cricket data (fixtures, teams, players, scores, stats, ball-by-ball)
+//   is NEVER duplicated here. We only store the Sportmonks numeric IDs
+//   (sportmonksFixtureId, sportmonksPlayerId, sportmonksTeamId, etc.) as
+//   foreign references, plus a thin, short-TTL cache table used purely to
+//   reduce API calls — never as a system of record. See CachedFixture /
+//   CachedPlayer below and apps/api/src/modules/sportmonks/README.md.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Users & Auth
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  PENDING_VERIFICATION
+}
+
+model User {
+  id                String     @id @default(uuid())
+  email             String     @unique
+  phone             String?    @unique
+  passwordHash      String
+  role              UserRole   @default(USER)
+  status            UserStatus @default(PENDING_VERIFICATION)
+
+  emailVerifiedAt   DateTime?
+  phoneVerifiedAt   DateTime?
+
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  lastLoginAt       DateTime?
+
+  profile           Profile?
+  wallet            Wallet?
+  refreshTokens     RefreshToken[]
+  authAudits        AuthAuditLog[]
+
+  fantasyTeams      FantasyTeam[]
+  contestEntries    ContestEntry[]
+  transactions      Transaction[]
+  deposits          Deposit[]
+  withdrawals       Withdrawal[]
+  kycRecords        KycRecord[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique
+  userAgent   String?
+  ipAddress   String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AuthAuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  event      String   // LOGIN_SUCCESS, LOGIN_FAILED, PASSWORD_RESET, MFA_CHALLENGE, etc.
+  ipAddress  String?
+  userAgent  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([event])
+}
+
+model Profile {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  displayName   String
+  avatarUrl     String?
+  dateOfBirth   DateTime?
+  state         String?
+  country       String    @default("IN")
+  favoriteTeamSportmonksId  Int?   // reference only — no duplicated team data
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+enum KycStatus {
+  NOT_SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model KycRecord {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentType   String    // PAN, AADHAAR, PASSPORT, etc.
+  documentNumberEncrypted String
+  status         KycStatus @default(PENDING)
+  reviewedByAdminId String?
+  reviewNote     String?
+  submittedAt    DateTime  @default(now())
+  reviewedAt     DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Wallet, Deposits, Withdrawals, Transactions
+// ---------------------------------------------------------------------------
+
+model Wallet {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Split so winnings (often withdrawable-restricted) and deposit balance
+  // and bonus balance can be tracked/reported separately — standard for
+  // real-money fantasy platforms and their compliance requirements.
+  depositBalance    Decimal  @default(0) @db.Decimal(14, 2)
+  winningsBalance   Decimal  @default(0) @db.Decimal(14, 2)
+  bonusBalance      Decimal  @default(0) @db.Decimal(14, 2)
+
+  currency          String   @default("INR")
+  version           Int      @default(0) // optimistic locking for concurrent debits/credits
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  CONTEST_ENTRY_DEBIT
+  CONTEST_WINNING_CREDIT
+  CONTEST_ENTRY_REFUND
+  BONUS_CREDIT
+  ADMIN_ADJUSTMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+model Transaction {
+  id             String             @id @default(uuid())
+  userId         String
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type           TransactionType
+  status         TransactionStatus  @default(PENDING)
+
+  amount         Decimal            @db.Decimal(14, 2)
+  balanceType    String             // DEPOSIT | WINNINGS | BONUS — which wallet bucket moved
+  balanceAfter   Decimal            @db.Decimal(14, 2)
+
+  referenceType  String?            // "CONTEST_ENTRY" | "DEPOSIT" | "WITHDRAWAL" | ...
+  referenceId    String?            // FK-by-convention to the relevant record
+
+  idempotencyKey String             @unique // required for every wallet-mutating op
+  metadata       Json?
+
+  createdAt      DateTime           @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+}
+
+enum DepositStatus {
+  INITIATED
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+model Deposit {
+  id                String        @id @default(uuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount            Decimal       @db.Decimal(14, 2)
+  status            DepositStatus @default(INITIATED)
+  paymentGateway    String        // razorpay, cashfree, stripe, etc.
+  gatewayOrderId    String?       @unique
+  gatewayPaymentId  String?
+  failureReason     String?
+  createdAt         DateTime      @default(now())
+  completedAt       DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum WithdrawalStatus {
+  REQUESTED
+  UNDER_REVIEW
+  APPROVED
+  PROCESSING
+  PAID
+  REJECTED
+  FAILED
+}
+
+model Withdrawal {
+  id              String           @id @default(uuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount          Decimal          @db.Decimal(14, 2)
+  status          WithdrawalStatus @default(REQUESTED)
+  bankAccountLast4 String?
+  payoutReference String?
+  rejectionReason String?
+  requestedAt     DateTime         @default(now())
+  processedAt     DateTime?
+  reviewedByAdminId String?
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Fantasy Scoring Configuration (application-owned; applied to Sportmonks
+// ball-by-ball / stats data, never stored as duplicated cricket data)
+// ---------------------------------------------------------------------------
+
+model ScoringRuleSet {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  matchType   String   // T20, ODI, TEST — rules differ per format
+  isActive    Boolean  @default(true)
+  rules       Json     // { run: 1, four_bonus: 1, six_bonus: 2, wicket: 25, catch: 8, ... }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contests    Contest[]
+}
+
+// ---------------------------------------------------------------------------
+// Contests (application-owned wrapper around a Sportmonks fixture)
+// ---------------------------------------------------------------------------
+
+enum ContestStatus {
+  UPCOMING
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Contest {
+  id                  String         @id @default(uuid())
+
+  // Reference only — the fixture itself, its teams, players, and status
+  // are always fetched live/cached from Sportmonks, never stored here.
+  sportmonksFixtureId Int
+
+  name                String
+  entryFee            Decimal        @db.Decimal(10, 2)
+  totalSpots          Int
+  filledSpots         Int            @default(0)
+  prizePoolTotal      Decimal        @db.Decimal(14, 2)
+  prizeDistribution   Json           // [{ rankFrom: 1, rankTo: 1, amount: 5000 }, ...]
+  maxTeamsPerUser      Int           @default(1)
+
+  scoringRuleSetId    String
+  scoringRuleSet      ScoringRuleSet @relation(fields: [scoringRuleSetId], references: [id])
+
+  status              ContestStatus  @default(UPCOMING)
+  lineupLockAt        DateTime       // mirrors fixture starting_at; set at creation, used to lock entries
+
+  createdAt           DateTime       @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  entries             ContestEntry[]
+
+  @@index([sportmonksFixtureId])
+  @@index([status])
+}
+
+model ContestEntry {
+  id              String       @id @default(uuid())
+  contestId       String
+  contest         Contest      @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fantasyTeamId   String
+  fantasyTeam     FantasyTeam  @relation(fields: [fantasyTeamId], references: [id])
+
+  entryFeePaid    Decimal      @db.Decimal(10, 2)
+  totalPoints     Decimal?     @db.Decimal(10, 2) // computed by scoring engine post/live match
+  rank            Int?
+  prizeWon        Decimal?     @db.Decimal(14, 2)
+
+  createdAt       DateTime     @default(now())
+
+  @@unique([contestId, fantasyTeamId])
+  @@index([userId])
+  @@index([contestId])
+}
+
+// ---------------------------------------------------------------------------
+// Fantasy Teams (user-built squads referencing Sportmonks player IDs)
+// ---------------------------------------------------------------------------
+
+model FantasyTeam {
+  id                  String              @id @default(uuid())
+  userId              String
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sportmonksFixtureId Int                 // which real match this squad was built for
+  name                String
+
+  captainSportmonksPlayerId    Int
+  viceCaptainSportmonksPlayerId Int
+
+  isLocked            Boolean             @default(false) // locked once lineupLockAt passes
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  players             FantasyTeamPlayer[]
+  entries             ContestEntry[]
+  editHistory         FantasyTeamEditHistory[]
+
+  @@index([userId])
+  @@index([sportmonksFixtureId])
+}
+
+model FantasyTeamPlayer {
+  id                    String      @id @default(uuid())
+  fantasyTeamId         String
+  fantasyTeam           FantasyTeam @relation(fields: [fantasyTeamId], references: [id], onDelete: Cascade)
+
+  sportmonksPlayerId    Int         // reference only — name/role/team fetched from Sportmonks
+  sportmonksTeamId      Int         // which of the 2 fixture teams this player belongs to
+  creditsAtSelection    Decimal     @db.Decimal(5, 2) // fantasy "credit cost" snapshot at pick time
+
+  @@unique([fantasyTeamId, sportmonksPlayerId])
+}
+
+model FantasyTeamEditHistory {
+  id             String      @id @default(uuid())
+  fantasyTeamId  String
+  fantasyTeam    FantasyTeam @relation(fields: [fantasyTeamId], references: [id], onDelete: Cascade)
+  changedByUserId String
+  diff           Json        // structured before/after of players, captain, vice-captain
+  createdAt      DateTime    @default(now())
+
+  @@index([fantasyTeamId])
+}
+
+// ---------------------------------------------------------------------------
+// Leaderboards (computed/materialized application data)
+// ---------------------------------------------------------------------------
+
+model LeaderboardSnapshot {
+  id           String   @id @default(uuid())
+  contestId    String
+  computedAt   DateTime @default(now())
+  standings    Json     // [{ contestEntryId, userId, rank, totalPoints }, ...]
+  isFinal      Boolean  @default(false)
+
+  @@index([contestId])
+}
+
+// ---------------------------------------------------------------------------
+// Fantasy "credits" (app-owned concept — Sportmonks has no fantasy pricing,
+// so credits are assigned by admins per player per fixture)
+// ---------------------------------------------------------------------------
+
+model PlayerFixtureCredit {
+  id                  String   @id @default(uuid())
+  sportmonksFixtureId Int
+  sportmonksPlayerId  Int
+  sportmonksTeamId    Int
+  credits             Decimal  @db.Decimal(5, 2)
+  setByAdminId        String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([sportmonksFixtureId, sportmonksPlayerId])
+  @@index([sportmonksFixtureId])
+}
+
+// ---------------------------------------------------------------------------
+// Thin Sportmonks cache (performance only — short TTL, never authoritative)
+// ---------------------------------------------------------------------------
+
+model CachedFixture {
+  sportmonksFixtureId Int      @id
+  payload             Json     // raw/trimmed Sportmonks fixture response incl. requested includes
+  fetchedAt            DateTime @updatedAt
+  expiresAt            DateTime
+
+  @@index([expiresAt])
+}
+
+model CachedPlayer {
+  sportmonksPlayerId Int      @id
+  payload            Json
+  fetchedAt          DateTime @updatedAt
+  expiresAt          DateTime
+
+  @@index([expiresAt])
+}

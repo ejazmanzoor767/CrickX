@@ -1,0 +1,17 @@
+# Local dev only — spins up Postgres for the API. Sportmonks is a real
+# external API and is never mocked/stubbed here; you need a real token.
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fantasy_cricket
+    ports:
+      - '5432:5432'
+    volumes:
+      - fantasy_cricket_pg:/var/lib/postgresql/data
+volumes:
+  fantasy_cricket_pg:

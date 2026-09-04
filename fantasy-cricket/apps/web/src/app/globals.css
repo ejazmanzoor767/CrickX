@@ -1,0 +1,10 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: #0b0d12; color: #eaeaf0; }
+.topnav { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #22242c; }
+.topnav nav a { color: #b7bacb; margin-left: 20px; text-decoration: none; font-weight: 600; }
+.topnav nav a:hover { color: #fff; }
+.container { max-width: 960px; margin: 0 auto; padding: 24px; }
+.card { background: #14161d; border: 1px solid #22242c; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.badge-live { background: #e5484d; color: white; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+button { background: #6e56cf; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+input { background: #1c1e26; border: 1px solid #2a2d38; color: white; padding: 10px; border-radius: 8px; width: 100%; margin-bottom: 10px; }
