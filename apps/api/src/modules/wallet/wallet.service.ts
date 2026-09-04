@@ -1,16 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { FirestoreService } from '../../common/firestore.service';
-import { FirestoreDecimal } from '../../common/firestore.service';
+import { BadRequestException, Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { FirestoreService, FirestoreDecimal } from '../../common/firestore.service';
 import { RazorpayService } from './razorpay.service';
 
 export type BalanceBucket = 'DEPOSIT' | 'WINNINGS' | 'BONUS';
 
 /**
  * WalletService — every balance mutation:
- *   1. runs inside a serializable-ish transaction using optimistic locking (Wallet.version)
- *   2. requires a caller-supplied idempotencyKey so retried requests (client
- *      timeouts, payment webhooks firing twice) never double-credit/debit
- *   3. writes a Transaction row as an immutable audit trail
+ *   1. runs inside a transaction using optimistic locking (Wallet.version)
+ *   2. uses an idempotency key so retries cannot double-credit/debit
+ *   3. writes an immutable Transaction audit record
  *
  * The web demo treats balances as virtual Gems. 1 Gem = PKR 5.
  * No real-money payment processing is performed by the demo wallet.
@@ -32,7 +31,7 @@ export class WalletService {
   async mutateBalance(params: {
     userId: string;
     bucket: BalanceBucket;
-    delta: FirestoreDecimal | number; // positive = credit, negative = debit
+    delta: FirestoreDecimal | number;
     type:
       | 'DEPOSIT'
       | 'WITHDRAWAL'
@@ -97,42 +96,80 @@ export class WalletService {
 
   // --- Deposits ---
   /**
-   * Demo wallet deposit. The demo accepts Gems directly and credits the virtual
-   * deposit balance immediately. No payment gateway is contacted.
+   * Demo wallet deposit. This path is intentionally implemented as one native
+   * Firestore transaction so the deposit record, wallet credit and audit entry
+   * succeed or fail together.
    */
   async initiateDeposit(userId: string, amount: number, gateway: string) {
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new BadRequestException('Enter a positive Gem amount.');
     }
+    if (amount > 1000000) {
+      throw new BadRequestException('Demo deposit amount is too large.');
+    }
 
-    const demoDeposit = await this.prisma.deposit.create({
-      data: {
-        userId,
-        amount,
-        paymentGateway: gateway || 'demo',
-        status: 'INITIATED',
-      },
-    });
+    const depositId = randomUUID();
+    const now = new Date();
+    const walletRef = this.prisma.db.collection('wallets').doc(userId);
+    const depositRef = this.prisma.db.collection('deposits').doc(depositId);
+    const transactionRef = this.prisma.db.collection('transactions').doc(randomUUID());
 
-    await this.mutateBalance({
+    try {
+      await this.prisma.db.runTransaction(async (tx) => {
+        const walletSnap = await tx.get(walletRef);
+        if (!walletSnap.exists) throw new NotFoundException('Wallet not found.');
+
+        const wallet = walletSnap.data() as Record<string, unknown>;
+        const current = Number(wallet.depositBalance ?? 0);
+        const next = current + amount;
+        const version = Number(wallet.version ?? 0);
+
+        tx.update(walletRef, {
+          depositBalance: next,
+          version: version + 1,
+          updatedAt: now,
+        });
+
+        tx.create(depositRef, {
+          userId,
+          amount,
+          paymentGateway: gateway || 'demo',
+          status: 'SUCCESS',
+          gatewayPaymentId: `DEMO-${depositId.slice(0, 8)}`,
+          createdAt: now,
+          completedAt: now,
+          metadata: { mode: 'DEMO', unit: 'GEM', conversionPkr: amount * 5 },
+        });
+
+        tx.create(transactionRef, {
+          userId,
+          type: 'DEPOSIT',
+          status: 'SUCCESS',
+          amount,
+          balanceType: 'DEPOSIT',
+          balanceAfter: next,
+          idempotencyKey: `demo-deposit:${depositId}`,
+          referenceType: 'DEPOSIT',
+          referenceId: depositId,
+          metadata: { mode: 'DEMO', unit: 'GEM', conversionPkr: amount * 5 },
+          createdAt: now,
+        });
+      });
+    } catch (err) {
+      if (err instanceof NotFoundException || err instanceof BadRequestException) throw err;
+      throw new InternalServerErrorException('Unable to add demo Gems right now. Please try again.');
+    }
+
+    return {
+      id: depositId,
       userId,
-      bucket: 'DEPOSIT',
-      delta: amount,
-      type: 'DEPOSIT',
-      idempotencyKey: `demo-deposit:${demoDeposit.id}`,
-      referenceType: 'DEPOSIT',
-      referenceId: demoDeposit.id,
-      metadata: { mode: 'DEMO', unit: 'GEM', conversionPkr: Number(amount) * 5 },
-    });
-
-    return this.prisma.deposit.update({
-      where: { id: demoDeposit.id },
-      data: {
-        status: 'SUCCESS',
-        gatewayPaymentId: `DEMO-${demoDeposit.id.slice(0, 8)}`,
-        completedAt: new Date(),
-      },
-    });
+      amount,
+      paymentGateway: gateway || 'demo',
+      status: 'SUCCESS',
+      gatewayPaymentId: `DEMO-${depositId.slice(0, 8)}`,
+      createdAt: now,
+      completedAt: now,
+    };
   }
 
   async confirmDeposit(depositId: string, gatewayPaymentId: string) {
