@@ -140,7 +140,17 @@ export class SportmonksDataService {
   }
 
   async getFixtureSquads(fixtureId: number) {
-    const fixture = await this.getFixture(fixtureId, { forceLive: false });
+    let fixture = await this.getFixture(fixtureId, { forceLive: false });
+    const startMs = new Date(fixture.starting_at).getTime();
+    const nearTossWindow = Number.isFinite(startMs) && Date.now() >= startMs - 2 * 60 * 60 * 1000 && Date.now() <= startMs + 30 * 60 * 1000;
+
+    // The official XI is normally published around the toss. Bypass the
+    // general 5-minute fixture cache during that window so the UI can mark
+    // both XIs without waiting for cache expiry.
+    if (nearTossWindow || fixture.live === 1) {
+      fixture = await this.getFixture(fixtureId, { forceLive: true });
+    }
+
     const localTeamId = fixture.localteam_id ?? fixture.localteam?.id;
     const visitorTeamId = fixture.visitorteam_id ?? fixture.visitorteam?.id;
 
