@@ -1,27 +1,41 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { useRouter } from 'next/navigation';
 import { WalletDto } from '@fantasy-cricket/shared';
+import { api } from '../../lib/api';
 
 export default function WalletPage() {
   const [wallet, setWallet] = useState<WalletDto | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  function refresh() {
-    api.wallet().then((w: any) => setWallet(w));
-    api.transactions().then((t: any) => setTransactions(t));
-  }
+  useEffect(() => {
+    Promise.all([api.wallet(), api.transactions()])
+      .then(([w, t]) => { setWallet(w as any); setTransactions(t as any); })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : 'Unable to load wallet';
+        if (message.includes('401') || message.toLowerCase().includes('unauthorized')) router.push('/login');
+        else setError(message);
+      });
+  }, [router]);
 
-  useEffect(refresh, []);
+  if (error) return <div><h1>Wallet</h1><p style={{ color: '#e5484d' }}>{error}</p></div>;
+  if (!wallet) return <p>Loading…</p>;
 
   async function deposit() {
-    await api.deposit(Number(amount), 'razorpay');
-    setAmount('');
-    refresh();
+    setError(null);
+    try {
+      await api.deposit(Number(amount), 'razorpay');
+      setAmount('');
+      const [w, t] = await Promise.all([api.wallet(), api.transactions()]);
+      setWallet(w as any);
+      setTransactions(t as any);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to add money');
+    }
   }
-
-  if (!wallet) return <p>Loading…</p>;
 
   return (
     <div>
@@ -31,12 +45,11 @@ export default function WalletPage() {
         <div>Winnings balance: ₹{wallet.winningsBalance}</div>
         <div>Bonus balance: ₹{wallet.bonusBalance}</div>
       </div>
-
       <div className="card">
         <input placeholder="Amount to deposit" value={amount} onChange={(e) => setAmount(e.target.value)} />
         <button onClick={deposit}>Add money</button>
       </div>
-
+      {error && <p style={{ color: '#e5484d' }}>{error}</p>}
       <h3>Recent Transactions</h3>
       {transactions.map((t) => (
         <div key={t.id} className="card">
