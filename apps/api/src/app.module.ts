@@ -10,6 +10,8 @@ import { WalletModule } from './modules/wallet/wallet.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { ScoringModule } from './modules/scoring/scoring.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { FirestoreService } from './common/firestore.service';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -25,5 +27,7 @@ import { AdminModule } from './modules/admin/admin.module';
     ScoringModule,
     AdminModule,
   ],
+  providers: [FirestoreService, JwtAuthGuard],
+  exports: [FirestoreService, JwtAuthGuard],
 })
 export class AppModule {}
