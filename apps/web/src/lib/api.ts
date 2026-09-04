@@ -40,9 +40,6 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     },
   });
 
-  // Read the body once. Some successful NestJS handlers/proxies can return
-  // an empty body; calling response.json() directly then throws
-  // "Unexpected end of JSON input" even though the request succeeded.
   const rawBody = await res.text();
 
   if (!res.ok) {
@@ -73,6 +70,13 @@ const feed = (path: string, params?: Record<string, string | number>) => {
   return apiFetch(`/matches${path}${query}`);
 };
 
+const leaderboard = (path: string, params?: Record<string, string | number>) => {
+  const query = params
+    ? `?${new URLSearchParams(Object.entries(params).map(([key, value]) => [key, String(value)]))}`
+    : '';
+  return apiFetch(`/leaderboard${path}${query}`);
+};
+
 export const api = {
   matches: () => apiFetch('/matches'),
   liveMatches: () => feed('/live'),
@@ -89,6 +93,11 @@ export const api = {
   myEntries: () => apiFetch('/fantasy/contests/mine/entries'),
   fantasyDraft: (fixtureId: number) => apiFetch(`/fantasy/teams/draft/${fixtureId}`),
   saveFantasyDraft: (fixtureId: number, payload: unknown) => apiFetch(`/fantasy/teams/draft/${fixtureId}`, { method: 'PUT', body: JSON.stringify(payload) }),
+
+  leaderboard: (limit = 100) => leaderboard('/global', { limit }),
+  leaderboardMe: () => leaderboard('/me'),
+  leaderboardFixture: (fixtureId: number, limit = 100) => leaderboard(`/fixture/${fixtureId}`, { limit }),
+  leaderboardContest: (contestId: string, limit = 100) => leaderboard(`/contest/${contestId}`, { limit }),
 
   wallet: () => apiFetch('/wallet'),
   transactions: () => apiFetch('/wallet/transactions'),
