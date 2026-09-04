@@ -1,3 +1,4 @@
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 
 /**
@@ -6,10 +7,32 @@ import { auth } from './firebase';
  */
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
 
+let authReady: Promise<void> | null = null;
+
+function waitForAuthReady() {
+  if (typeof window === 'undefined' || auth.currentUser) return Promise.resolve();
+  authReady ??= new Promise<void>((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      unsubscribe();
+      resolve();
+    });
+  });
+  return authReady;
+}
+
+function errorMessage(body: any, fallback: string) {
+  const message = body?.message ?? body?.error;
+  if (typeof message === 'string') return message;
+  if (Array.isArray(message)) return message.map((item) => typeof item === 'string' ? item : JSON.stringify(item)).join(', ');
+  if (message && typeof message === 'object') return message.message ?? JSON.stringify(message);
+  return fallback;
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   let token: string | null = null;
-  if (typeof window !== 'undefined' && auth.currentUser) {
-    token = await auth.currentUser.getIdToken();
+  if (typeof window !== 'undefined') {
+    await waitForAuthReady();
+    if (auth.currentUser) token = await auth.currentUser.getIdToken();
   }
 
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -23,7 +46,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? `Request failed: ${res.status}`);
+    throw new Error(errorMessage(body, `Request failed: ${res.status}`));
   }
   return res.json();
 }
