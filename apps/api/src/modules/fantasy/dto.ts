@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsString, ArrayMinSize, ArrayMaxSize, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, Equals, IsArray, IsInt, IsString, Min } from 'class-validator';
 
 export const DEMO_ENTRY_FEE_GEMS = 4;
 
@@ -14,7 +14,7 @@ export class CreateFantasyTeamDto {
 export class CreateContestDto {
   @IsInt() sportmonksFixtureId!: number;
   @IsString() name!: string;
-  @Min(0) entryFee!: number;
+  @Equals(DEMO_ENTRY_FEE_GEMS, { message: 'CrickX demo contest entry fee must be exactly 4 Gems.' }) entryFee!: number;
   @Min(2) totalSpots!: number;
   @IsString() scoringRuleSetId!: string;
   prizeDistribution!: { rankFrom: number; rankTo: number; amount: number }[];
