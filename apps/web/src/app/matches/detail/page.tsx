@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function MatchDetailPage() {
+function MatchDetailContent() {
   const params = useSearchParams();
   const fixtureId = params.get('fixtureId');
   const [fixture, setFixture] = useState<any>(null);
@@ -35,5 +35,13 @@ export default function MatchDetailPage() {
       ))}
       <a href={`/fantasy?fixtureId=${fixture.id}`}><button>Build fantasy team for this match</button></a>
     </div>
+  );
+}
+
+export default function MatchDetailPage() {
+  return (
+    <Suspense fallback={<p>Loading match...</p>}>
+      <MatchDetailContent />
+    </Suspense>
   );
 }
