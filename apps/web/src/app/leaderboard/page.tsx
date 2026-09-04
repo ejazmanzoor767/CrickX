@@ -4,11 +4,10 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
-import { useAuth } from '../../lib/auth-context';
 import styles from './leaderboard.module.css';
 
-function unwrap(value: any) {
-  return Array.isArray(value) ? value : value?.data ?? value ?? [];
+function unwrap(value: unknown) {
+  return Array.isArray(value) ? value : (value as { data?: unknown } | null)?.data ?? value ?? [];
 }
 
 function movement(row: any) {
@@ -36,8 +35,9 @@ export default function LeaderboardPage() {
   async function load() {
     try {
       const [globalResult, meResult] = await Promise.all([api.leaderboard(100), api.leaderboardMe()]);
-      setRows(unwrap(globalResult));
-      setMe(meResult && !Array.isArray(meResult) ? meResult?.data ?? meResult : null);
+      setRows(unwrap(globalResult) as any[]);
+      const unwrappedMe = unwrap(meResult);
+      setMe(unwrappedMe && !Array.isArray(unwrappedMe) ? unwrappedMe : null);
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load leaderboard.');
