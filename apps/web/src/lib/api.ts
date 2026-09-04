@@ -1,17 +1,17 @@
+import { auth } from './firebase';
+
 /**
- * Single fetch client for the web app. This is the ONLY place that talks to
- * our own backend; the backend is in turn the only thing that talks to
- * Sportmonks. The web app never imports Sportmonks types or URLs directly.
+ * Single fetch client for the web app. Firebase Auth supplies the bearer ID token;
+ * the NestJS backend verifies it and uses the Firebase user's identity.
  */
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
 
-function getAccessToken() {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('accessToken');
-}
-
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getAccessToken();
+  let token: string | null = null;
+  if (typeof window !== 'undefined' && auth.currentUser) {
+    token = await auth.currentUser.getIdToken();
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -29,14 +29,6 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 }
 
 export const api = {
-  login: (email: string, password: string) =>
-    apiFetch<{ accessToken: string; refreshToken: string; user: { id: string; email: string } }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    }),
-  register: (email: string, password: string, displayName: string) =>
-    apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) }),
-
   matches: () => apiFetch('/matches'),
   liveMatches: () => apiFetch('/matches/live'),
   matchDetail: (fixtureId: number) => apiFetch(`/matches/${fixtureId}`),
@@ -61,7 +53,7 @@ export const api = {
 
 export const adminApi = {
   dashboard: () => apiFetch('/admin/dashboard'),
-  setCredits: (credits: unknown[]) => apiFetch('/admin/player-credits', { method: 'POST', body: JSON.stringify({ credits }) }),
+  setCredits: (credits: unknown[]) => apiFetch('/admin/player-credits', { method: 'POST', body: JSON.stringify({ credits })),
   creditsForFixture: (fixtureId: number) => apiFetch(`/admin/player-credits/${fixtureId}`),
   createRuleSet: (payload: unknown) => apiFetch('/admin/scoring-rule-sets', { method: 'POST', body: JSON.stringify(payload) }),
   ruleSets: () => apiFetch('/admin/scoring-rule-sets'),
