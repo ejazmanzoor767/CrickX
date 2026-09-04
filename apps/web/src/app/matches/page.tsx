@@ -3,39 +3,38 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { SportmonksFixtureSummary } from '@fantasy-cricket/shared';
 
 export default function MatchesPage() {
-  const [fixtures, setFixtures] = useState<SportmonksFixtureSummary[]>([]);
+  const [fixtures, setFixtures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     api.matches()
-      .then((res: any) => setFixtures(res?.data ?? []))
-      .catch((err: any) => setError(err instanceof Error ? err.message : 'Unable to load matches'))
+      .then((result: any) => setFixtures(result.data ?? result ?? []))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Unable to load matches.'))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div><h1>Matches</h1><p>Loading matches...</p></div>;
-  if (error) return <div><h1>Matches</h1><p style={{ color: '#e5484d' }}>{error}</p></div>;
-
   return (
-    <div>
-      <h1>Matches</h1>
-      <p style={{ color: '#8b8fa3' }}>Live from Sportmonks — nothing here is hardcoded.</p>
-      {fixtures.length === 0 && <p>No matches available right now (check API auth / Sportmonks plan coverage).</p>}
+    <section>
+      <p className="eyebrow">MATCH CENTRE</p>
+      <h1 className="section-title">Play the next match</h1>
+      <p className="section-subtitle">Live fixtures powered by Sportmonks. Choose a match and build your XI.</p>
+      {loading && <div className="card">Loading live matches…</div>}
+      {error && <div className="card error-text">{error}</div>}
+      {!loading && !error && fixtures.length === 0 && <div className="card">No matches are available right now. Check Sportmonks plan coverage and API credentials.</div>}
       {fixtures.map((f) => (
-        <Link key={f.id} href={`/matches/detail?fixtureId=${f.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <strong>{f.localteam?.name ?? 'TBD'} vs {f.visitorteam?.name ?? 'TBD'}</strong>
+        <Link key={f.id} href={`/matches/detail?fixtureId=${f.id}`} style={{ textDecoration: 'none' }}>
+          <article className="card" style={{ display: 'block' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
+              <strong style={{ fontSize: 18 }}>{f.localteam?.name ?? 'TBD'} <span style={{ color: 'var(--muted)' }}>vs</span> {f.visitorteam?.name ?? 'TBD'}</strong>
               {f.live === 1 && <span className="badge-live">LIVE</span>}
             </div>
-            <div style={{ color: '#8b8fa3', fontSize: 14 }}>{f.type} · {f.status} · {new Date(f.starting_at).toLocaleString()}</div>
-          </div>
+            <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 8 }}>{f.type} · {f.status} · {new Date(f.starting_at).toLocaleString()}</div>
+          </article>
         </Link>
       ))}
-    </div>
+    </section>
   );
 }
