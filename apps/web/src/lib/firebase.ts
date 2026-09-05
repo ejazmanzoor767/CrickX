@@ -1,7 +1,7 @@
 'use client';
 
-import { getApp, getApps, initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -12,5 +12,19 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-export const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
-export const auth = getAuth(firebaseApp);
+let firebaseApp: FirebaseApp | null = null;
+let auth: Auth | null = null;
+
+if (typeof window !== 'undefined') {
+  firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  auth = getAuth(firebaseApp);
+}
+
+export { firebaseApp, auth };
+
+export function getClientAuth(): Auth {
+  if (typeof window === 'undefined' || !auth) {
+    throw new Error('Authentication is only available in the browser.');
+  }
+  return auth;
+}
