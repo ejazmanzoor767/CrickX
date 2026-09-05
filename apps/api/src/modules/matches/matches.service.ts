@@ -11,18 +11,31 @@ export class MatchesService {
   constructor(private readonly sportmonks: SportmonksDataService) {}
 
   async listUpcomingAndRecent(page = 1) {
-    // Sportmonks already limits fixture results to the competitions covered by
-    // the customer's subscription. Do not apply an application-side league
-    // allow-list that can hide newly covered competitions.
     return this.sportmonks.listFixtures({
       page,
       include: 'localteam,visitorteam,venue,league,season,stage,tosswon',
     });
   }
 
+  async listToday() {
+    const now = new Date();
+    const today = sportmonksDate(now);
+    const envelope = await this.sportmonks.listFixtures({
+      startsBetween: { start: today, end: today },
+      page: 1,
+      include: 'localteam,visitorteam,venue,league,season,stage,tosswon,runs,scoreboards',
+    });
+
+    const data = (Array.isArray(envelope.data) ? envelope.data : [])
+      .filter((f: SportmonksFixture) => sportmonksDate(new Date(f.starting_at)) === today)
+      .sort((a: SportmonksFixture, b: SportmonksFixture) =>
+        new Date(a.starting_at).getTime() - new Date(b.starting_at).getTime(),
+      );
+
+    return { ...envelope, data };
+  }
+
   async listLive() {
-    // Current-day fixtures are obtained separately from the dedicated
-    // in-play endpoint so scheduled matches are not confused with live play.
     return this.sportmonks.listLiveFixtures();
   }
 
@@ -33,8 +46,6 @@ export class MatchesService {
     let page = 1;
     let totalPages = 1;
 
-    // Walk all fixture pages for the requested window. This avoids missing
-    // matches when a busy cricket day spans multiple Sportmonks pages.
     do {
       const envelope = await this.sportmonks.listFixtures({
         startsBetween: { start: sportmonksDate(now), end: sportmonksDate(end) },
@@ -48,11 +59,13 @@ export class MatchesService {
     } while (page <= totalPages);
 
     const data = fixtures
-      .filter((f) => {
+      .filter((f: SportmonksFixture) => {
         const startsAt = new Date(f.starting_at).getTime();
         return Number.isFinite(startsAt) && startsAt > now.getTime();
       })
-      .sort((a, b) => new Date(a.starting_at).getTime() - new Date(b.starting_at).getTime());
+      .sort((a: SportmonksFixture, b: SportmonksFixture) =>
+        new Date(a.starting_at).getTime() - new Date(b.starting_at).getTime(),
+      );
 
     return {
       data,
@@ -88,7 +101,7 @@ export class MatchesService {
     } while (page <= totalPages);
 
     const data = fixtures
-      .filter((f) => {
+      .filter((f: SportmonksFixture) => {
         const status = String(f.status ?? '').toLowerCase();
         return new Date(f.starting_at).getTime() <= now.getTime() && f.live === 0 && (
           status.includes('finished') ||
@@ -97,7 +110,9 @@ export class MatchesService {
           status.includes('postponed')
         );
       })
-      .sort((a, b) => new Date(b.starting_at).getTime() - new Date(a.starting_at).getTime());
+      .sort((a: SportmonksFixture, b: SportmonksFixture) =>
+        new Date(b.starting_at).getTime() - new Date(a.starting_at).getTime(),
+      );
 
     return {
       data,
