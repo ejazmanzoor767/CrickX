@@ -106,7 +106,7 @@ export default function MatchesPage() {
   return (
     <section>
       <div className="page-heading-row">
-        <div><p className="eyebrow">CRICKX MATCH CENTRE</p><h1 className="section-title">Every match. One screen.</h1><p className="section-subtitle">Live scores refresh every 15 seconds. Today's schedule and the next four days stay in sync with the cricket feed.</p></div>
+        <div><p className="eyebrow">CRICKX MATCH CENTRE</p><h1 className="section-title">Every match. One screen.</h1></div>
         <div className="match-rules-pill"><strong>4 ◆</strong><span>Fantasy entry</span></div>
       </div>
 
@@ -114,7 +114,7 @@ export default function MatchesPage() {
       {loading && <div className="card skeleton-card">Loading the match centre…</div>}
 
       <section className="match-section">
-        <div className="section-mini-row"><div><p className="eyebrow">LIVE NOW</p><h2 className="section-title">Live scorecards</h2></div><span className="demo-pill">AUTO REFRESH · 15s</span></div>
+        <div className="section-mini-row"><div><p className="eyebrow">LIVE NOW</p><h2 className="section-title">Live scorecards</h2></div></div>
         {!loading && live.length === 0 ? <div className="card empty-state"><strong>No matches are live right now.</strong><span>Live scorecards will appear here as matches enter play.</span></div> : <div className="match-list">{live.map((f) => <MatchCard key={f.id} fixture={f} live />)}</div>}
       </section>
 
