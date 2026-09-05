@@ -7,97 +7,15 @@ import { useAuth } from '../../lib/auth-context';
 import { api } from '../../lib/api';
 import styles from './leaderboard.module.css';
 
-function unwrap(value: unknown) {
-  return Array.isArray(value) ? value : (value as { data?: unknown } | null)?.data ?? value ?? [];
-}
-
-function movement(row: any) {
-  const change = Number(row?.rankChange ?? 0);
-  if (change > 0) return <span className={styles.moveUp}>▲ {change}</span>;
-  if (change < 0) return <span className={styles.moveDown}>▼ {Math.abs(change)}</span>;
-  return row?.previousRank == null ? <span className="demo-pill">NEW</span> : <span className={styles.moveFlat}>—</span>;
-}
-
-function avatar(row: any) {
-  return row?.avatarUrl
-    ? <img src={row.avatarUrl} alt="" className={styles.avatar} />
-    : <span className={`${styles.avatar} ${styles.avatarFallback}`}>{String(row?.displayName ?? 'CX').slice(0, 2).toUpperCase()}</span>;
-}
+function unwrap(value: unknown) { return Array.isArray(value) ? value : (value as { data?: unknown } | null)?.data ?? value ?? []; }
+function movement(row: any) { const change = Number(row?.rankChange ?? 0); if (change > 0) return <span className={styles.moveUp}>▲ {change}</span>; if (change < 0) return <span className={styles.moveDown}>▼ {Math.abs(change)}</span>; return row?.previousRank == null ? <span className="demo-pill">NEW</span> : <span className={styles.moveFlat}>—</span>; }
+function avatar(row: any) { return row?.avatarUrl ? <img src={row.avatarUrl} alt="" className={styles.avatar} /> : <span className={`${styles.avatar} ${styles.avatarFallback}`}>{String(row?.displayName ?? 'CX').slice(0, 2).toUpperCase()}</span>; }
 
 export default function LeaderboardPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-  const [rows, setRows] = useState<any[]>([]);
-  const [me, setMe] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  async function load() {
-    try {
-      const [globalResult, meResult] = await Promise.all([api.leaderboard(100), api.leaderboardMe()]);
-      setRows(unwrap(globalResult) as any[]);
-      const unwrappedMe = unwrap(meResult);
-      setMe(unwrappedMe && !Array.isArray(unwrappedMe) ? unwrappedMe : null);
-      setError('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load leaderboard.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) { router.push('/login'); return; }
-    load();
-    const timer = window.setInterval(load, 15000);
-    return () => window.clearInterval(timer);
-  }, [authLoading, user, router]);
-
+  const { user, loading: authLoading } = useAuth(); const router = useRouter();
+  const [rows, setRows] = useState<any[]>([]); const [me, setMe] = useState<any>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  async function load() { try { const [globalResult, meResult] = await Promise.all([api.leaderboard(100), api.leaderboardMe()]); setRows(unwrap(globalResult) as any[]); const mine = unwrap(meResult); setMe(mine && !Array.isArray(mine) ? mine : null); setError(''); } catch (err) { setError(err instanceof Error ? err.message : 'Unable to load leaderboard.'); } finally { setLoading(false); } }
+  useEffect(() => { if (authLoading) return; if (!user) { router.push('/login'); return; } void load(); const timer = window.setInterval(() => void load(), 15000); return () => window.clearInterval(timer); }, [authLoading, user, router]);
   if (authLoading || loading) return <div className="card skeleton-card">Loading leaderboard…</div>;
-
-  return (
-    <section>
-      <div className="page-heading-row">
-        <div>
-          <p className="eyebrow">CRICKX LEADERBOARD</p>
-          <h1 className="section-title">See where you stand.</h1>
-          <p className="section-subtitle">Track your total fantasy points, latest score, matches played and movement in the rankings.</p>
-        </div>
-        <div className="match-rules-pill"><strong>{me?.rank ? `#${me.rank}` : '—'}</strong><span>{Number(me?.totalPoints ?? 0).toFixed(1)} pts</span></div>
-      </div>
-
-      {error && <div className="card"><p className="error-text">{error}</p></div>}
-
-      {me && (
-        <div className={`card ${styles.meCard}`}>
-          <div className={styles.playerMain}>{avatar(me)}<div><p className="eyebrow">YOUR RANK</p><h2 className={styles.meTitle}>#{me.rank ?? '—'} · {me.displayName ?? 'CrickX Player'}</h2><p className={styles.meSub}>{Number(me.totalPoints ?? 0).toFixed(1)} total points · {me.matchesPlayed ?? 0} matches played</p></div></div>
-          <div className={styles.meStats}>
-            <div className={styles.stat}><small>Last match</small><strong>{Number(me.lastMatchPoints ?? 0).toFixed(1)}</strong></div>
-            <div className={styles.stat}><small>Movement</small><strong>{movement(me)}</strong></div>
-            <div className={styles.stat}><small>Format</small><strong>{me.lastFormat || '—'}</strong></div>
-          </div>
-        </div>
-      )}
-
-      <div className="card">
-        <div className="section-mini-row"><div><p className="eyebrow">GLOBAL RANKINGS</p><h2>Top players</h2></div></div>
-        {rows.length === 0 ? (
-          <div className="empty-state"><strong>No rankings yet.</strong><span>Save a fantasy team and your points will appear here after match performance is recorded.</span><Link className="primary-button" href="/matches">Explore matches →</Link></div>
-        ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead><tr><th>Rank</th><th>Player</th><th>Total points</th><th>Last match</th><th>Matches</th><th>Move</th></tr></thead>
-              <tbody>{rows.map((row) => <tr key={row.id} className={row.userId === user?.uid ? styles.selfRow : ''}><td><strong>#{row.rank}</strong></td><td><div className={styles.playerMain}>{avatar(row)}<span>{row.displayName ?? 'CrickX Player'}</span></div></td><td><strong>{Number(row.totalPoints ?? 0).toFixed(1)}</strong></td><td>{Number(row.lastMatchPoints ?? 0).toFixed(1)}</td><td>{row.matchesPlayed ?? 0}</td><td>{movement(row)}</td></tr>)}</tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div className={`card ${styles.note}`}>
-        <div><p className="eyebrow">FANTASY POINTS</p><h2>Every match can move your rank.</h2><p className="section-subtitle">Your captain receives 2× fantasy points and your vice-captain receives 1.5× points. Rankings update as scores are recorded.</p></div>
-        <Link href="/fantasy" className="primary-button">Build a team →</Link>
-      </div>
-    </section>
-  );
+  return <section className="app-page"><div className="page-intro"><div><p className="eyebrow">CRICKX LEADERBOARD</p><h1 className="section-title">See where you stand.</h1><p className="section-subtitle">Track your total fantasy points, latest score, matches played and movement in the rankings.</p></div><div className="match-rules-pill"><strong>{me?.rank?`#${me.rank}`:'—'}</strong><span>{Number(me?.totalPoints??0).toFixed(1)} pts</span></div></div>{error&&<div className="card"><p className="error-text">{error}</p></div>}{me&&<div className={`card ${styles.meCard}`}><div className={styles.playerMain}>{avatar(me)}<div><p className="eyebrow">YOUR RANK</p><h2 className={styles.meTitle}>#{me.rank??'—'} · {me.displayName??'CrickX Player'}</h2><p className={styles.meSub}>{Number(me.totalPoints??0).toFixed(1)} total points · {me.matchesPlayed??0} matches played</p></div></div><div className={styles.meStats}><div className={styles.stat}><small>Last match</small><strong>{Number(me.lastMatchPoints??0).toFixed(1)}</strong></div><div className={styles.stat}><small>Movement</small><strong>{movement(me)}</strong></div><div className={styles.stat}><small>Format</small><strong>{me.lastFormat||'—'}</strong></div></div></div>}<div className="card"><div className="section-mini-row"><div><p className="eyebrow">GLOBAL RANKINGS</p><h2>Top players</h2></div></div>{rows.length===0?<div className="empty-state"><strong>No rankings yet.</strong><span>Save a fantasy team and your points will appear here after match performance is recorded.</span><Link className="primary-button" href="/fantasy-home">Explore fantasy →</Link></div>:<div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Rank</th><th>Player</th><th>Total points</th><th>Last match</th><th>Matches</th><th>Move</th></tr></thead><tbody>{rows.map((row)=><tr key={row.id} className={row.userId===user?.uid?styles.selfRow:''}><td><strong>#{row.rank}</strong></td><td><div className={styles.playerMain}>{avatar(row)}<span>{row.displayName??'CrickX Player'}</span></div></td><td><strong>{Number(row.totalPoints??0).toFixed(1)}</strong></td><td>{Number(row.lastMatchPoints??0).toFixed(1)}</td><td>{row.matchesPlayed??0}</td><td>{movement(row)}</td></tr>)}</tbody></table></div>}</div><div className={`card ${styles.note}`}><div><p className="eyebrow">FANTASY POINTS</p><h2>Every match can move your rank.</h2><p className="section-subtitle">Your captain receives 2× fantasy points and your vice-captain receives 1.5× points. Rankings update as scores are recorded.</p></div><Link href="/fantasy-home" className="primary-button">Build a team →</Link></div></section>;
 }
