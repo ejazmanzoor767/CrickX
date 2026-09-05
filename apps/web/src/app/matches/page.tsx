@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 
 const asList = (result: any) => Array.isArray(result) ? result : (result?.data ?? []);
-const title = (f: any) => `${f.localteam?.name ?? 'TBD'} vs ${f.visitorteam?.name ?? 'TBD'}`;
 const formatTime = (value: string) => new Date(value).toLocaleString([], { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const scoreText = (r: any) => `${r?.score ?? 0}/${r?.wickets ?? 0} (${r?.overs ?? 0} ov)`;
 
@@ -44,29 +43,48 @@ export default function MatchesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  async function loadFeeds(showSpinner = false) {
+  async function loadLive(showSpinner = false) {
     if (showSpinner) setLoading(true);
     try {
-      const [liveResult, upcomingResult, completedResult] = await Promise.all([
-        api.liveMatches(),
+      const todayResult = await api.todayMatches();
+      const today = asList(todayResult);
+      setLive(today.filter((f: any) => Number(f.live) === 1));
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load live matches.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadSchedules(showSpinner = false) {
+    if (showSpinner) setLoading(true);
+    try {
+      const [upcomingResult, completedResult] = await Promise.all([
         api.upcomingMatches(4),
         api.completedMatches(14),
       ]);
-      setLive(asList(liveResult));
       setUpcoming(asList(upcomingResult));
       setCompleted(asList(completedResult));
       setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load match centre.');
+      setError(err instanceof Error ? err.message : 'Unable to load match schedule.');
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadFeeds(true);
-    const timer = window.setInterval(() => loadFeeds(false), 15000);
-    return () => window.clearInterval(timer);
+    void loadLive(true);
+    void loadSchedules(true);
+
+    const liveTimer = window.setInterval(() => { void loadLive(false); }, 15000);
+    const scheduleTimer = window.setInterval(() => { void loadSchedules(false); }, 5 * 60 * 1000);
+
+    return () => {
+      window.clearInterval(liveTimer);
+      window.clearInterval(scheduleTimer);
+    };
   }, []);
 
   const nextFour = useMemo(() => upcoming.slice(0, 50), [upcoming]);
@@ -74,21 +92,21 @@ export default function MatchesPage() {
   return (
     <section>
       <div className="page-heading-row">
-        <div><p className="eyebrow">CRICKX MATCH CENTRE</p><h1 className="section-title">Every match. One screen.</h1><p className="section-subtitle">Live matches update every 15 seconds. Upcoming fixtures cover the next four days. Fantasy entry closes automatically at match start.</p></div>
+        <div><p className="eyebrow">CRICKX MATCH CENTRE</p><h1 className="section-title">Every match. One screen.</h1><p className="section-subtitle">Live scores refresh every 15 seconds. Today's schedule and the next four days stay in sync with the cricket feed.</p></div>
         <div className="match-rules-pill"><strong>4 ◆</strong><span>Fantasy entry</span></div>
       </div>
 
-      {error && <div className="card"><p className="error-text">{error}</p><p className="section-subtitle">Check the Sportmonks token and the leagues enabled in Render.</p></div>}
-      {loading && <div className="card skeleton-card">Loading the live match centre…</div>}
+      {error && <div className="card"><p className="error-text">{error}</p><p className="section-subtitle">Please try again in a moment.</p></div>}
+      {loading && <div className="card skeleton-card">Loading the match centre…</div>}
 
       <section className="match-section">
         <div className="section-mini-row"><div><p className="eyebrow">LIVE NOW</p><h2 className="section-title">Live scorecards</h2></div><span className="demo-pill">AUTO REFRESH · 15s</span></div>
-        {!loading && live.length === 0 ? <div className="card empty-state"><strong>No matches are live right now.</strong><span>As soon as Sportmonks marks a fixture live, it appears here.</span></div> : <div className="match-list">{live.map((f) => <MatchCard key={f.id} fixture={f} live />)}</div>}
+        {!loading && live.length === 0 ? <div className="card empty-state"><strong>No matches are live right now.</strong><span>Live scorecards will appear here as matches enter play.</span></div> : <div className="match-list">{live.map((f) => <MatchCard key={f.id} fixture={f} live />)}</div>}
       </section>
 
       <section className="match-section">
         <div className="section-mini-row"><div><p className="eyebrow">NEXT 4 DAYS</p><h2 className="section-title">Upcoming</h2></div><span className="demo-pill">4 GEMS / ENTRY</span></div>
-        {nextFour.length === 0 ? <div className="card empty-state"><strong>No upcoming matches found.</strong><span>We're watching the next four days for fixtures in your covered leagues.</span></div> : <div className="match-list">{nextFour.map((f) => <MatchCard key={f.id} fixture={f} />)}</div>}
+        {nextFour.length === 0 ? <div className="card empty-state"><strong>No upcoming matches found.</strong><span>We're watching today's schedule and the next four days.</span></div> : <div className="match-list">{nextFour.map((f) => <MatchCard key={f.id} fixture={f} />)}</div>}
       </section>
 
       <section className="match-section">
