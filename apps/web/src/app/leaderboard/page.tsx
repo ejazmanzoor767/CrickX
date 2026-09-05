@@ -15,8 +15,7 @@ function movement(row: any) {
   const change = Number(row?.rankChange ?? 0);
   if (change > 0) return <span className={styles.moveUp}>▲ {change}</span>;
   if (change < 0) return <span className={styles.moveDown}>▼ {Math.abs(change)}</span>;
-  if (row?.previousRank == null) return <span className="demo-pill">NEW</span>;
-  return <span className={styles.moveFlat}>—</span>;
+  return row?.previousRank == null ? <span className="demo-pill">NEW</span> : <span className={styles.moveFlat}>—</span>;
 }
 
 function avatar(row: any) {
@@ -62,8 +61,8 @@ export default function LeaderboardPage() {
       <div className="page-heading-row">
         <div>
           <p className="eyebrow">CRICKX LEADERBOARD</p>
-          <h1 className="section-title">Compete on real performance.</h1>
-          <p className="section-subtitle">Fantasy points are recalculated from Sportmonks match performance. Your position can move during live play and after every completed match.</p>
+          <h1 className="section-title">See where you stand.</h1>
+          <p className="section-subtitle">Track your total fantasy points, latest score, matches played and movement in the rankings.</p>
         </div>
         <div className="match-rules-pill"><strong>{me?.rank ? `#${me.rank}` : '—'}</strong><span>{Number(me?.totalPoints ?? 0).toFixed(1)} pts</span></div>
       </div>
@@ -72,26 +71,33 @@ export default function LeaderboardPage() {
 
       {me && (
         <div className={`card ${styles.meCard}`}>
-          <div className={styles.playerMain}>{avatar(me)}<div><p className="eyebrow">YOUR POSITION</p><h2 className={styles.meTitle}>#{me.rank ?? '—'} · {me.displayName ?? 'CrickX Player'}</h2><p className={styles.meSub}>{Number(me.totalPoints ?? 0).toFixed(1)} total points · {me.matchesPlayed ?? 0} matches</p></div></div>
-          <div className={styles.meStats}><div className={styles.stat}><small>Last match</small><strong>{Number(me.lastMatchPoints ?? 0).toFixed(1)}</strong></div><div className={styles.stat}><small>Movement</small><strong>{movement(me)}</strong></div><div className={styles.stat}><small>Format</small><strong>{me.lastFormat || '—'}</strong></div></div>
+          <div className={styles.playerMain}>{avatar(me)}<div><p className="eyebrow">YOUR RANK</p><h2 className={styles.meTitle}>#{me.rank ?? '—'} · {me.displayName ?? 'CrickX Player'}</h2><p className={styles.meSub}>{Number(me.totalPoints ?? 0).toFixed(1)} total points · {me.matchesPlayed ?? 0} matches played</p></div></div>
+          <div className={styles.meStats}>
+            <div className={styles.stat}><small>Last match</small><strong>{Number(me.lastMatchPoints ?? 0).toFixed(1)}</strong></div>
+            <div className={styles.stat}><small>Movement</small><strong>{movement(me)}</strong></div>
+            <div className={styles.stat}><small>Format</small><strong>{me.lastFormat || '—'}</strong></div>
+          </div>
         </div>
       )}
 
       <div className="card">
-        <div className="section-mini-row"><div><p className="eyebrow">GLOBAL RANKINGS</p><h2>Top fantasy players</h2></div><span className="demo-pill">LIVE · 15s</span></div>
+        <div className="section-mini-row"><div><p className="eyebrow">GLOBAL RANKINGS</p><h2>Top players</h2></div></div>
         {rows.length === 0 ? (
-          <div className="empty-state"><strong>No leaderboard scores yet.</strong><span>Save a fantasy team for a real fixture. Points appear as Sportmonks publishes player performance.</span></div>
+          <div className="empty-state"><strong>No rankings yet.</strong><span>Save a fantasy team and your points will appear here after match performance is recorded.</span><Link className="primary-button" href="/matches">Explore matches →</Link></div>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
-              <thead><tr><th>Rank</th><th>Player</th><th>Total</th><th>Last match</th><th>Matches</th><th>Format</th><th>Move</th></tr></thead>
-              <tbody>{rows.map((row) => <tr key={row.id} className={row.userId === user?.uid ? styles.selfRow : ''}><td><strong>#{row.rank}</strong></td><td><div className={styles.playerMain}>{avatar(row)}<span>{row.displayName ?? 'CrickX Player'}</span></div></td><td><strong>{Number(row.totalPoints ?? 0).toFixed(1)}</strong></td><td>{Number(row.lastMatchPoints ?? 0).toFixed(1)}</td><td>{row.matchesPlayed ?? 0}</td><td>{row.lastFormat ?? '—'}</td><td>{movement(row)}</td></tr>)}</tbody>
+              <thead><tr><th>Rank</th><th>Player</th><th>Total points</th><th>Last match</th><th>Matches</th><th>Move</th></tr></thead>
+              <tbody>{rows.map((row) => <tr key={row.id} className={row.userId === user?.uid ? styles.selfRow : ''}><td><strong>#{row.rank}</strong></td><td><div className={styles.playerMain}>{avatar(row)}<span>{row.displayName ?? 'CrickX Player'}</span></div></td><td><strong>{Number(row.totalPoints ?? 0).toFixed(1)}</strong></td><td>{Number(row.lastMatchPoints ?? 0).toFixed(1)}</td><td>{row.matchesPlayed ?? 0}</td><td>{movement(row)}</td></tr>)}</tbody>
             </table>
           </div>
         )}
       </div>
 
-      <div className={`card ${styles.note}`}><div><p className="eyebrow">SCORING ENGINE</p><h2>T20 + ODI are scored separately</h2><p className="section-subtitle">T20 uses shorter strike-rate and bowling-economy thresholds; ODI uses longer minimum samples and ODI-specific thresholds. Captain scores are multiplied by 2× and vice-captain scores by 1.5×.</p></div><Link href="/matches" className="primary-button">Open matches →</Link></div>
+      <div className={`card ${styles.note}`}>
+        <div><p className="eyebrow">FANTASY POINTS</p><h2>Every match can move your rank.</h2><p className="section-subtitle">Your captain receives 2× fantasy points and your vice-captain receives 1.5× points. Rankings update as scores are recorded.</p></div>
+        <Link href="/fantasy" className="primary-button">Build a team →</Link>
+      </div>
     </section>
   );
 }
