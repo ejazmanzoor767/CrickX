@@ -63,6 +63,15 @@ export class SportmonksDataService {
     private readonly prisma: FirestoreService,
   ) {}
 
+  async listLeagues() {
+    // Sportmonks Cricket API 2.0 returns the leagues covered by the current
+    // subscription from this endpoint. No application-side league allow-list
+    // is applied, so an upgraded subscription is reflected automatically.
+    return this.client.get<any[]>('/leagues', {
+      include: 'season,country',
+    });
+  }
+
   async listFixtures(params: {
     leagueId?: number;
     page?: number;
