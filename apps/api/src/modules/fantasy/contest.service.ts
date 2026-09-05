@@ -4,6 +4,8 @@ import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { WalletService } from '../wallet/wallet.service';
 import { CreateContestDto, JoinContestDto } from './dto';
 
+const VIRTUAL_ENTRY_FEE_GEMS = 4;
+
 @Injectable()
 export class ContestService {
   constructor(
@@ -39,13 +41,16 @@ export class ContestService {
     return this.prisma.contest.findMany({ where: { sportmonksFixtureId: fixtureId }, orderBy: { entryFee: 'asc' } });
   }
 
-  /** Joins a contest and debits entry fee atomically. The team remains editable until match lock/scoring begins. */
+  /** Joins a contest and debits exactly 4 virtual Gems before creating the entry. */
   async join(userId: string, dto: JoinContestDto) {
     const contest = await this.prisma.contest.findUnique({ where: { id: dto.contestId } });
     if (!contest) throw new NotFoundException('Contest not found.');
     if (contest.status !== 'UPCOMING') throw new ForbiddenException('Contest is no longer open for entries.');
     if (contest.filledSpots >= contest.totalSpots) throw new ForbiddenException('Contest is full.');
     if (new Date() >= contest.lineupLockAt) throw new ForbiddenException('Entries are locked — match has started.');
+    if (contest.entryFee.toNumber() !== VIRTUAL_ENTRY_FEE_GEMS) {
+      throw new BadRequestException('This contest is not configured for the 4 Gem entry fee.');
+    }
 
     const team = await this.prisma.fantasyTeam.findUnique({ where: { id: dto.fantasyTeamId } });
     if (!team || team.userId !== userId) throw new NotFoundException('Fantasy team not found.');
@@ -63,11 +68,15 @@ export class ContestService {
     await this.wallet.mutateBalance({
       userId,
       bucket: 'DEPOSIT',
-      delta: -contest.entryFee.toNumber(),
+      delta: -VIRTUAL_ENTRY_FEE_GEMS,
       type: 'CONTEST_ENTRY_DEBIT',
       idempotencyKey: `contest-entry:${contest.id}:${dto.fantasyTeamId}`,
       referenceType: 'CONTEST',
       referenceId: contest.id,
+      metadata: {
+        unit: 'GEM',
+        entryFeeGems: VIRTUAL_ENTRY_FEE_GEMS,
+      },
     });
 
     const entry = await this.prisma.contestEntry.create({
