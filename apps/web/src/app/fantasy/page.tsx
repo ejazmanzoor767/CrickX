@@ -94,7 +94,7 @@ function FantasyContent() {
     setSelected((team.players ?? []).map((p: any) => Number(p.sportmonksPlayerId)).filter((id: number) => Number.isFinite(id)));
     setCaptain(Number(team.captainSportmonksPlayerId) || null);
     setViceCaptain(Number(team.viceCaptainSportmonksPlayerId) || null);
-    setMessage(`Editing ${team.name || 'Fantasy XI'}. Changes are allowed until match scoring begins.`);
+    setMessage('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -107,9 +107,9 @@ function FantasyContent() {
       if (viceCaptain === player.player_id) setViceCaptain(null);
       return;
     }
-    if (selected.length >= 11) return setMessage('Your fantasy XI can contain exactly 11 players.');
-    if ((teamCounts[player.team_id] ?? 0) >= 7) return setMessage('Maximum 7 players from one real-world team.');
-    if (totalCredits + Number(player.creditValue ?? DEFAULT_CREDITS) > 100) return setMessage('Credit limit is 100. Remove a player before selecting this one.');
+    if (selected.length >= 11) return setMessage('Select up to 11 players.');
+    if ((teamCounts[player.team_id] ?? 0) >= 7) return setMessage('Maximum 7 players from one team.');
+    if (totalCredits + Number(player.creditValue ?? DEFAULT_CREDITS) > 100) return setMessage('Your team exceeds the 100 credit limit.');
     setSelected((current) => [...current, player.player_id]);
   }
 
@@ -129,19 +129,16 @@ function FantasyContent() {
         viceCaptainSportmonksPlayerId: viceCaptain,
       };
 
-      // Before the official XI is announced, persist the selection as the
-      // user's editable fantasy draft. The backend validates the final XI
-      // against Sportmonks once the lineup is available.
       if (!announced) {
         await api.saveFantasyDraft(fixtureId, payload);
-        setMessage('Fantasy Team saved as draft. You can edit it until match scoring begins. The official lineup will be checked when it is announced.');
+        setMessage('Fantasy Team saved.');
         return;
       }
 
       const result = unwrap(editingTeamId
         ? await api.editFantasyTeam(editingTeamId, payload)
         : await api.createFantasyTeam(payload));
-      setMessage(`${editingTeamId ? 'Fantasy XI updated.' : 'Fantasy XI saved.'} ${result?.id ? 'You can edit it again until match scoring begins.' : ''}`);
+      setMessage(editingTeamId ? 'Fantasy Team updated.' : 'Fantasy Team saved.');
       setEditingTeamId(result?.id ?? editingTeamId ?? null);
       await loadMine();
       await api.saveFantasyDraft(fixtureId, payload).catch(() => {});
@@ -151,41 +148,41 @@ function FantasyContent() {
   }
 
   async function joinSelectedContest() {
-    if (!contest) return setMessage('No 4-Gem contest is currently available for this match.');
-    if (!selectedTeam) return setMessage('Save your XI first, then join the contest.');
+    if (!contest) return setMessage('No contest is available for this match.');
+    if (!selectedTeam) return setMessage('Save your team first.');
     setJoining(true); setMessage('');
     try {
       await api.joinContest(contest.id, selectedTeam.id);
-      setMessage('Contest joined successfully. 4 Gems were deducted from your demo wallet.');
+      setMessage('Contest joined successfully.');
       await loadMine();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Unable to join contest.');
     } finally { setJoining(false); }
   }
 
-  if (loading) return <div className="card skeleton-card">Loading fantasy builder…</div>;
+  if (loading) return <div className="card skeleton-card">Loading…</div>;
 
   return (
     <div>
-      <div className="page-heading-row"><div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Build your XI</h1><p className="section-subtitle">Select and save your XI. You may edit an unlocked team any time until match scoring begins.</p></div><div className="match-rules-pill"><strong>{selected.length}/11</strong><span>{totalCredits.toFixed(1)} / 100 credits</span></div></div>
+      <div className="page-heading-row"><div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Build your XI</h1><p className="section-subtitle">Select 11 players, choose your captain and vice-captain, then save your team.</p></div><div className="match-rules-pill"><strong>{selected.length}/11</strong><span>{totalCredits.toFixed(1)} / 100 credits</span></div></div>
 
-      {!hasFixture ? <div className="card"><h2>Choose a match first</h2><p className="section-subtitle">Open an upcoming match and select Create XI.</p><Link className="primary-button" href="/matches">Go to matches</Link></div> : <>
-        <div className="card"><div className="section-mini-row"><div><p className="eyebrow">MATCH SQUADS</p><h2>{announced ? 'Official XI confirmed' : 'Squad not announced yet'}</h2></div><span className={announced ? 'badge-live' : 'demo-pill'}>{announced ? 'XI CONFIRMED' : 'PRE-TOSS'}</span></div><p className="section-subtitle">{announced ? 'Only players marked PLAYING XI are selectable. Other squad members remain visible but are locked.' : 'You can save your fantasy team now. It remains editable, and the final XI will be checked against the official Sportmonks lineup when announced.'}</p></div>
+      {!hasFixture ? <div className="card"><h2>Choose a match</h2><p className="section-subtitle">Open a match and select Create XI.</p><Link className="primary-button" href="/matches">Go to matches</Link></div> : <>
+        <div className="card"><div className="section-mini-row"><div><p className="eyebrow">MATCH SQUADS</p><h2>{announced ? 'Official XI confirmed' : 'Squads'}</h2></div><span className={announced ? 'badge-live' : 'demo-pill'}>{announced ? 'READY' : 'UPCOMING'}</span></div><p className="section-subtitle">Select your players below.</p></div>
 
         {teamsForFixture.map((team: any) => <section className="match-section" key={team.id}><div className="section-mini-row"><div><p className="eyebrow">{team.name}</p><h2>{team.playingXICount}/11 playing · {team.playerCount} squad</h2></div><span className="demo-pill">{selectedPlayers.filter((p) => p.team_id === team.id).length}/7 selected</span></div><div className="match-list">{(team.players ?? []).map((player: any) => {
           const isSelected = selected.includes(player.player_id);
           const blocked = announced && !player.isPlayingXI;
           const c = captain === player.player_id;
           const vc = viceCaptain === player.player_id;
-          return <article key={player.player_id} className="card" style={{ opacity: blocked ? .48 : 1 }}><div className="section-mini-row"><div><strong>{player.fullname ?? `Player ${player.player_id}`}</strong><div className="section-subtitle">{player.position_name ?? 'Player'} · {player.isPlayingXI ? 'PLAYING XI' : 'SQUAD'} · {Number(player.creditValue ?? DEFAULT_CREDITS).toFixed(1)} credits</div></div><button className={isSelected ? 'primary-button' : 'secondary-button'} onClick={() => togglePlayer(player)} disabled={blocked}>{isSelected ? '✓ Selected' : blocked ? 'Not playing' : 'Select'}</button></div>{isSelected && <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:10 }}><button className={c ? 'primary-button' : 'secondary-button'} onClick={() => setCaptain(player.player_id)}>C</button><button className={vc ? 'primary-button' : 'secondary-button'} onClick={() => setViceCaptain(player.player_id)}>VC</button></div>}</article>;
+          return <article key={player.player_id} className="card" style={{ opacity: blocked ? .48 : 1 }}><div className="section-mini-row"><div><strong>{player.fullname ?? `Player ${player.player_id}`}</strong><div className="section-subtitle">{player.position_name ?? 'Player'} · {player.isPlayingXI ? 'PLAYING XI' : 'SQUAD'} · {Number(player.creditValue ?? DEFAULT_CREDITS).toFixed(1)} credits</div></div><button className={isSelected ? 'primary-button' : 'secondary-button'} onClick={() => togglePlayer(player)} disabled={blocked}>{isSelected ? '✓ Selected' : blocked ? 'Unavailable' : 'Select'}</button></div>{isSelected && <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:10 }}><button className={c ? 'primary-button' : 'secondary-button'} onClick={() => setCaptain(player.player_id)}>C</button><button className={vc ? 'primary-button' : 'secondary-button'} onClick={() => setViceCaptain(player.player_id)}>VC</button></div>}</article>;
         })}</div></section>)}
 
-        <div className="card match-actions"><div><p className="eyebrow">{editingTeamId ? 'EDIT FANTASY TEAM' : 'SAVE FANTASY TEAM'}</p><h2>{editingTeamId ? 'Update your XI' : 'Save your XI'} · {selected.length}/11 · C {captain ? '✓' : '—'} · VC {viceCaptain ? '✓' : '—'}</h2><input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Fantasy team name" style={{ width:'100%', maxWidth:420, marginTop:10 }} />{message && <p className={message.includes('successfully') || message.includes('saved') || message.includes('updated') || message.includes('Editing') ? 'section-subtitle' : 'error-text'}>{message}</p>}</div><button className="primary-button" onClick={saveTeam} disabled={saving}>{saving ? (editingTeamId ? 'Updating…' : 'Saving…') : (editingTeamId ? 'Update Fantasy Team' : 'Save Fantasy Team')}</button></div>
+        <div className="card match-actions"><div><p className="eyebrow">{editingTeamId ? 'EDIT FANTASY TEAM' : 'SAVE FANTASY TEAM'}</p><h2>{editingTeamId ? 'Update your XI' : 'Save your XI'} · {selected.length}/11 · C {captain ? '✓' : '—'} · VC {viceCaptain ? '✓' : '—'}</h2><input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Fantasy team name" style={{ width:'100%', maxWidth:420, marginTop:10 }} />{message && <p className={message.includes('successfully') || message.includes('saved') || message.includes('updated') ? 'section-subtitle' : 'error-text'}>{message}</p>}</div><button className="primary-button" onClick={saveTeam} disabled={saving}>{saving ? (editingTeamId ? 'Updating…' : 'Saving…') : (editingTeamId ? 'Update Fantasy Team' : 'Save Fantasy Team')}</button></div>
 
-        <div className="card"><div className="section-mini-row"><div><p className="eyebrow">CONTEST</p><h2>Join with 4 Gems</h2></div><span className="demo-pill">1 GEM = PKR 5</span></div>{contests.length === 0 ? <p className="section-subtitle">No 4-Gem contest has been opened for this fixture yet.</p> : <>{contests.map((c: any) => <button key={c.id} onClick={() => setSelectedContestId(c.id)} className={selectedContestId === c.id || (!selectedContestId && contests[0].id === c.id) ? 'primary-button' : 'secondary-button'} style={{ marginRight:8, marginBottom:8 }}>{c.name} · 4 ◆ · {c.filledSpots}/{c.totalSpots}</button>)}<div style={{ marginTop:12 }}><button className="primary-button" onClick={joinSelectedContest} disabled={joining || !selectedTeam}>{joining ? 'Joining…' : `Join Contest · ${ENTRY_FEE} ◆`}</button>{!selectedTeam && <p className="section-subtitle">Save a new XI first; an entered team becomes locked.</p>}</div></>}</div>
+        <div className="card"><div className="section-mini-row"><div><p className="eyebrow">CONTEST</p><h2>Join with 4 Gems</h2></div><span className="demo-pill">1 GEM = PKR 5</span></div>{contests.length === 0 ? <p className="section-subtitle">No contest is available for this match yet.</p> : <>{contests.map((c: any) => <button key={c.id} onClick={() => setSelectedContestId(c.id)} className={selectedContestId === c.id || (!selectedContestId && contests[0].id === c.id) ? 'primary-button' : 'secondary-button'} style={{ marginRight:8, marginBottom:8 }}>{c.name} · 4 ◆ · {c.filledSpots}/{c.totalSpots}</button>)}<div style={{ marginTop:12 }}><button className="primary-button" onClick={joinSelectedContest} disabled={joining || !selectedTeam}>{joining ? 'Joining…' : `Join Contest · ${ENTRY_FEE} ◆`}</button>{!selectedTeam && <p className="section-subtitle">Save your team first.</p>}</div></>}</div>
       </>}
 
-      <section className="match-section"><h2 className="section-title">My Teams</h2>{teams.length === 0 ? <p>No fantasy teams yet.</p> : teams.map((t) => <div key={t.id} className="card"><div className="section-mini-row"><div><strong>{t.name}</strong><div className="section-subtitle">{t.players.length} players · {t.isLocked ? 'LOCKED — scoring has begun / team is already entered' : 'EDITABLE UNTIL SCORING BEGINS'}</div></div>{t.sportmonksFixtureId === fixtureId && !t.isLocked && <button className="secondary-button" onClick={() => editTeam(t)}>Edit Team</button>}</div></div>)}<h2 className="section-title" style={{marginTop:32}}>My Contest Entries</h2>{entries.length === 0 ? <p>No contest entries yet.</p> : entries.map((e) => <div key={e.id} className="card"><div>{e.contest?.name}</div><div className="section-subtitle">Entry: {e.entryFeePaid?.toString?.() ?? 4} Gems · Points: {e.totalPoints ?? '—'} · Rank: {e.rank ?? '—'} · Prize: {e.prizeWon ?? '—'}</div></div>)}</section>
+      <section className="match-section"><h2 className="section-title">My Teams</h2>{teams.length === 0 ? <p>No fantasy teams yet.</p> : teams.map((t) => <div key={t.id} className="card"><div className="section-mini-row"><div><strong>{t.name}</strong><div className="section-subtitle">{t.players.length} players</div></div>{t.sportmonksFixtureId === fixtureId && !t.isLocked && <button className="secondary-button" onClick={() => editTeam(t)}>Edit Team</button>}</div></div>)}<h2 className="section-title" style={{marginTop:32}}>My Contest Entries</h2>{entries.length === 0 ? <p>No contest entries yet.</p> : entries.map((e) => <div key={e.id} className="card"><div>{e.contest?.name}</div><div className="section-subtitle">Entry: {e.entryFeePaid?.toString?.() ?? 4} Gems · Points: {e.totalPoints ?? '—'} · Rank: {e.rank ?? '—'} · Prize: {e.prizeWon ?? '—'}</div></div>)}</section>
     </div>
   );
 }
