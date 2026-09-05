@@ -1,12 +1,14 @@
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
+import { getClientAuth } from './firebase';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
 
 let authReady: Promise<void> | null = null;
 
 function waitForAuthReady() {
-  if (typeof window === 'undefined' || auth.currentUser) return Promise.resolve();
+  if (typeof window === 'undefined') return Promise.resolve();
+  const auth = getClientAuth();
+  if (auth.currentUser) return Promise.resolve();
   authReady ??= new Promise<void>((resolve) => {
     const unsubscribe = onAuthStateChanged(auth, () => {
       unsubscribe();
@@ -28,6 +30,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   let token: string | null = null;
   if (typeof window !== 'undefined') {
     await waitForAuthReady();
+    const auth = getClientAuth();
     if (auth.currentUser) token = await auth.currentUser.getIdToken();
   }
 
