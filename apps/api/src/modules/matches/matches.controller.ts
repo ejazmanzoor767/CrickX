@@ -10,6 +10,11 @@ export class MatchesController {
     return this.matches.listUpcomingAndRecent(page ? parseInt(page, 10) : 1);
   }
 
+  @Get('leagues')
+  leagues() {
+    return this.matches.listLeagues();
+  }
+
   @Get('today')
   today() {
     return this.matches.listToday();
