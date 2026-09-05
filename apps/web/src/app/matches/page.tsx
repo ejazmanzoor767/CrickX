@@ -38,20 +38,21 @@ function MatchCard({ fixture, live, completed }: { fixture: any; live?: boolean;
 
 export default function MatchesPage() {
   const [live, setLive] = useState<any[]>([]);
+  const [todayScheduled, setTodayScheduled] = useState<any[]>([]);
   const [upcoming, setUpcoming] = useState<any[]>([]);
   const [completed, setCompleted] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  async function loadLive(showSpinner = false) {
+  async function loadToday(showSpinner = false) {
     if (showSpinner) setLoading(true);
     try {
-      const todayResult = await api.todayMatches();
-      const today = asList(todayResult);
+      const today = asList(await api.todayMatches());
       setLive(today.filter((f: any) => Number(f.live) === 1));
+      setTodayScheduled(today.filter((f: any) => Number(f.live) !== 1 && new Date(f.starting_at).getTime() >= Date.now()));
       setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load live matches.');
+      setError(err instanceof Error ? err.message : 'Unable to load today’s matches.');
     } finally {
       setLoading(false);
     }
@@ -75,19 +76,32 @@ export default function MatchesPage() {
   }
 
   useEffect(() => {
-    void loadLive(true);
+    void loadToday(true);
     void loadSchedules(true);
 
-    const liveTimer = window.setInterval(() => { void loadLive(false); }, 15000);
+    const todayTimer = window.setInterval(() => { void loadToday(false); }, 15000);
     const scheduleTimer = window.setInterval(() => { void loadSchedules(false); }, 5 * 60 * 1000);
 
     return () => {
-      window.clearInterval(liveTimer);
+      window.clearInterval(todayTimer);
       window.clearInterval(scheduleTimer);
     };
   }, []);
 
-  const nextFour = useMemo(() => upcoming.slice(0, 50), [upcoming]);
+  const nextFour = useMemo(() => {
+    const merged = [...todayScheduled, ...upcoming];
+    const seen = new Set<number>();
+    return merged
+      .filter((fixture: any) => {
+        const id = Number(fixture.id);
+        if (!Number.isFinite(id) || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .filter((fixture: any) => new Date(fixture.starting_at).getTime() > Date.now())
+      .sort((a: any, b: any) => new Date(a.starting_at).getTime() - new Date(b.starting_at).getTime())
+      .slice(0, 50);
+  }, [todayScheduled, upcoming]);
 
   return (
     <section>
