@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 
 function sportmonksDate(value: Date) {
@@ -8,34 +7,21 @@ function sportmonksDate(value: Date) {
 
 @Injectable()
 export class MatchesService {
-  private readonly allowedLeagueIds: Set<number>;
-
-  constructor(
-    private readonly sportmonks: SportmonksDataService,
-    config: ConfigService,
-  ) {
-    const raw = config.get<string>('ALLOWED_SPORTMONKS_LEAGUE_IDS', '');
-    this.allowedLeagueIds = new Set(
-      raw.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !Number.isNaN(n)),
-    );
-  }
-
-  private isAllowed(leagueId: number) {
-    return this.allowedLeagueIds.size === 0 || this.allowedLeagueIds.has(leagueId);
-  }
-
-  private filterAllowed<T extends { league_id: number }>(rows: T[]) {
-    return rows.filter((f) => this.isAllowed(f.league_id));
-  }
+  constructor(private readonly sportmonks: SportmonksDataService) {}
 
   async listUpcomingAndRecent(page = 1) {
-    const envelope = await this.sportmonks.listFixtures({ page });
-    return { ...envelope, data: this.filterAllowed(envelope.data) };
+    // Sportmonks already limits fixture results to the leagues covered by the
+    // customer's subscription. Do not apply a second hard-coded league
+    // allow-list here: doing so can hide newly covered competitions.
+    return this.sportmonks.listFixtures({
+      page,
+      include: 'localteam,visitorteam,venue,league,season,stage,tosswon',
+    });
   }
 
   async listLive() {
-    const envelope = await this.sportmonks.listLiveFixtures();
-    return { ...envelope, data: this.filterAllowed(envelope.data) };
+    // The livescores endpoint is the correct source for current-day/live data.
+    return this.sportmonks.listLiveFixtures();
   }
 
   async listUpcoming(days = 4) {
@@ -43,15 +29,18 @@ export class MatchesService {
     const end = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
     const envelope = await this.sportmonks.listFixtures({
       startsBetween: { start: sportmonksDate(now), end: sportmonksDate(end) },
-      // Sportmonks Cricket API v2.0 allows `lineup` on fixtures, but the
-      // current plan does not allow the nested `lineup.player` include.
-      // The `lineup` response already contains player details needed by the app.
-      include: 'localteam,visitorteam,venue,lineup',
+      sort: 'starting_at',
+      // Keep list payloads useful but compact. Fixture details use the
+      // richer fixture-by-id endpoint when users open a match.
+      include: 'localteam,visitorteam,venue,league,season,stage,tosswon,lineup',
     });
-    const data = this.filterAllowed(envelope.data)
-      .filter((f) => new Date(f.starting_at) > now)
-      .sort((a, b) => new Date(a.starting_at).getTime() - new Date(b.starting_at).getTime());
-    return { ...envelope, data };
+
+    return {
+      ...envelope,
+      data: envelope.data
+        .filter((f) => new Date(f.starting_at).getTime() > now.getTime())
+        .sort((a, b) => new Date(a.starting_at).getTime() - new Date(b.starting_at).getTime()),
+    };
   }
 
   async listCompleted(daysBack = 14) {
@@ -59,17 +48,24 @@ export class MatchesService {
     const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
     const envelope = await this.sportmonks.listFixtures({
       startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) },
-      include: 'localteam,visitorteam,venue,runs,scoreboards',
+      sort: '-starting_at',
+      include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,winnerteam,tosswon',
     });
-    const data = this.filterAllowed(envelope.data)
-      .filter((f) => {
-        const status = String(f.status ?? '').toLowerCase();
-        return new Date(f.starting_at) <= now && f.live === 0 && (
-          status.includes('finished') || status.includes('abandoned') || status.includes('cancelled') || status.includes('postponed')
-        );
-      })
-      .sort((a, b) => new Date(b.starting_at).getTime() - new Date(a.starting_at).getTime());
-    return { ...envelope, data };
+
+    return {
+      ...envelope,
+      data: envelope.data
+        .filter((f) => {
+          const status = String(f.status ?? '').toLowerCase();
+          return new Date(f.starting_at).getTime() <= now.getTime() && f.live === 0 && (
+            status.includes('finished') ||
+            status.includes('abandoned') ||
+            status.includes('cancelled') ||
+            status.includes('postponed')
+          );
+        })
+        .sort((a, b) => new Date(b.starting_at).getTime() - new Date(a.starting_at).getTime()),
+    };
   }
 
   async getDetail(fixtureId: number) {
