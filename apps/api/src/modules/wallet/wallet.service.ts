@@ -36,6 +36,7 @@ export class WalletService {
       | 'DEPOSIT'
       | 'WITHDRAWAL'
       | 'CONTEST_ENTRY_DEBIT'
+      | 'FANTASY_TEAM_CREATION_DEBIT'
       | 'CONTEST_WINNING_CREDIT'
       | 'CONTEST_ENTRY_REFUND'
       | 'BONUS_CREDIT'
