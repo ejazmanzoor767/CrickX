@@ -116,7 +116,7 @@ export default function ProfilePage() {
 
       <div className="profile-grid">
         <div className="card">
-          <div className="section-mini-row"><div><p className="eyebrow">PLAYER IDENTITY</p><h2>Profile details</h2></div><span className="demo-pill">DATABASE SAVED</span></div>
+          <div className="section-mini-row"><div><p className="eyebrow">PLAYER IDENTITY</p><h2>Profile details</h2></div></div>
           <form onSubmit={save}>
             <label className="form-label">Display name</label>
             <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your cricket name" />
@@ -133,7 +133,6 @@ export default function ProfilePage() {
         <div className="profile-side">
           <div className="card">
             <div className="section-mini-row"><div><p className="eyebrow">PROFILE PHOTO</p><h2>Upload avatar</h2></div><span className="demo-pill">JPG · PNG · WEBP</span></div>
-            <p className="section-subtitle">Choose a photo and CrickX will resize it to 512×512 and store the compressed image directly in your Firestore profile record.</p>
             <label className="primary-button full" style={{ cursor: photoSaving ? 'wait' : 'pointer' }}>
               {photoSaving ? 'Saving photo…' : profile.avatarUrl ? 'Change profile photo' : 'Upload profile photo'}
               <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoSaving} style={{ display: 'none' }} />
