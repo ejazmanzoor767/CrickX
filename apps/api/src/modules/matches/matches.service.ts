@@ -18,24 +18,15 @@ export class MatchesService {
   }
 
   async listToday() {
-    const now = new Date();
-    const today = sportmonksDate(now);
-    const envelope = await this.sportmonks.listFixtures({
-      startsBetween: { start: today, end: today },
-      page: 1,
-      include: 'localteam,visitorteam,venue,league,season,stage,tosswon,runs,scoreboards',
-    });
-
-    const data = (Array.isArray(envelope.data) ? envelope.data : [])
-      .filter((f: SportmonksFixture) => sportmonksDate(new Date(f.starting_at)) === today)
-      .sort((a: SportmonksFixture, b: SportmonksFixture) =>
-        new Date(a.starting_at).getTime() - new Date(b.starting_at).getTime(),
-      );
-
-    return { ...envelope, data };
+    // Sportmonks documents /livescores as the current-day feed. Use it
+    // directly instead of /fixtures with a date filter so today's fixture
+    // set follows the provider's own current-day semantics and subscription
+    // coverage.
+    return this.sportmonks.listTodayFixtures();
   }
 
   async listLive() {
+    // /livescores/now is the dedicated in-play feed.
     return this.sportmonks.listLiveFixtures();
   }
 
@@ -92,7 +83,7 @@ export class MatchesService {
       const envelope = await this.sportmonks.listFixtures({
         startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) },
         page,
-        include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,winnerteam,tosswon',
+        include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon',
       });
 
       fixtures.push(...(Array.isArray(envelope.data) ? envelope.data : []));
