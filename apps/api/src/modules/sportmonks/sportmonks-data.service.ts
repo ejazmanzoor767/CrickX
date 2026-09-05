@@ -8,9 +8,10 @@ import {
   SportmonksTeam,
 } from './sportmonks.types';
 
-// These are top-level includes documented/accepted by the Cricket API 2.0.
-// Do not use unsupported nested includes such as lineup.player.
-const FIXTURE_INCLUDES = 'localteam,visitorteam,venue,runs,batting,bowling,lineup,scoreboards,stage,season,league,tosswon,winnerteam';
+// Keep fixture includes to the exact top-level relationships accepted by the
+// connected Cricket API 2.0 account. Do not use unsupported nested includes
+// such as lineup.player or unsupported relationships such as winnerteam.
+const FIXTURE_INCLUDES = 'localteam,visitorteam,venue,runs,batting,bowling,lineup,scoreboards,stage,season,league,tosswon';
 const LIVE_FIXTURE_INCLUDES = `${FIXTURE_INCLUDES},balls`;
 
 const TTL_LIVE_MS = 15 * 1000;
@@ -116,16 +117,15 @@ export class SportmonksDataService {
   }
 
   async listTodayFixtures() {
-    // Cricket API 2.0's /livescores returns all fixtures for the current day,
-    // not only fixtures already in progress.
+    // /livescores is the current-day feed and includes scheduled and live
+    // fixtures for today.
     return this.client.get<SportmonksFixture[]>('/livescores', {
       include: LIVE_FIXTURE_INCLUDES,
     });
   }
 
   async listLiveFixtures() {
-    // /livescores/now is the in-play feed. The broader /livescores feed is
-    // exposed separately through listTodayFixtures().
+    // /livescores/now is the dedicated in-play feed.
     return this.client.get<SportmonksFixture[]>('/livescores/now', {
       include: LIVE_FIXTURE_INCLUDES,
     });
