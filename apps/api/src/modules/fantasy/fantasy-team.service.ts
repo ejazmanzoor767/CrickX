@@ -1,18 +1,21 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
+import { WalletService } from '../wallet/wallet.service';
 import { CreateFantasyTeamDto } from './dto';
 
 const SQUAD_SIZE = 11;
 const MAX_CREDITS = 100;
 const MAX_PLAYERS_PER_REAL_TEAM = 7;
 const DEFAULT_PLAYER_CREDITS = 9;
+const TEAM_CREATION_FEE = 4;
 
 @Injectable()
 export class FantasyTeamService {
   constructor(
     private readonly prisma: FirestoreService,
     private readonly sportmonks: SportmonksDataService,
+    private readonly wallet: WalletService,
   ) {}
 
   private async assertLineupEligible(fixtureId: number, playerIds: number[]) {
@@ -48,22 +51,46 @@ export class FantasyTeamService {
     if (!uniqueIds.has(dto.viceCaptainSportmonksPlayerId)) throw new BadRequestException('Vice-captain must be part of the squad.');
     if (dto.captainSportmonksPlayerId === dto.viceCaptainSportmonksPlayerId) throw new BadRequestException('Captain and vice-captain must be different players.');
 
+    const existing = await this.prisma.findFirstOp({ where: { userId, sportmonksFixtureId: dto.sportmonksFixtureId } });
+    if (existing) throw new ForbiddenException('You already created a fantasy team for this match.');
+
     const { lineup } = await this.assertLineupEligible(dto.sportmonksFixtureId, dto.sportmonksPlayerIds);
     const creditByPlayer = await this.ensureCredits(dto.sportmonksFixtureId, dto.sportmonksPlayerIds);
     const totalCredits = dto.sportmonksPlayerIds.reduce((sum, playerId) => sum + Number(creditByPlayer.get(playerId) ?? DEFAULT_PLAYER_CREDITS), 0);
     if (totalCredits > MAX_CREDITS) throw new BadRequestException(`Squad costs ${totalCredits} credits, exceeds the ${MAX_CREDITS} credit cap.`);
 
     const playerTeamMap = new Map(lineup.map((p) => [p.player_id, p.team_id]));
-    return this.prisma.fantasyTeam.create({
-      data: {
+    const teamId = `team_${userId}_${dto.sportmonksFixtureId}`;
+
+    return this.prisma.$transaction(async (tx) => {
+      const latestExisting = await tx.findUnique({ where: { id: teamId }, include: { players: true } });
+      if (latestExisting) return latestExisting;
+
+      const team = await tx.create({
+        data: {
+          id: teamId,
+          userId,
+          sportmonksFixtureId: dto.sportmonksFixtureId,
+          name: dto.name,
+          captainSportmonksPlayerId: dto.captainSportmonksPlayerId,
+          viceCaptainSportmonksPlayerId: dto.viceCaptainSportmonksPlayerId,
+          players: { create: dto.sportmonksPlayerIds.map((playerId) => ({ sportmonksPlayerId: playerId, sportmonksTeamId: playerTeamMap.get(playerId)!, creditsAtSelection: creditByPlayer.get(playerId)! })) },
+        },
+        include: { players: true },
+      });
+
+      await this.wallet.mutateBalance({
         userId,
-        sportmonksFixtureId: dto.sportmonksFixtureId,
-        name: dto.name,
-        captainSportmonksPlayerId: dto.captainSportmonksPlayerId,
-        viceCaptainSportmonksPlayerId: dto.viceCaptainSportmonksPlayerId,
-        players: { create: dto.sportmonksPlayerIds.map((playerId) => ({ sportmonksPlayerId: playerId, sportmonksTeamId: playerTeamMap.get(playerId)!, creditsAtSelection: creditByPlayer.get(playerId)! })) },
-      },
-      include: { players: true },
+        bucket: 'DEPOSIT',
+        delta: -TEAM_CREATION_FEE,
+        type: 'CONTEST_ENTRY_DEBIT',
+        idempotencyKey: `fantasy-team-create:${userId}:${dto.sportmonksFixtureId}`,
+        referenceType: 'FANTASY_TEAM',
+        referenceId: teamId,
+        metadata: { description: 'Fantasy Team Entry', unit: 'GEM', amount: TEAM_CREATION_FEE },
+      });
+
+      return team;
     });
   }
 
