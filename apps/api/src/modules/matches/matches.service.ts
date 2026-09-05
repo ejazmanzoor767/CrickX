@@ -17,11 +17,14 @@ export class MatchesService {
     });
   }
 
+  async listLeagues() {
+    return this.sportmonks.listLeagues();
+  }
+
   async listToday() {
     // Sportmonks documents /livescores as the current-day feed. Use it
-    // directly instead of /fixtures with a date filter so today's fixture
-    // set follows the provider's own current-day semantics and subscription
-    // coverage.
+    // directly so today's fixture set follows provider current-day semantics
+    // and the leagues enabled on the customer's subscription.
     return this.sportmonks.listTodayFixtures();
   }
 
