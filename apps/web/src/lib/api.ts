@@ -79,6 +79,7 @@ const leaderboard = (path: string, params?: Record<string, string | number>) => 
 
 export const api = {
   matches: () => apiFetch('/matches'),
+  todayMatches: () => feed('/today'),
   liveMatches: () => feed('/live'),
   upcomingMatches: (days = 4) => feed('/upcoming', { days }),
   completedMatches: (days = 14) => feed('/completed', { days }),
@@ -90,7 +91,7 @@ export const api = {
   myFantasyTeams: () => apiFetch('/fantasy/teams'),
   createFantasyTeam: (payload: unknown) => apiFetch('/fantasy/teams', { method: 'POST', body: JSON.stringify(payload) }),
   editFantasyTeam: (teamId: string, payload: unknown) => apiFetch(`/fantasy/teams/${teamId}`, { method: 'PUT', body: JSON.stringify(payload) }),
-  joinContest: (contestId: string, fantasyTeamId: string) => apiFetch('/fantasy/contests/join', { method: 'POST', body: JSON.stringify({ contestId, fantasyTeamId }) }),
+  joinContest: (contestId: string, fantasyTeamId: string) => apiFetch('/fantasy/contests/join', { method: 'POST', body: JSON.stringify({ contestId, fantasyTeamId })),
   myEntries: () => apiFetch('/fantasy/contests/mine/entries'),
   fantasyDraft: (fixtureId: number) => apiFetch(`/fantasy/teams/draft/${fixtureId}`),
   saveFantasyDraft: (fixtureId: number, payload: unknown) => apiFetch(`/fantasy/teams/draft/${fixtureId}`, { method: 'PUT', body: JSON.stringify(payload) }),
