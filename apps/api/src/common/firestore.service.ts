@@ -274,6 +274,8 @@ export class FirestoreService implements OnModuleInit, OnModuleDestroy {
 
   async $transaction<T>(arg: ((tx: this) => Promise<T>) | Array<Promise<T>>): Promise<T | T[]> {
     if (Array.isArray(arg)) return Promise.all(arg);
+    const active = this.transactionContext.getStore();
+    if (active) return arg(this);
     return this.db.runTransaction((t) => this.transactionContext.run(t, () => arg(this)));
   }
 
@@ -291,53 +293,13 @@ export class FirestoreService implements OnModuleInit, OnModuleDestroy {
     if (model === 'contestEntry') {
       if (include?.contest) out.contest = await this.findUnique('contest', { where: { id: row.contestId }, include: include.contest === true ? undefined : include.contest.include });
       if (include?.fantasyTeam) out.fantasyTeam = await this.findUnique('fantasyTeam', { where: { id: row.fantasyTeamId }, include: include.fantasyTeam === true ? undefined : include.fantasyTeam.include });
-      if (include?.user) out.user = await this.findUnique('user', { where: { id: row.userId }, select: include.user === true ? undefined : include.user.select });
     }
-    if (model === 'contest') {
-      if (include?.scoringRuleSet) out.scoringRuleSet = await this.findUnique('scoringRuleSet', { where: { id: row.scoringRuleSetId } });
-      if (include?.entries) out.entries = await this.findMany('contestEntry', { where: { contestId: row.id }, include: include.entries === true ? undefined : include.entries.include });
-    }
-    if ((model === 'kycRecord' || model === 'withdrawal') && include?.user) out.user = await this.findUnique('user', { where: { id: row.userId }, select: include.user === true ? undefined : include.user.select });
     if (select) {
-      const picked: any = {};
-      for (const [k, enabled] of Object.entries(select)) if (enabled && out[k] !== undefined) picked[k] = out[k];
-      return picked;
+      const picked: Record<string, any> = {};
+      for (const [key, enabled] of Object.entries(select)) if (enabled) picked[key] = out[key];
+      if (picked.id === undefined && out.id !== undefined) picked.id = out.id;
+      out = picked;
     }
     return out;
-  }
-
-  readonly user = this.delegate('user');
-  readonly refreshToken = this.delegate('refreshToken');
-  readonly authAuditLog = this.delegate('authAuditLog');
-  readonly profile = this.delegate('profile');
-  readonly kycRecord = this.delegate('kycRecord');
-  readonly wallet = this.delegate('wallet');
-  readonly transaction = this.delegate('transaction');
-  readonly deposit = this.delegate('deposit');
-  readonly withdrawal = this.delegate('withdrawal');
-  readonly scoringRuleSet = this.delegate('scoringRuleSet');
-  readonly contest = this.delegate('contest');
-  readonly contestEntry = this.delegate('contestEntry');
-  readonly fantasyTeam = this.delegate('fantasyTeam');
-  readonly fantasyTeamPlayer = this.delegate('fantasyTeamPlayer');
-  readonly fantasyTeamEditHistory = this.delegate('fantasyTeamEditHistory');
-  readonly leaderboardSnapshot = this.delegate('leaderboardSnapshot');
-  readonly playerFixtureCredit = this.delegate('playerFixtureCredit');
-  readonly cachedFixture = this.delegate('cachedFixture');
-  readonly cachedPlayer = this.delegate('cachedPlayer');
-
-  private delegate(model: string) {
-    return {
-      findUnique: (args: any) => this.findUnique(model, args),
-      findFirst: (args: any) => this.findFirstOp(model, args),
-      findMany: (args?: any) => this.findMany(model, args),
-      create: (args: any) => this.create(model, args),
-      update: (args: any) => this.update(model, args),
-      updateMany: (args: any) => this.updateMany(model, args),
-      deleteMany: (args: any) => this.deleteMany(model, args),
-      count: (args?: any) => this.count(model, args),
-      aggregate: (args: any) => this.aggregate(model, args),
-      upsert: (args: any) => this.upsert(model, args),
-    };
   }
 }
