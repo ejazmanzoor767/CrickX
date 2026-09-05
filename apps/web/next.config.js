@@ -2,5 +2,5 @@
 module.exports = {
   reactStrictMode: true,
   output: 'export',
-  trailingSlash: false,
+  trailingSlash: true,
 };
