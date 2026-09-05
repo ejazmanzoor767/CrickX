@@ -8,12 +8,15 @@ import {
   SportmonksTeam,
 } from './sportmonks.types';
 
-const FIXTURE_INCLUDES = 'localteam,visitorteam,venue,runs,batting,bowling,lineup,scoreboards';
+// These are top-level includes documented/accepted by the Cricket API 2.0.
+// Do not use unsupported nested includes such as lineup.player.
+const FIXTURE_INCLUDES = 'localteam,visitorteam,venue,runs,batting,bowling,lineup,scoreboards,stage,season,league,tosswon,winnerteam';
 const LIVE_FIXTURE_INCLUDES = `${FIXTURE_INCLUDES},balls`;
 
 const TTL_LIVE_MS = 15 * 1000;
 const TTL_UPCOMING_MS = 5 * 60 * 1000;
 const TTL_PLAYER_MS = 60 * 60 * 1000;
+const MAX_FIXTURE_PAGES = 5;
 
 function normalizeLineupPlayer(entry: any): SportmonksLineupPlayer {
   const meta = entry?.lineup ?? {};
@@ -65,6 +68,7 @@ export class SportmonksDataService {
     status?: string;
     startsBetween?: { start: string; end: string };
     include?: string;
+    sort?: string;
   }) {
     const filter: Record<string, string> = {};
     if (params.leagueId) filter['filter[league_id]'] = String(params.leagueId);
@@ -78,14 +82,51 @@ export class SportmonksDataService {
       ...filter,
     };
     if (params.page !== undefined) requestParams.page = params.page;
+    if (params.sort) requestParams.sort = params.sort;
 
-    // Keep this request minimal and close to Sportmonks' documented v2.0
-    // fixture examples. Sorting is performed locally by MatchesService.
     return this.client.get<SportmonksFixture[]>('/fixtures', requestParams);
   }
 
-  async listLiveFixtures() {
+  async listFixturesPaginated(params: {
+    leagueId?: number;
+    startsBetween?: { start: string; end: string };
+    status?: string;
+    include?: string;
+    sort?: string;
+  }, maxPages = MAX_FIXTURE_PAGES) {
+    const rows: SportmonksFixture[] = [];
+    let lastEnvelope: any = null;
+
+    for (let page = 1; page <= maxPages; page += 1) {
+      const envelope = await this.listFixtures({ ...params, page });
+      lastEnvelope = envelope;
+      rows.push(...(envelope.data ?? []));
+
+      const pagination = envelope.meta?.pagination;
+      if (!pagination || pagination.current_page >= pagination.total_pages || (envelope.data ?? []).length === 0) {
+        break;
+      }
+    }
+
+    if (!lastEnvelope) return { data: [] as SportmonksFixture[] };
+    return {
+      ...lastEnvelope,
+      data: rows,
+    };
+  }
+
+  async listTodayFixtures() {
+    // Cricket API 2.0's /livescores returns all fixtures for the current day,
+    // not only fixtures already in progress.
     return this.client.get<SportmonksFixture[]>('/livescores', {
+      include: LIVE_FIXTURE_INCLUDES,
+    });
+  }
+
+  async listLiveFixtures() {
+    // /livescores/now is the in-play feed. The broader /livescores feed is
+    // exposed separately through listTodayFixtures().
+    return this.client.get<SportmonksFixture[]>('/livescores/now', {
       include: LIVE_FIXTURE_INCLUDES,
     });
   }
