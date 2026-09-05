@@ -25,7 +25,6 @@ export default function Home() {
             <div className="score">11 <span>PLAYERS.</span></div>
             <div className="score">5 <span>PKR / GEM.</span></div>
             <p>Pick smart. Track points. Build your own fantasy story.</p>
-            <div className="card" style={{ marginBottom: 0 }}><strong>DEMO MODE</strong><p style={{ marginBottom: 0 }}>No real-money deposits or withdrawals.</p></div>
           </div>
         </div>
       </div>
