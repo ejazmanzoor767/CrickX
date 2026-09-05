@@ -83,7 +83,7 @@ export class FantasyTeamService {
         userId,
         bucket: 'DEPOSIT',
         delta: -TEAM_CREATION_FEE,
-        type: 'CONTEST_ENTRY_DEBIT',
+        type: 'FANTASY_TEAM_CREATION_DEBIT',
         idempotencyKey: `fantasy-team-create:${userId}:${dto.sportmonksFixtureId}`,
         referenceType: 'FANTASY_TEAM',
         referenceId: teamId,
