@@ -16,6 +16,7 @@ type Transaction = { id: string; type?: string; amount?: number | string; balanc
 function formatNumber(value: number) { return new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(value); }
 function initials(value: string) { return value.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'CX'; }
 function transactionLabel(type?: string) {
+  if (type === 'FANTASY_TEAM_CREATION_DEBIT') return 'Fantasy Team Entry';
   return (type || 'TRANSACTION').replaceAll('_', ' ').toLowerCase().replace(/(^| )\S/g, (letter) => letter.toUpperCase());
 }
 
@@ -57,7 +58,7 @@ export default function WalletPage() {
     if (filter === 'ALL') return transactions;
     return transactions.filter((tx) => filter === 'CREDIT'
       ? ['DEPOSIT', 'CONTEST_WINNING_CREDIT', 'CONTEST_ENTRY_REFUND', 'BONUS_CREDIT'].includes(tx.type ?? '')
-      : ['WITHDRAWAL', 'CONTEST_ENTRY_DEBIT'].includes(tx.type ?? ''));
+      : ['WITHDRAWAL', 'CONTEST_ENTRY_DEBIT', 'FANTASY_TEAM_CREATION_DEBIT'].includes(tx.type ?? ''));
   }, [filter, transactions]);
 
   async function deposit() {
