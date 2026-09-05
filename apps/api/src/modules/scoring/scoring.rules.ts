@@ -1,99 +1,87 @@
 import { SportmonksBatting, SportmonksBowling } from '../sportmonks/sportmonks.types';
 
 export interface ScoringRules {
-  appearance: number;
   run: number;
   four_bonus: number;
   six_bonus: number;
-  half_century_bonus: number;
-  century_bonus: number;
   duck_penalty: number;
   wicket: number;
-  three_wicket_bonus: number;
-  five_wicket_bonus: number;
   maiden_over: number;
   catch: number;
   stumping: number;
   run_out: number;
-  batting_strike_rate_min_balls: number;
-  batting_strike_rate_bonus_threshold: number;
-  batting_strike_rate_bonus: number;
-  batting_strike_rate_penalty_threshold: number;
-  batting_strike_rate_penalty: number;
-  bowling_min_overs: number;
-  bowling_economy_bonus_threshold: number;
-  bowling_economy_bonus: number;
-  bowling_economy_penalty_threshold: number;
-  bowling_economy_penalty: number;
+  strike_rate_bands: Array<{ max: number; points: number }>;
+  bowling_economy_bands: Array<{ max: number; points: number }>;
+  milestone_runs: number;
+  milestone_points: number;
+  minimum_balls_for_strike_rate: number;
+  minimum_overs_for_economy: number;
   captain_multiplier: number;
   vice_captain_multiplier: number;
+  player_of_match_bonus: number;
+  winning_team_bonus: number;
+  dot_ball_bonus: number;
 }
 
-export const DEFAULT_RULES: ScoringRules = {
-  appearance: 4,
-  run: 1,
-  four_bonus: 1,
-  six_bonus: 2,
-  half_century_bonus: 8,
-  century_bonus: 16,
-  duck_penalty: -2,
-  wicket: 25,
-  three_wicket_bonus: 4,
-  five_wicket_bonus: 8,
-  maiden_over: 4,
-  catch: 8,
-  stumping: 12,
-  run_out: 6,
-  batting_strike_rate_min_balls: 10,
-  batting_strike_rate_bonus_threshold: 160,
-  batting_strike_rate_bonus: 6,
-  batting_strike_rate_penalty_threshold: 70,
-  batting_strike_rate_penalty: -2,
-  bowling_min_overs: 2,
-  bowling_economy_bonus_threshold: 5,
-  bowling_economy_bonus: 3,
-  bowling_economy_penalty_threshold: 10,
-  bowling_economy_penalty: -2,
-  captain_multiplier: 2,
-  vice_captain_multiplier: 1.5,
-};
+const T20_STRIKE_RATE = [
+  { max: 49.99, points: -30 }, { max: 59.99, points: -20 }, { max: 79.99, points: -10 },
+  { max: 99.99, points: 0 }, { max: 149.99, points: 10 }, { max: 174.99, points: 20 }, { max: 1000, points: 30 },
+];
+const T20_ECONOMY = [
+  { max: 4.99, points: 30 }, { max: 5.99, points: 20 }, { max: 7.99, points: 10 }, { max: 8.99, points: 0 },
+  { max: 9.99, points: -10 }, { max: 11.99, points: -20 }, { max: 1000, points: -30 },
+];
+const T10_STRIKE_RATE = [
+  { max: 39.99, points: -40 }, { max: 59.99, points: -30 }, { max: 79.99, points: -20 }, { max: 99.99, points: -10 },
+  { max: 124.99, points: 10 }, { max: 149.99, points: 20 }, { max: 199.99, points: 30 }, { max: 1000, points: 40 },
+];
+const T10_ECONOMY = [
+  { max: 5.99, points: 40 }, { max: 7.99, points: 30 }, { max: 9.99, points: 20 }, { max: 11.99, points: 10 },
+  { max: 13.99, points: -10 }, { max: 15.99, points: -20 }, { max: 19.99, points: -30 }, { max: 1000, points: -40 },
+];
+const ODI_STRIKE_RATE = [
+  { max: 29.99, points: -30 }, { max: 49.99, points: -20 }, { max: 59.99, points: -10 }, { max: 99.99, points: 5 },
+  { max: 124.99, points: 10 }, { max: 149.99, points: 20 }, { max: 1000, points: 30 },
+];
+const ODI_ECONOMY = [
+  { max: 2.49, points: 30 }, { max: 4, points: 20 }, { max: 5, points: 10 }, { max: 7, points: 0 },
+  { max: 9, points: -10 }, { max: 10, points: -20 }, { max: 1000, points: -30 },
+];
 
-export const T20_RULES: ScoringRules = {
-  ...DEFAULT_RULES,
-  half_century_bonus: 8,
-  century_bonus: 16,
-  batting_strike_rate_min_balls: 10,
-  batting_strike_rate_bonus_threshold: 160,
-  batting_strike_rate_bonus: 6,
-  batting_strike_rate_penalty_threshold: 70,
-  bowling_min_overs: 2,
-  bowling_economy_bonus_threshold: 5,
-  bowling_economy_bonus: 3,
-  bowling_economy_penalty_threshold: 10,
-  bowling_economy_penalty: -2,
-};
+function baseRules(overrides: Partial<ScoringRules>): ScoringRules {
+  return {
+    run: 1, four_bonus: 5, six_bonus: 10, duck_penalty: -10, wicket: 30, maiden_over: 20,
+    catch: 10, stumping: 20, run_out: 10,
+    strike_rate_bands: T20_STRIKE_RATE, bowling_economy_bands: T20_ECONOMY,
+    milestone_runs: 25, milestone_points: 20, minimum_balls_for_strike_rate: 1, minimum_overs_for_economy: 1,
+    captain_multiplier: 2, vice_captain_multiplier: 1.5, player_of_match_bonus: 25, winning_team_bonus: 5,
+    dot_ball_bonus: 3, ...overrides,
+  };
+}
 
-export const ODI_RULES: ScoringRules = {
-  ...DEFAULT_RULES,
-  half_century_bonus: 8,
-  century_bonus: 16,
-  batting_strike_rate_min_balls: 20,
-  batting_strike_rate_bonus_threshold: 100,
-  batting_strike_rate_bonus: 4,
-  batting_strike_rate_penalty_threshold: 50,
-  batting_strike_rate_penalty: -2,
-  bowling_min_overs: 4,
-  bowling_economy_bonus_threshold: 4,
-  bowling_economy_bonus: 3,
-  bowling_economy_penalty_threshold: 7,
-  bowling_economy_penalty: -2,
-};
+export const T20_RULES = baseRules({ strike_rate_bands: T20_STRIKE_RATE, bowling_economy_bands: T20_ECONOMY, milestone_runs: 25, milestone_points: 20, dot_ball_bonus: 3 });
+export const T10_RULES = baseRules({ strike_rate_bands: T10_STRIKE_RATE, bowling_economy_bands: T10_ECONOMY, milestone_runs: 20, milestone_points: 25, dot_ball_bonus: 5 });
+export const ODI_RULES = baseRules({ strike_rate_bands: ODI_STRIKE_RATE, bowling_economy_bands: ODI_ECONOMY, milestone_runs: 50, milestone_points: 20, wicket: 25, maiden_over: 10, dot_ball_bonus: 1 });
 
 export function rulesForFormat(format: string | null | undefined): ScoringRules {
   const value = String(format ?? '').toUpperCase();
-  if (value.includes('ODI')) return ODI_RULES;
-  if (value.includes('T20')) return T20_RULES;
-  return DEFAULT_RULES;
+  if (value.includes('ODI') || value.includes('ONE DAY')) return ODI_RULES;
+  if (value.includes('T10') || value.includes('TEN')) return T10_RULES;
+  return T20_RULES;
+}
+
+function bandPoints(value: number, bands: Array<{ max: number; points: number }>) {
+  if (!Number.isFinite(value)) return 0;
+  return bands.find((band) => value <= band.max)?.points ?? 0;
+}
+
+function economyFromOvers(runs: number, oversValue: number) {
+  const numeric = Number(oversValue ?? 0);
+  if (numeric <= 0) return 0;
+  const whole = Math.floor(numeric);
+  const balls = Math.round((numeric - whole) * 10);
+  const legalBalls = whole * 6 + Math.min(5, Math.max(0, balls));
+  return legalBalls > 0 ? (runs / legalBalls) * 6 : 0;
 }
 
 export function computePlayerPoints(
@@ -101,53 +89,37 @@ export function computePlayerPoints(
   batting?: Pick<SportmonksBatting, 'score' | 'ball' | 'four_x' | 'six_x' | 'rate'>,
   bowling?: Pick<SportmonksBowling, 'wickets' | 'medians' | 'runs' | 'overs'>,
   fielding?: { catches: number; stumpings: number; runOuts: number },
+  dotBalls = 0,
+  playerOfMatch = false,
+  winningTeam = false,
 ): number {
-  let points = batting || bowling || fielding ? rules.appearance : 0;
-
+  let points = 0;
   if (batting) {
     points += batting.score * rules.run;
     points += batting.four_x * rules.four_bonus;
     points += batting.six_x * rules.six_bonus;
     if (batting.score === 0 && batting.ball > 0) points += rules.duck_penalty;
-    if (batting.score >= 100) points += rules.century_bonus;
-    else if (batting.score >= 50) points += rules.half_century_bonus;
-
-    if (batting.ball >= rules.batting_strike_rate_min_balls) {
-      if (batting.rate >= rules.batting_strike_rate_bonus_threshold) points += rules.batting_strike_rate_bonus;
-      else if (batting.rate < rules.batting_strike_rate_penalty_threshold) points += rules.batting_strike_rate_penalty;
-    }
+    if (batting.ball >= rules.minimum_balls_for_strike_rate) points += bandPoints(batting.rate, rules.strike_rate_bands);
+    if (rules.milestone_runs > 0) points += Math.floor(batting.score / rules.milestone_runs) * rules.milestone_points;
   }
-
   if (bowling) {
     points += bowling.wickets * rules.wicket;
-    if (bowling.wickets >= 5) points += rules.five_wicket_bonus;
-    else if (bowling.wickets >= 3) points += rules.three_wicket_bonus;
     points += bowling.medians * rules.maiden_over;
-
-    if (bowling.overs >= rules.bowling_min_overs) {
-      const economy = bowling.overs > 0 ? bowling.runs / bowling.overs : 0;
-      if (economy > 0 && economy <= rules.bowling_economy_bonus_threshold) points += rules.bowling_economy_bonus;
-      else if (economy >= rules.bowling_economy_penalty_threshold) points += rules.bowling_economy_penalty;
-    }
+    points += dotBalls * rules.dot_ball_bonus;
+    if (bowling.overs >= rules.minimum_overs_for_economy) points += bandPoints(economyFromOvers(bowling.runs, bowling.overs), rules.bowling_economy_bands);
   }
-
   if (fielding) {
     points += fielding.catches * rules.catch;
     points += fielding.stumpings * rules.stumping;
     points += fielding.runOuts * rules.run_out;
   }
-
+  if (playerOfMatch) points += rules.player_of_match_bonus;
+  if (winningTeam) points += rules.winning_team_bonus;
   return Math.round(points * 10) / 10;
 }
 
-export function applyCaptaincy(
-  points: number,
-  playerId: number,
-  captainId: number,
-  viceCaptainId: number,
-  rules: ScoringRules,
-): number {
-  if (playerId === captainId) return points * rules.captain_multiplier;
-  if (playerId === viceCaptainId) return points * rules.vice_captain_multiplier;
+export function applyCaptaincy(points: number, playerId: number, captainId: number, viceCaptainId: number, rules: ScoringRules): number {
+  if (playerId === captainId) return Math.round(points * rules.captain_multiplier * 10) / 10;
+  if (playerId === viceCaptainId) return Math.round(points * rules.vice_captain_multiplier * 10) / 10;
   return points;
 }
