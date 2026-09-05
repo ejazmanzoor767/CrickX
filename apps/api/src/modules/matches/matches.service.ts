@@ -10,28 +10,26 @@ export class MatchesService {
   constructor(private readonly sportmonks: SportmonksDataService) {}
 
   async listUpcomingAndRecent(page = 1) {
-    // Sportmonks already limits fixture results to the leagues covered by the
-    // customer's subscription. Do not apply a second hard-coded league
-    // allow-list here: doing so can hide newly covered competitions.
     return this.sportmonks.listFixtures({
       page,
       include: 'localteam,visitorteam,venue,league,season,stage,tosswon',
     });
   }
 
+  async listToday() {
+    return this.sportmonks.listTodayFixtures();
+  }
+
   async listLive() {
-    // The livescores endpoint is the correct source for current-day/live data.
     return this.sportmonks.listLiveFixtures();
   }
 
   async listUpcoming(days = 4) {
     const now = new Date();
     const end = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-    const envelope = await this.sportmonks.listFixtures({
+    const envelope = await this.sportmonks.listFixturesPaginated({
       startsBetween: { start: sportmonksDate(now), end: sportmonksDate(end) },
       sort: 'starting_at',
-      // Keep list payloads useful but compact. Fixture details use the
-      // richer fixture-by-id endpoint when users open a match.
       include: 'localteam,visitorteam,venue,league,season,stage,tosswon,lineup',
     });
 
@@ -46,9 +44,9 @@ export class MatchesService {
   async listCompleted(daysBack = 14) {
     const now = new Date();
     const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
-    const envelope = await this.sportmonks.listFixtures({
+    const envelope = await this.sportmonks.listFixturesPaginated({
       startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) },
-      sort: '-starting_at',
+      sort: 'starting_at',
       include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,winnerteam,tosswon',
     });
 
