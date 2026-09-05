@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut, updateProfile, type User } from 'firebase/auth';
 import { getClientAuth } from './firebase';
 
@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const value = useMemo<AuthContextValue>(() => ({
+  const value: AuthContextValue = {
     user,
     loading,
     async signIn(email, password) {
@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return result.user;
     },
     logout: () => signOut(getClientAuth()),
-  }), [user, loading]);
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
