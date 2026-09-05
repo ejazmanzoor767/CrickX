@@ -91,7 +91,7 @@ export const api = {
   myFantasyTeams: () => apiFetch('/fantasy/teams'),
   createFantasyTeam: (payload: unknown) => apiFetch('/fantasy/teams', { method: 'POST', body: JSON.stringify(payload) }),
   editFantasyTeam: (teamId: string, payload: unknown) => apiFetch(`/fantasy/teams/${teamId}`, { method: 'PUT', body: JSON.stringify(payload) }),
-  joinContest: (contestId: string, fantasyTeamId: string) => apiFetch('/fantasy/contests/join', { method: 'POST', body: JSON.stringify({ contestId, fantasyTeamId })),
+  joinContest: (contestId: string, fantasyTeamId: string) => apiFetch('/fantasy/contests/join', { method: 'POST', body: JSON.stringify({ contestId, fantasyTeamId }) }),
   myEntries: () => apiFetch('/fantasy/contests/mine/entries'),
   fantasyDraft: (fixtureId: number) => apiFetch(`/fantasy/teams/draft/${fixtureId}`),
   saveFantasyDraft: (fixtureId: number, payload: unknown) => apiFetch(`/fantasy/teams/draft/${fixtureId}`, { method: 'PUT', body: JSON.stringify(payload) }),
@@ -104,7 +104,7 @@ export const api = {
   wallet: () => apiFetch('/wallet'),
   transactions: () => apiFetch('/wallet/transactions'),
   deposit: (amount: number, paymentGateway: string) => apiFetch('/wallet/deposits', { method: 'POST', body: JSON.stringify({ amount, paymentGateway }) }),
-  withdraw: (amount: number, bankAccountLast4: string) => apiFetch('/wallet/withdrawals', { method: 'POST', body: JSON.stringify({ amount, bankAccountLast4 }) }),
+  withdraw: (amount: number, bankAccountLast4: string) => apiFetch('/wallet/withdrawals', { method: 'POST', body: JSON.stringify({ amount, bankAccountLast4 })),
   profile: () => apiFetch('/profile'),
   updateProfile: (payload: unknown) => apiFetch('/profile', { method: 'PUT', body: JSON.stringify(payload) }),
 };
