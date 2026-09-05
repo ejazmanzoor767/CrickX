@@ -1,0 +1,23 @@
+'use client';
+
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '../../lib/api';
+import { useAuth } from '../../lib/auth-context';
+
+const list = (x:any) => Array.isArray(x) ? x : (x?.data ?? []);
+const fmt = (v:string) => new Date(v).toLocaleString('en-PK',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+
+export default function FantasyHomePage() {
+  const { user } = useAuth();
+  const [matches,setMatches]=useState<any[]>([]); const [teams,setTeams]=useState<any[]>([]); const [entries,setEntries]=useState<any[]>([]); const [tab,setTab]=useState<'TODAY'|'TOMORROW'>('TODAY'); const [loading,setLoading]=useState(true); const [error,setError]=useState('');
+  useEffect(()=>{let active=true; (async()=>{try{const [today,upcoming,mine,joined]=await Promise.all([api.todayMatches(),api.upcomingMatches(2),user?api.myFantasyTeams():Promise.resolve([]),user?api.myEntries():Promise.resolve([])]); if(!active)return; const now=new Date(); const todayDate=now.toISOString().slice(0,10); const tomorrow=new Date(now.getTime()+86400000).toISOString().slice(0,10); const all=[...list(today),...list(upcoming)].filter((m:any)=>Number(m.live)!==1&&new Date(m.starting_at)>now); const seen=new Set<number>(); setMatches(all.filter((m:any)=>{const id=Number(m.id); if(seen.has(id))return false; seen.add(id); const d=new Date(m.starting_at).toISOString().slice(0,10); return d===todayDate||d===tomorrow;})); setTeams(list(mine)); setEntries(list(joined));}catch(e){if(active)setError(e instanceof Error?e.message:'Unable to load fantasy matches.')}finally{if(active)setLoading(false)}})(); return()=>{active=false}},[user?.uid]);
+  const dayMatches=useMemo(()=>{const key=tab==='TODAY'?new Date().toISOString().slice(0,10):new Date(Date.now()+86400000).toISOString().slice(0,10); return matches.filter((m:any)=>new Date(m.starting_at).toISOString().slice(0,10)===key)},[matches,tab]);
+  const teamByFixture=useMemo(()=>{const map=new Map<number,any>(); for(const t of teams){const id=Number(t.sportmonksFixtureId); if(!map.has(id)) map.set(id,t);} return map},[teams]);
+  const joinedByFixture=useMemo(()=>new Set(entries.map((e:any)=>Number(e?.fantasyTeam?.sportmonksFixtureId??e?.contest?.sportmonksFixtureId)).filter(Number.isFinite)),[entries]);
+  return <section className="app-page"><div className="page-intro"><div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Choose your match</h1><p className="section-subtitle">Build your XI for today or tomorrow. Once created, your team stays attached to the match for View Team and live leaderboard tracking.</p></div><div className="page-actions"><Link className="secondary-button" href="/matches">Match centre</Link><Link className="secondary-button" href="/leaderboard">Leaderboard</Link></div></div>
+    <div className="card" style={{padding:8}}><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>{(['TODAY','TOMORROW'] as const).map(v=><button key={v} onClick={()=>setTab(v)} className={tab===v?'primary-button':'secondary-button'} style={{minHeight:48}}>{v}</button>)}</div></div>
+    {error&&<div className="card"><p className="error-text">{error}</p></div>}
+    {loading?<div className="card skeleton-card">Loading eligible fantasy matches…</div>:dayMatches.length===0?<div className="card empty-state"><strong>No fantasy matches for {tab.toLowerCase()}.</strong><span>Only upcoming matches before live play are shown here.</span></div>:<div className="match-list">{dayMatches.map((m:any)=>{const team=teamByFixture.get(Number(m.id)); const joined=joinedByFixture.has(Number(m.id)); const hasTeam=Boolean(team); return <article className="card match-list-card" key={m.id}><div className="match-topline"><span className="match-meta">{m.league?.name??m.type??'CRICKET'} · UPCOMING</span><span className="match-date">{fmt(m.starting_at)}</span></div><div className="match-teams"><div><small>{m.localteam?.code??'HOME'}</small><strong>{m.localteam?.name??'TBD'}</strong></div><span className="vs-badge">VS</span><div className="team-away"><small>{m.visitorteam?.code??'AWAY'}</small><strong>{m.visitorteam?.name??'TBD'}</strong></div></div><div className="section-subtitle" style={{marginTop:10}}>{m.venue?.name??'Venue unavailable'} · Entry 4 CrickX</div><div className="match-footer"><span>{joined?'Contest joined':hasTeam?'Team saved':'Ready to create'}</span><Link className="inline-action primary-link" href={`/fantasy?fixtureId=${m.id}`}>{joined||hasTeam?'View / Edit XI':'Create Team →'}</Link></div></article>})}</div>}
+  </section>;
+}
