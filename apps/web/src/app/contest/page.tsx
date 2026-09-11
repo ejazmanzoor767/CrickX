@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
 import { approveContestPool, connectWallet, CRX_CONTEST_POOL_ADDRESS, getCurrentWallet, joinOnchainContest, readCrxWallet } from '../../lib/web3';
+import type { Address } from 'viem';
 
 function ContestContent() {
   const params = useSearchParams();
@@ -13,7 +14,7 @@ function ContestContent() {
   const [contest, setContest] = useState<any>(null);
   const [teams, setTeams] = useState<any[]>([]);
   const [teamId, setTeamId] = useState(selectedTeamId);
-  const [address, setAddress] = useState<string | null>(null);
+  const [address, setAddress] = useState<Address | null>(null);
   const [wallet, setWallet] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -41,7 +42,7 @@ function ContestContent() {
     if (!teamId) return setError('Select your fantasy team first.');
     setBusy(true); setError(''); setMessage('Preparing your contest entry…');
     try {
-      const connected = address || await connectWallet();
+      const connected: Address = address || await connectWallet();
       setAddress(connected);
       const freshWallet = await readCrxWallet(connected);
       setWallet(freshWallet);
