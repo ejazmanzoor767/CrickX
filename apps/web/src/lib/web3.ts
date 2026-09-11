@@ -1,6 +1,7 @@
 'use client';
 
 import { createPublicClient, createWalletClient, custom, formatUnits, http, isAddress, parseUnits, type Address, type Hex } from 'viem';
+import { createEVMClient } from '@metamask/connect-evm';
 import { polygon } from 'viem/chains';
 
 export const CRX_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_CRX_TOKEN_ADDRESS || '0x0706508638A6cBaaC482f971326299eCdd2D0731') as Address;
@@ -31,15 +32,32 @@ declare global {
   interface Window { ethereum?: { request(args: { method: string; params?: unknown[] }): Promise<unknown>; on?: Function; removeListener?: Function } }
 }
 
-function requireEthereum() {
-  if (typeof window === 'undefined' || !window.ethereum) throw new Error('MetaMask is not installed. Install MetaMask and try again.');
-  return window.ethereum;
+type EthereumProvider = { request(args: { method: string; params?: unknown[] }): Promise<unknown>; on?: Function; removeListener?: Function };
+let metamaskConnectPromise: ReturnType<typeof createEVMClient> | null = null;
+
+async function getEthereumProvider(): Promise<EthereumProvider> {
+  if (typeof window === 'undefined') throw new Error('Wallet connection is only available in the browser.');
+  if (window.ethereum) return window.ethereum;
+  if (!metamaskConnectPromise) {
+    metamaskConnectPromise = createEVMClient({
+      dapp: { name: 'CrickX', url: window.location.origin, iconUrl: `${window.location.origin}/crickx-app-logo.svg` },
+      api: { supportedNetworks: { '0x89': DEFAULT_RPC_URL, '0x1': 'https://ethereum-rpc.publicnode.com' } },
+      ui: { preferExtension: true, showInstallModal: true },
+      analytics: { enabled: false },
+    });
+  }
+  const client = await metamaskConnectPromise;
+  return client.getProvider() as EthereumProvider;
+}
+
+async function requireEthereum() {
+  return getEthereumProvider();
 }
 
 export function shortAddress(address?: string | null) { return address ? `${address.slice(0, 6)}…${address.slice(-4)}` : ''; }
 
 export async function switchToPolygon() {
-  const ethereum = requireEthereum();
+  const ethereum = await requireEthereum();
   const chainId = await ethereum.request({ method: 'eth_chainId' }) as string;
   if (Number.parseInt(chainId, 16) === POLYGON_CHAIN_ID) return;
   try {
@@ -60,8 +78,10 @@ export async function connectWallet() {
 }
 
 export async function getCurrentWallet() {
-  if (typeof window === 'undefined' || !window.ethereum) return null;
-  const accounts = await window.ethereum.request({ method: 'eth_accounts' }) as string[];
+  if (typeof window === 'undefined') return null;
+  const provider = window.ethereum;
+  if (!provider) return null;
+  const accounts = await provider.request({ method: 'eth_accounts' }) as string[];
   const address = accounts?.[0];
   return address && isAddress(address) ? address as Address : null;
 }
