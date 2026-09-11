@@ -90,7 +90,7 @@ export class OnchainContestService {
     if (joinDeadlineUnix <= now) throw new BadRequestException('Contest deadline must be in the future.');
     const decimals = Number(await this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'decimals' }));
     const fee = BigInt(Math.round(entryFeeCrx * 10 ** decimals));
-    const hash = await this.walletClient.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'createContest', args: [id, fee, BigInt(joinDeadlineUnix)] });
+    const hash = await this.walletClient!.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'createContest', args: [id, fee, BigInt(joinDeadlineUnix)] });
     await this.publicClient.waitForTransactionReceipt({ hash });
     return { ...(await this.summary(contestId)), createTxHash: String(hash) };
   }
@@ -173,25 +173,25 @@ export class OnchainContestService {
     let lockHash: string | null = null, prizeHash: string | null = null, rankHash: string | null = null, payoutHash: string | null = null;
 
     if (currentStage === 0) {
-      const txHash = await this.walletClient.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'lockContest', args: [id] });
+      const txHash = await this.walletClient!.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'lockContest', args: [id] });
       lockHash = String(txHash); await this.publicClient.waitForTransactionReceipt({ hash: txHash }); currentStage = 1;
     }
     if (currentStage === 1) {
       const winnerCount = Number(await this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'winnerCount', args: [id] }));
       if (rankingWallets.length !== winnerCount) throw new BadRequestException(`Ranking must contain exactly ${winnerCount} winners.`);
       const bps = this.equalPrizeBps(winnerCount);
-      const txHash = await this.walletClient.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'setPrizeTable', args: [id, bps] });
+      const txHash = await this.walletClient!.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'setPrizeTable', args: [id, bps] });
       prizeHash = String(txHash); await this.publicClient.waitForTransactionReceipt({ hash: txHash }); currentStage = 2;
     }
     const winnerCount = Number(await this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'winnerCount', args: [id] }));
     if (rankingWallets.length !== winnerCount) throw new BadRequestException(`Ranking must contain exactly ${winnerCount} winners.`);
     if (currentStage === 2) {
       const ranking = rankingWallets.map(getAddress) as Address[];
-      const txHash = await this.walletClient.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'finalizeRanking', args: [id, ranking] });
+      const txHash = await this.walletClient!.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'finalizeRanking', args: [id, ranking] });
       rankHash = String(txHash); await this.publicClient.waitForTransactionReceipt({ hash: txHash }); currentStage = 3;
     }
     if (currentStage === 3) {
-      const txHash = await this.walletClient.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'distributePrizes', args: [id] });
+      const txHash = await this.walletClient!.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'distributePrizes', args: [id] });
       payoutHash = String(txHash); await this.publicClient.waitForTransactionReceipt({ hash: txHash }); currentStage = 4;
     }
     if (currentStage !== 4) throw new BadRequestException('Contest could not reach the distributed stage.');
@@ -204,3 +204,4 @@ export class OnchainContestService {
     return Array.from({ length: winnerCount }, (_, index) => base + (index < remainder ? 1 : 0));
   }
 }
+
