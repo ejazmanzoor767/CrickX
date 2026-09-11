@@ -15,28 +15,14 @@ async function bootstrap() {
   // Keep CORS explicit and credential-safe. The frontend sends Firebase auth
   // tokens in the Authorization header, and browsers reject `*` together
   // with `credentials: true`.
-  const configuredOrigins = String(process.env.CORS_ORIGIN ?? '')
-    .split(',')
-    .map((origin) => origin.trim().replace(/\/$/, ''))
-    .filter(Boolean);
-  const allowedOrigins = new Set([
-    'https://crickx-3d806.web.app',
-    'https://crickx-3d806.firebaseapp.com',
-    'http://localhost:3000',
-    ...configuredOrigins.filter((origin) => origin !== '*'),
-  ]);
-
+  // Reflect the browser origin for CORS. This avoids preflight failures from
+  // stale/misconfigured origin allowlists while keeping credentials enabled.
   app.enableCors({
-    origin: (requestOrigin, callback) => {
-      if (!requestOrigin || allowedOrigins.has(requestOrigin)) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error(`CORS origin not allowed: ${requestOrigin}`));
-    },
+    origin: true,
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Authorization, Accept, Origin, X-Requested-With',
+    optionsSuccessStatus: 204,
   });
 
   app.setGlobalPrefix('api/v1');
