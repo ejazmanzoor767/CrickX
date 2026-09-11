@@ -1,6 +1,6 @@
 'use client';
 
-import { createPublicClient, createWalletClient, custom, formatUnits, http, isAddress, parseUnits, type Address, type Hex } from 'viem';
+import { createPublicClient, createWalletClient, custom, formatUnits, http, isAddress, parseUnits, type Address } from 'viem';
 import { polygon } from 'viem/chains';
 
 export const CRX_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_CRX_TOKEN_ADDRESS || '0x0706508638A6cBaaC482f971326299eCdd2D0731') as Address;
@@ -20,11 +20,15 @@ const POOL_ABI = [
   { type: 'function', name: 'entryFee', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'stage', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [{ type: 'uint8' }] },
   { type: 'function', name: 'participantCount', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [{ type: 'uint256' }] },
-  { type: 'function', name: 'hasEntered', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }, { type: 'address' }], outputs: [{ type: 'bool' }] },
+  { type: 'function', name: 'hasEntered', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }, { name: 'account', type: 'address' }], outputs: [{ type: 'bool' }] },
   { type: 'function', name: 'joinContest', stateMutability: 'nonpayable', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [] },
 ] as const;
 
 const publicClient = createPublicClient({ chain: polygon, transport: http(DEFAULT_RPC_URL) });
+// viem 2.56's generated overloads can require transaction-only fields on
+// readContract under some TypeScript configurations. The runtime accepts the
+// normal readContract arguments, so keep the boundary typed loosely here.
+const readContract: any = publicClient.readContract.bind(publicClient);
 
 declare global {
   interface Window { ethereum?: { request(args: { method: string; params?: unknown[] }): Promise<unknown>; on?: Function; removeListener?: Function } }
@@ -66,10 +70,10 @@ export async function getCurrentWallet() {
 }
 
 export async function readCrxWallet(address: Address) {
-  const decimals = Number(await publicClient.readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'decimals' }));
-  const balanceRaw = await publicClient.readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'balanceOf', args: [address] });
+  const decimals = Number(await readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'decimals' }));
+  const balanceRaw = await readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'balanceOf', args: [address] });
   const allowanceRaw = CRX_CONTEST_POOL_ADDRESS
-    ? await publicClient.readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'allowance', args: [address, CRX_CONTEST_POOL_ADDRESS] })
+    ? await readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'allowance', args: [address, CRX_CONTEST_POOL_ADDRESS] })
     : 0n;
   return { address, decimals, balanceRaw, allowanceRaw, balance: Number(formatUnits(balanceRaw, decimals)), allowance: Number(formatUnits(allowanceRaw, decimals)) };
 }
@@ -108,10 +112,10 @@ export async function sendCrx(to: string, amount: string, decimals = 18) {
 export async function readOnchainContest(contestId: number) {
   if (!CRX_CONTEST_POOL_ADDRESS) throw new Error('CRX contest pool address is not configured.');
   const [entryFeeRaw, stage, participantCount] = await Promise.all([
-    publicClient.readContract({ address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'entryFee', args: [BigInt(contestId)] }),
-    publicClient.readContract({ address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'stage', args: [BigInt(contestId)] }),
-    publicClient.readContract({ address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'participantCount', args: [BigInt(contestId)] }),
+    readContract({ address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'entryFee', args: [BigInt(contestId)] }),
+    readContract({ address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'stage', args: [BigInt(contestId)] }),
+    readContract({ address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'participantCount', args: [BigInt(contestId)] }),
   ]);
-  const decimals = Number(await publicClient.readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'decimals' }));
+  const decimals = Number(await readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'decimals' }));
   return { entryFee: Number(formatUnits(entryFeeRaw, decimals)), stage: Number(stage), participantCount: Number(participantCount), decimals };
 }
