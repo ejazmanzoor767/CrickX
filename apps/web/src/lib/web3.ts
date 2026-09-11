@@ -40,7 +40,6 @@ type EthereumProvider = {
 
 type EvmClient = Awaited<ReturnType<typeof createEVMClient>>;
 let metamaskClientPromise: Promise<EvmClient> | null = null;
-let metamaskConnected = false;
 
 async function getMetaMaskClient(): Promise<EvmClient> {
   if (typeof window === 'undefined') {
@@ -68,9 +67,12 @@ async function getMetaMaskClient(): Promise<EvmClient> {
 async function getEthereumProvider(connect = false): Promise<EthereumProvider> {
   const client = await getMetaMaskClient();
 
-  if (connect && !metamaskConnected) {
-    await client.connect({ chainIds: ['0x1', '0x89'] });
-    metamaskConnected = true;
+  if (connect) {
+    // MetaMask Connect initializes its transport only after connect().
+    // Do not call getProvider() before the connection has been established.
+    if (client.status !== 'connected') {
+      await client.connect({ chainIds: ['0x89', '0x1'] });
+    }
   }
 
   return client.getProvider() as EthereumProvider;
@@ -95,10 +97,26 @@ export async function switchToPolygon() {
 }
 
 export async function connectWallet() {
-  const ethereum = requireEthereum();
-  await switchToPolygon();
-  const accounts = await ethereum.request({ method: 'eth_requestAccounts' }) as string[];
-  const address = accounts?.[0];
+  const client = await getMetaMaskClient();
+
+  // Establish the MetaMask Connect session first. This is required for
+  // mobile/deeplink transports; calling getProvider() before connect() can
+  // raise "transport not initialized".
+  const result = await client.connect({ chainIds: ['0x89', '0x1'] });
+  if (client.getChainId() !== '0x89') {
+    await client.switchChain({
+      chainId: '0x89',
+      chainConfiguration: {
+        chainId: '0x89',
+        chainName: 'Polygon Mainnet',
+        nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
+        rpcUrls: [DEFAULT_RPC_URL],
+        blockExplorerUrls: ['https://polygonscan.com'],
+      },
+    });
+  }
+
+  const address = result.accounts?.[0] ?? client.getAccount();
   if (!address || !isAddress(address)) throw new Error('No wallet account was selected.');
   return address as Address;
 }
