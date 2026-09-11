@@ -5,10 +5,11 @@ import { OnchainModule } from '../onchain/onchain.module';
 import { ScoringService } from './scoring.service';
 import { LeaderboardService } from './leaderboard.service';
 import { LeaderboardController } from './leaderboard.controller';
+import { FirestoreService } from '../../common/firestore.service';
 
 @Module({
   imports: [ScheduleModule, SportmonksModule, OnchainModule],
-  providers: [ScoringService, LeaderboardService],
+  providers: [FirestoreService, ScoringService, LeaderboardService],
   controllers: [LeaderboardController],
   exports: [ScoringService, LeaderboardService],
 })
