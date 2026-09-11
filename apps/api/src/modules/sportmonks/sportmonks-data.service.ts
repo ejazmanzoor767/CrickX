@@ -173,19 +173,14 @@ export class SportmonksDataService {
   }
 
   async getFixtureSquads(fixtureId: number) {
-    // Always resolve the actual fixture teams from Sportmonks first. A cached
-    // upcoming fixture can be a lightweight payload without team IDs.
+    // Resolve the fixture first so the squad is tied to the correct two teams
+    // and the correct season. Use the dedicated season/team squad endpoint
+    // instead of relying on a nested team.squad response shape.
     let fixture = await this.getFixture(fixtureId, { forceLive: true });
 
     let localTeamId = Number(fixture.localteam_id ?? fixture.localteam?.id);
     let visitorTeamId = Number(fixture.visitorteam_id ?? fixture.visitorteam?.id);
 
-    // Some responses omit the *_id fields but still include nested team data.
-    if (!Number.isFinite(localTeamId) || localTeamId <= 0) localTeamId = Number((fixture.localteam as any)?.id);
-    if (!Number.isFinite(visitorTeamId) || visitorTeamId <= 0) visitorTeamId = Number((fixture.visitorteam as any)?.id);
-
-    // Final authoritative fallback: request the fixture directly with team
-    // relationships instead of inventing placeholder teams.
     if (!Number.isFinite(localTeamId) || !Number.isFinite(visitorTeamId) || localTeamId <= 0 || visitorTeamId <= 0) {
       const envelope = await this.client.get<SportmonksFixture>(`/fixtures/${fixtureId}`, { include: 'localteam,visitorteam,lineup' });
       fixture = normalizeFixture(envelope.data);
@@ -197,27 +192,80 @@ export class SportmonksDataService {
       return { fixtureId, seasonId: fixture.season_id, lineupAnnounced: false, announcementComplete: false, teams: [] };
     }
 
-    const [localEnvelope, visitorEnvelope] = await Promise.all([
-      this.client.get<SportmonksTeam>(`/teams/${localTeamId}`, { include: 'squad', 'filter[season_id]': fixture.season_id }),
-      this.client.get<SportmonksTeam>(`/teams/${visitorTeamId}`, { include: 'squad', 'filter[season_id]': fixture.season_id }),
+    const seasonId = Number(fixture.season_id);
+    if (!Number.isFinite(seasonId) || seasonId <= 0) {
+      return { fixtureId, seasonId: fixture.season_id, lineupAnnounced: false, announcementComplete: false, teams: [] };
+    }
+
+    const [localTeamEnvelope, visitorTeamEnvelope, localSquadEnvelope, visitorSquadEnvelope] = await Promise.all([
+      this.client.get<SportmonksTeam>(`/teams/${localTeamId}`),
+      this.client.get<SportmonksTeam>(`/teams/${visitorTeamId}`),
+      this.client.get<any[]>(`/teams/${localTeamId}/squad/${seasonId}`),
+      this.client.get<any[]>(`/teams/${visitorTeamId}/squad/${seasonId}`),
     ]);
+
     const lineup = (fixture.lineup ?? []).map(normalizeLineupPlayer).filter((p) => !p.substitution);
     const lineupByPlayer = new Map<number, SportmonksLineupPlayer>();
-    for (const player of lineup) if (Number.isFinite(player.player_id)) lineupByPlayer.set(player.player_id, player);
-    const buildTeam = (team: SportmonksTeam, teamId: number) => {
-      const rawSquad = Array.isArray(team.squad) ? team.squad : [];
-      const players = rawSquad.map((entry) => normalizeSquadPlayer(entry, teamId)).filter((player) => Number.isFinite(player.player_id));
+    for (const player of lineup) {
+      if (Number.isFinite(player.player_id)) lineupByPlayer.set(player.player_id, player);
+    }
+
+    const buildTeam = (team: SportmonksTeam, squadEnvelope: any, teamId: number) => {
+      const rawSquad = asRows(squadEnvelope?.data ?? squadEnvelope);
+      const players = rawSquad
+        .map((entry: any) => normalizeSquadPlayer(entry, teamId))
+        .filter((player: any) => Number.isFinite(player.player_id));
+
       const teamLineup = lineup.filter((player) => player.team_id === teamId);
-      const merged = players.map((player) => {
+
+      const merged = players.map((player: any) => {
         const xi = lineupByPlayer.get(player.player_id);
-        return { ...player, isPlayingXI: Boolean(xi && xi.team_id === teamId), lineupCaptain: Boolean(xi?.captain), lineupWicketkeeper: Boolean(xi?.wicketkeeper) };
+        return {
+          ...player,
+          isPlayingXI: Boolean(xi && xi.team_id === teamId),
+          lineupCaptain: Boolean(xi?.captain),
+          lineupWicketkeeper: Boolean(xi?.wicketkeeper),
+        };
       });
-      for (const xi of teamLineup) if (!merged.some((p) => p.player_id === xi.player_id)) merged.push({ ...xi, player_id: xi.player_id, team_id: teamId, position_name: xi.position?.name ?? null, squad_captain: false, injured: false, isPlayingXI: true, lineupCaptain: xi.captain, lineupWicketkeeper: xi.wicketkeeper });
-      merged.sort((a, b) => Number(b.isPlayingXI) - Number(a.isPlayingXI) || String(a.fullname ?? '').localeCompare(String(b.fullname ?? '')));
-      return { id: team.id, name: team.name, code: team.code, image_path: team.image_path, playerCount: merged.length, playingXICount: teamLineup.length, players: merged };
+
+      // If Sportmonks lineup contains a player not present in the season squad,
+      // still expose that player so the announced XI is never incomplete.
+      for (const xi of teamLineup) {
+        if (!merged.some((p: any) => p.player_id === xi.player_id)) {
+          merged.push({
+            ...xi,
+            player_id: xi.player_id,
+            team_id: teamId,
+            position_name: xi.position?.name ?? null,
+            squad_captain: false,
+            injured: false,
+            isPlayingXI: true,
+            lineupCaptain: xi.captain,
+            lineupWicketkeeper: xi.wicketkeeper,
+          });
+        }
+      }
+
+      merged.sort(
+        (a: any, b: any) =>
+          Number(b.isPlayingXI) - Number(a.isPlayingXI) ||
+          String(a.fullname ?? '').localeCompare(String(b.fullname ?? '')),
+      );
+
+      return {
+        id: team.id,
+        name: team.name,
+        code: team.code,
+        image_path: team.image_path,
+        playerCount: merged.length,
+        playingXICount: teamLineup.length,
+        players: merged,
+      };
     };
-    const localTeam = buildTeam(localEnvelope.data, localTeamId);
-    const visitorTeam = buildTeam(visitorEnvelope.data, visitorTeamId);
+
+    const localTeam = buildTeam(localTeamEnvelope.data, localSquadEnvelope, localTeamId);
+    const visitorTeam = buildTeam(visitorTeamEnvelope.data, visitorSquadEnvelope, visitorTeamId);
+
     return {
       fixtureId,
       seasonId: fixture.season_id,
