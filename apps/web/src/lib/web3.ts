@@ -32,26 +32,52 @@ declare global {
   interface Window { ethereum?: { request(args: { method: string; params?: unknown[] }): Promise<unknown>; on?: Function; removeListener?: Function } }
 }
 
-type EthereumProvider = { request(args: { method: string; params?: unknown[] }): Promise<unknown>; on?: Function; removeListener?: Function };
-let metamaskConnectPromise: ReturnType<typeof createEVMClient> | null = null;
+type EthereumProvider = {
+  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
+  on?: Function;
+  removeListener?: Function;
+};
 
-async function getEthereumProvider(): Promise<EthereumProvider> {
-  if (typeof window === 'undefined') throw new Error('Wallet connection is only available in the browser.');
-  if (window.ethereum) return window.ethereum;
-  if (!metamaskConnectPromise) {
-    metamaskConnectPromise = createEVMClient({
-      dapp: { name: 'CrickX', url: window.location.origin, iconUrl: `${window.location.origin}/crickx-app-logo.svg` },
-      api: { supportedNetworks: { '0x89': DEFAULT_RPC_URL, '0x1': 'https://ethereum-rpc.publicnode.com' } },
-      ui: { preferExtension: true, showInstallModal: true },
+type EvmClient = Awaited<ReturnType<typeof createEVMClient>>;
+let metamaskClientPromise: Promise<EvmClient> | null = null;
+let metamaskConnected = false;
+
+async function getMetaMaskClient(): Promise<EvmClient> {
+  if (typeof window === 'undefined') {
+    throw new Error('Wallet connection is only available in the browser.');
+  }
+  if (!metamaskClientPromise) {
+    metamaskClientPromise = createEVMClient({
+      dapp: {
+        name: 'CrickX',
+        url: window.location.origin,
+        iconUrl: `${window.location.origin}/crickx-app-logo.svg`,
+      },
+      api: {
+        supportedNetworks: {
+          '0x89': DEFAULT_RPC_URL,
+          '0x1': 'https://ethereum-rpc.publicnode.com',
+        },
+      },
       analytics: { enabled: false },
     });
   }
-  const client = await metamaskConnectPromise;
+  return metamaskClientPromise;
+}
+
+async function getEthereumProvider(connect = false): Promise<EthereumProvider> {
+  const client = await getMetaMaskClient();
+
+  if (connect && !metamaskConnected) {
+    await client.connect({ chainIds: ['0x1', '0x89'] });
+    metamaskConnected = true;
+  }
+
   return client.getProvider() as EthereumProvider;
 }
 
 async function requireEthereum() {
-  return getEthereumProvider();
+  return getEthereumProvider(true);
 }
 
 export function shortAddress(address?: string | null) { return address ? `${address.slice(0, 6)}…${address.slice(-4)}` : ''; }
