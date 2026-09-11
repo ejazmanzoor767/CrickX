@@ -6,7 +6,6 @@ import { useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
 import { approveContestPool, connectWallet, CRX_CONTEST_POOL_ADDRESS, getCurrentWallet, joinOnchainContest, readCrxWallet } from '../../lib/web3';
 import type { Address } from 'viem';
-
 function ContestContent() {
   const params = useSearchParams();
   const fixtureId = Number(params.get('fixtureId'));

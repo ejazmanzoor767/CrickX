@@ -1,6 +1,6 @@
 'use client';
 
-import { createPublicClient, createWalletClient, custom, formatUnits, http, isAddress, parseUnits, type Address } from 'viem';
+import { createPublicClient, createWalletClient, custom, formatUnits, http, isAddress, parseUnits, type Address, type Hex } from 'viem';
 import { polygon } from 'viem/chains';
 
 export const CRX_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_CRX_TOKEN_ADDRESS || '0x0706508638A6cBaaC482f971326299eCdd2D0731') as Address;
@@ -20,14 +20,11 @@ const POOL_ABI = [
   { type: 'function', name: 'entryFee', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'stage', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [{ type: 'uint8' }] },
   { type: 'function', name: 'participantCount', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [{ type: 'uint256' }] },
-  { type: 'function', name: 'hasEntered', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }, { name: 'account', type: 'address' }], outputs: [{ type: 'bool' }] },
+  { type: 'function', name: 'hasEntered', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }, { type: 'address' }], outputs: [{ type: 'bool' }] },
   { type: 'function', name: 'joinContest', stateMutability: 'nonpayable', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [] },
 ] as const;
 
 const publicClient = createPublicClient({ chain: polygon, transport: http(DEFAULT_RPC_URL) });
-// viem 2.56's generated overloads can require transaction-only fields on
-// readContract under some TypeScript configurations. The runtime accepts the
-// normal readContract arguments, so keep the boundary typed loosely here.
 const readContract: any = publicClient.readContract.bind(publicClient);
 
 declare global {
@@ -74,7 +71,7 @@ export async function readCrxWallet(address: Address) {
   const balanceRaw = await readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'balanceOf', args: [address] });
   const allowanceRaw = CRX_CONTEST_POOL_ADDRESS
     ? await readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'allowance', args: [address, CRX_CONTEST_POOL_ADDRESS] })
-    : 0n;
+    : BigInt(0);
   return { address, decimals, balanceRaw, allowanceRaw, balance: Number(formatUnits(balanceRaw, decimals)), allowance: Number(formatUnits(allowanceRaw, decimals)) };
 }
 
@@ -83,7 +80,7 @@ export async function approveContestPool(amount: string | number, decimals = 18)
   const ethereum = requireEthereum();
   const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
   const [account] = await walletClient.requestAddresses();
-  const hash = await walletClient.writeContract({ account, address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'approve', args: [CRX_CONTEST_POOL_ADDRESS, parseUnits(String(amount), decimals)] });
+  const hash = await walletClient.writeContract({ account, chain: polygon, address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'approve', args: [CRX_CONTEST_POOL_ADDRESS, parseUnits(String(amount), decimals)] });
   await publicClient.waitForTransactionReceipt({ hash });
   return hash;
 }
@@ -93,7 +90,7 @@ export async function joinOnchainContest(contestId: number) {
   const ethereum = requireEthereum();
   const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
   const [account] = await walletClient.requestAddresses();
-  const hash = await walletClient.writeContract({ account, address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'joinContest', args: [BigInt(contestId)] });
+  const hash = await walletClient.writeContract({ account, chain: polygon, address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'joinContest', args: [BigInt(contestId)] });
   await publicClient.waitForTransactionReceipt({ hash });
   return { hash, account };
 }
@@ -104,7 +101,7 @@ export async function sendCrx(to: string, amount: string, decimals = 18) {
   const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
   const [account] = await walletClient.requestAddresses();
   const value = parseUnits(amount, decimals);
-  const hash = await walletClient.writeContract({ account, address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'transfer', args: [to as Address, value] });
+  const hash = await walletClient.writeContract({ account, chain: polygon, address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'transfer', args: [to as Address, value] });
   await publicClient.waitForTransactionReceipt({ hash });
   return hash;
 }
@@ -119,3 +116,7 @@ export async function readOnchainContest(contestId: number) {
   const decimals = Number(await readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'decimals' }));
   return { entryFee: Number(formatUnits(entryFeeRaw, decimals)), stage: Number(stage), participantCount: Number(participantCount), decimals };
 }
+
+
+
+
