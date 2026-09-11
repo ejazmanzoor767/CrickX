@@ -4,7 +4,6 @@ import '../components/structure.css';
 import { AuthProvider } from '../lib/auth-context';
 import Nav from '../components/nav';
 import Footer from '../components/footer';
-import PlayingXIMarker from '../components/playing-xi-marker';
 
 export const metadata = {
   title: 'CrickX — Fantasy Cricket',
@@ -18,7 +17,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AuthProvider>
           <Nav />
-          <PlayingXIMarker />
           <main className="page-shell">{children}</main>
           <Footer />
         </AuthProvider>
