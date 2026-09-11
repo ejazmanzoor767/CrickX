@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // CrickX application data is accessed by the NestJS API through the
+    // Firebase Admin SDK. The browser does not access Firestore directly.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

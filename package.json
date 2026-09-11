@@ -1,0 +1,11 @@
+{
+  "name": "fantasy-cricket",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "deployment:check": "node scripts/deployment-check.mjs"
+  }
+}

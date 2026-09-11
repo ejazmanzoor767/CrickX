@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: crickx-api
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build --workspace @fantasy-cricket/api
+    startCommand: npm run start:prod --workspace @fantasy-cricket/api
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGIN
+        value: https://crickx-3d806.web.app
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: SPORTMONKS_BASE_URL
+        value: https://cricket.sportmonks.com/api/v2.0
+      - key: SPORTMONKS_API_TOKEN
+        sync: false
+      - key: SPORTMONKS_HOURLY_LIMIT
+        value: '3000'
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: JWT_REFRESH_TTL
+        value: 30d
+      - key: ALLOWED_SPORTMONKS_LEAGUE_IDS
+        sync: false
+      - key: POLYGON_RPC_URL
+        sync: false
+      - key: CRX_TOKEN_ADDRESS
+        sync: false
+      - key: CRX_CONTEST_POOL_ADDRESS
+        sync: false
+      - key: CRX_CONTEST_OWNER_PRIVATE_KEY
+        sync: false
