@@ -44,10 +44,9 @@ async function getMetaMaskClient(): Promise<EvmClient> {
       dapp: { name: 'CrickX', url: window.location.origin, iconUrl: `${window.location.origin}/crickx-app-logo.svg` },
       api: { supportedNetworks: { '0x89': DEFAULT_RPC_URL, '0x1': 'https://ethereum-rpc.publicnode.com' } },
       // Keep the SDK provider hidden until connect() establishes a session.
+      // MetaMask Connect then selects the proper desktop extension or mobile
+      // deeplink + relay transport automatically.
       skipAutoAnnounce: true,
-      // On mobile web, explicitly hand the SDK's deeplink to the OS so
-      // Android/iOS opens MetaMask Mobile instead of falling back to the
-      // desktop QR/install UI.
       mobile: {
         preferredOpenLink: (deeplink: string) => {
           window.location.href = deeplink;
@@ -82,33 +81,10 @@ export async function switchToPolygon() {
   });
 }
 
-function isMobileBrowser() {
-  if (typeof navigator === 'undefined') return false;
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-}
-
-function isMetaMaskMobileBrowser() {
-  if (typeof navigator === 'undefined') return false;
-  return /MetaMaskMobile|MetaMask/i.test(navigator.userAgent);
-}
-
-function openCurrentSiteInMetaMaskMobile() {
-  if (typeof window === 'undefined') return false;
-  const path = window.location.pathname + window.location.search + window.location.hash;
-  const deeplink = `https://metamask.app.link/dapp/${window.location.host}${path}`;
-  window.location.href = deeplink;
-  return true;
-}
-
 export async function connectWallet() {
-  // A normal Android/iOS browser cannot expose MetaMask's injected provider.
-  // Send mobile users directly into MetaMask Mobile's in-app browser rather
-  // than letting the desktop MWP UI fall back to a QR/install modal.
-  if (isMobileBrowser() && !isMetaMaskMobileBrowser()) {
-    openCurrentSiteInMetaMaskMobile();
-    throw new Error('Opening CrickX in MetaMask Mobile…');
-  }
-
+  // Let MetaMask Connect detect the platform and choose:
+  // desktop extension -> direct transport
+  // mobile native browser -> MetaMask Mobile deeplink + relay
   const client = await getMetaMaskClient();
   const result = await client.connect({ chainIds: ['0x89', '0x1'] });
   if (client.getChainId() !== '0x89') {
