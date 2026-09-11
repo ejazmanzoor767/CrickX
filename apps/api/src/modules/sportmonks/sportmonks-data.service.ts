@@ -173,45 +173,57 @@ export class SportmonksDataService {
   }
 
   async getFixtureSquads(fixtureId: number) {
-    // Resolve the fixture first so the squad is tied to the correct two teams
-    // and the correct season. Use the dedicated season/team squad endpoint
-    // instead of relying on a nested team.squad response shape.
-    let fixture = await this.getFixture(fixtureId, { forceLive: true });
+    // Cricket API v2.0 exposes a team's squad through the Teams endpoint:
+    // /teams/{teamId}?include=squad&filter[season_id]={seasonId}.
+    // The football v3-style /squads/seasons/... endpoint is not valid here.
+    const envelope = await this.client.get<SportmonksFixture>(
+      `/fixtures/${fixtureId}`,
+      { include: 'localteam,visitorteam,season,lineup' },
+    );
+    const fixture = normalizeFixture(envelope.data);
 
-    let localTeamId = Number(fixture.localteam_id ?? fixture.localteam?.id);
-    let visitorTeamId = Number(fixture.visitorteam_id ?? fixture.visitorteam?.id);
-
-    if (!Number.isFinite(localTeamId) || !Number.isFinite(visitorTeamId) || localTeamId <= 0 || visitorTeamId <= 0) {
-      const envelope = await this.client.get<SportmonksFixture>(`/fixtures/${fixtureId}`, { include: 'localteam,visitorteam,lineup' });
-      fixture = normalizeFixture(envelope.data);
-      localTeamId = Number(fixture.localteam_id ?? fixture.localteam?.id);
-      visitorTeamId = Number(fixture.visitorteam_id ?? fixture.visitorteam?.id);
-    }
-
-    if (!Number.isFinite(localTeamId) || !Number.isFinite(visitorTeamId) || localTeamId <= 0 || visitorTeamId <= 0) {
-      return { fixtureId, seasonId: fixture.season_id, lineupAnnounced: false, announcementComplete: false, teams: [] };
-    }
-
+    const localTeamId = Number(fixture.localteam_id ?? fixture.localteam?.id);
+    const visitorTeamId = Number(fixture.visitorteam_id ?? fixture.visitorteam?.id);
     const seasonId = Number(fixture.season_id);
-    if (!Number.isFinite(seasonId) || seasonId <= 0) {
-      return { fixtureId, seasonId: fixture.season_id, lineupAnnounced: false, announcementComplete: false, teams: [] };
+
+    if (
+      !Number.isFinite(localTeamId) || localTeamId <= 0 ||
+      !Number.isFinite(visitorTeamId) || visitorTeamId <= 0
+    ) {
+      return {
+        fixtureId,
+        seasonId: fixture.season_id,
+        lineupAnnounced: false,
+        announcementComplete: false,
+        teams: [],
+      };
     }
 
-    const [localTeamEnvelope, visitorTeamEnvelope, localSquadEnvelope, visitorSquadEnvelope] = await Promise.all([
-      this.client.get<SportmonksTeam>(`/teams/${localTeamId}`),
-      this.client.get<SportmonksTeam>(`/teams/${visitorTeamId}`),
-      this.client.get<any[]>(`/teams/${localTeamId}/squad/${seasonId}`),
-      this.client.get<any[]>(`/teams/${visitorTeamId}/squad/${seasonId}`),
+    const [localEnvelope, visitorEnvelope] = await Promise.all([
+      this.client.get<SportmonksTeam>(`/teams/${localTeamId}`, {
+        include: 'squad',
+        'filter[season_id]': seasonId,
+      }),
+      this.client.get<SportmonksTeam>(`/teams/${visitorTeamId}`, {
+        include: 'squad',
+        'filter[season_id]': seasonId,
+      }),
     ]);
 
-    const lineup = (fixture.lineup ?? []).map(normalizeLineupPlayer).filter((p) => !p.substitution);
+    const lineup = (fixture.lineup ?? [])
+      .map(normalizeLineupPlayer)
+      .filter((p) => !p.substitution);
+
     const lineupByPlayer = new Map<number, SportmonksLineupPlayer>();
     for (const player of lineup) {
       if (Number.isFinite(player.player_id)) lineupByPlayer.set(player.player_id, player);
     }
 
-    const buildTeam = (team: SportmonksTeam, squadEnvelope: any, teamId: number) => {
-      const rawSquad = asRows(squadEnvelope?.data ?? squadEnvelope);
+    const buildTeam = (team: SportmonksTeam, teamId: number) => {
+      const rawSquad = Array.isArray(team.squad)
+        ? team.squad
+        : asRows((team as any).squad);
+
       const players = rawSquad
         .map((entry: any) => normalizeSquadPlayer(entry, teamId))
         .filter((player: any) => Number.isFinite(player.player_id));
@@ -228,8 +240,7 @@ export class SportmonksDataService {
         };
       });
 
-      // If Sportmonks lineup contains a player not present in the season squad,
-      // still expose that player so the announced XI is never incomplete.
+      // Keep announced XI players even if they are absent from the season squad response.
       for (const xi of teamLineup) {
         if (!merged.some((p: any) => p.player_id === xi.player_id)) {
           merged.push({
@@ -263,8 +274,8 @@ export class SportmonksDataService {
       };
     };
 
-    const localTeam = buildTeam(localTeamEnvelope.data, localSquadEnvelope, localTeamId);
-    const visitorTeam = buildTeam(visitorTeamEnvelope.data, visitorSquadEnvelope, visitorTeamId);
+    const localTeam = buildTeam(localEnvelope.data, localTeamId);
+    const visitorTeam = buildTeam(visitorEnvelope.data, visitorTeamId);
 
     return {
       fixtureId,
@@ -274,7 +285,8 @@ export class SportmonksDataService {
       tossWonTeamId: fixture.toss_won_team_id,
       elected: fixture.elected,
       lineupAnnounced: localTeam.playingXICount > 0 || visitorTeam.playingXICount > 0,
-      announcementComplete: localTeam.playingXICount >= 11 && visitorTeam.playingXICount >= 11,
+      announcementComplete:
+        localTeam.playingXICount >= 11 && visitorTeam.playingXICount >= 11,
       teams: [localTeam, visitorTeam],
     };
   }
