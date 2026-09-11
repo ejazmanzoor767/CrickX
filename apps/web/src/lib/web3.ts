@@ -43,6 +43,11 @@ async function getMetaMaskClient(): Promise<EvmClient> {
     metamaskClientPromise = createEVMClient({
       dapp: { name: 'CrickX', url: window.location.origin, iconUrl: `${window.location.origin}/crickx-app-logo.svg` },
       api: { supportedNetworks: { '0x89': DEFAULT_RPC_URL, '0x1': 'https://ethereum-rpc.publicnode.com' } },
+      // Do not announce the MMConnect-managed provider before a session exists.
+      // On a normal mobile browser there is no injected extension provider, so
+      // announcing it too early can expose an uninitialized transport to wallet
+      // discovery code. The explicit connect() call below initializes it first.
+      skipAutoAnnounce: true,
       analytics: { enabled: false },
     });
   }
@@ -119,7 +124,6 @@ export async function approveContestPool(amount: string | number, decimals = 18)
 
 export async function joinOnchainContest(contestId: number) {
   if (!CRX_CONTEST_POOL_ADDRESS) throw new Error('CRX contest pool address is not configured.');
-  // Critical mobile fix: await MetaMask Connect before giving its provider to viem.
   const ethereum = await getEthereumProvider(true);
   const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
   const [account] = await walletClient.requestAddresses();
