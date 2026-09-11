@@ -141,7 +141,7 @@ export async function readCrxWallet(address: Address) {
 
 export async function approveContestPool(amount: string | number, decimals = 18) {
   if (!CRX_CONTEST_POOL_ADDRESS) throw new Error('CRX contest pool address is not configured.');
-  const ethereum = requireEthereum();
+  const ethereum = await requireEthereum();
   const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
   const [account] = await walletClient.requestAddresses();
   const hash = await walletClient.writeContract({ account, chain: polygon, address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'approve', args: [CRX_CONTEST_POOL_ADDRESS, parseUnits(String(amount), decimals)] });
