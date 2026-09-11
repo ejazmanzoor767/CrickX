@@ -58,9 +58,11 @@ export class OnchainContestService {
     this.tokenAddress = token ? getAddress(token) : null;
     this.publicClient = createPublicClient({ chain: polygon, transport: http(this.rpcUrl) });
 
-    const privateKey = this.config.get<string>('CRX_CONTEST_OWNER_PRIVATE_KEY');
-    if (privateKey) {
-      this.ownerAccount = privateKeyToAccount(privateKey as Hex);
+    const rawPrivateKey = this.config.get<string>('CRX_CONTEST_OWNER_PRIVATE_KEY');
+    const privateKey = rawPrivateKey?.trim().replace(/^['"]|['"]$/g, '');
+    const normalizedPrivateKey = privateKey && /^[0-9a-fA-F]{64}$/.test(privateKey) ? `0x${privateKey}` : privateKey;
+    if (normalizedPrivateKey && /^0x[0-9a-fA-F]{64}$/.test(normalizedPrivateKey)) {
+      this.ownerAccount = privateKeyToAccount(normalizedPrivateKey as Hex);
       this.walletClient = createWalletClient({ account: this.ownerAccount, chain: polygon, transport: http(this.rpcUrl) });
     } else {
       this.ownerAccount = null;
