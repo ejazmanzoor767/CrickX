@@ -53,7 +53,7 @@ function ContestContent() {
         await approveContestPool(prepared.entryFee, freshWallet.decimals);
       }
       setMessage('Join the contest in MetaMask…');
-      const { hash } = await joinOnchainContest(Number(fixtureId));
+      const { hash } = await joinOnchainContest(Number(prepared.chainContestId));
       setMessage('Blockchain entry confirmed. Verifying it with CrickX…');
       const result: any = await api.confirmContestJoin(contest.id, teamId, connected, hash);
       setMessage(`Contest joined successfully. Transaction: ${result?.onchain?.txHash || hash}`);
