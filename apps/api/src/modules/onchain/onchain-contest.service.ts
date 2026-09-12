@@ -210,13 +210,13 @@ export class OnchainContestService {
       lockHash = String(txHash); await this.publicClient.waitForTransactionReceipt({ hash: txHash }); currentStage = 1;
     }
     if (currentStage === 1) {
-      const winnerCount = Number(await this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'winnerCount', args: [id] }));
+      const winnerCount = Number((await this.summary(contestId)).winnerCount);
       if (rankingWallets.length !== winnerCount) throw new BadRequestException(`Ranking must contain exactly ${winnerCount} winners.`);
       const bps = this.equalPrizeBps(winnerCount);
       const txHash = await this.walletClient!.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'setPrizeTable', args: [id, bps] });
       prizeHash = String(txHash); await this.publicClient.waitForTransactionReceipt({ hash: txHash }); currentStage = 2;
     }
-    const winnerCount = Number(await this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'winnerCount', args: [id] }));
+    const winnerCount = Number((await this.summary(contestId)).winnerCount);
     if (rankingWallets.length !== winnerCount) throw new BadRequestException(`Ranking must contain exactly ${winnerCount} winners.`);
     if (currentStage === 2) {
       const ranking = rankingWallets.map(getAddress) as Address[];
