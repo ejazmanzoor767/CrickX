@@ -35,7 +35,7 @@ export class FantasyTeamService {
     const teamCounts = new Map<number, number>();
     for (const id of playerIds) { const teamId = playerTeamMap.get(Number(id)); if (teamId !== undefined) teamCounts.set(teamId, (teamCounts.get(teamId) ?? 0) + 1); }
     for (const count of teamCounts.values()) if (count > MAX_PLAYERS_PER_REAL_TEAM) throw new BadRequestException(`You can select a maximum of ${MAX_PLAYERS_PER_REAL_TEAM} players from one team.`);
-    return { fixture, playerTeamMap };
+    return { playerTeamMap };
   }
 
   private async ensureCredits(fixtureId: number, playerIds: number[]) {
