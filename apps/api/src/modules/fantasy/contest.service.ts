@@ -52,6 +52,14 @@ export class ContestService {
 
   async active(fixtureId: number) {
     let contest = await this.prisma.contest.findFirst({ where: { sportmonksFixtureId: fixtureId } });
+    if (contest) {
+      const fixture = await this.sportmonks.getFixture(fixtureId);
+      const kickoff = Math.floor(new Date(fixture.starting_at).getTime() / 1000);
+      const chain = await this.onchain.ensureContest(fixtureId, kickoff, 4);
+      if (Number(chain.joinDeadline) !== kickoff) throw new ForbiddenException('The on-chain contest deadline does not match the match start time.');
+      return { ...contest, totalSpots: null, unlimited: true, chain };
+    }
+
     const fixture = await this.sportmonks.getFixture(fixtureId);
     const kickoff = Math.floor(new Date(fixture.starting_at).getTime() / 1000);
     if (!contest) {
