@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { OnchainContestService } from '../onchain/onchain-contest.service';
@@ -52,30 +52,21 @@ export class ContestService {
 
   async active(fixtureId: number) {
     let contest = await this.prisma.contest.findFirst({ where: { sportmonksFixtureId: fixtureId } });
-    if (contest) {
-      const fixture = await this.sportmonks.getFixture(fixtureId);
-      const kickoff = Math.floor(new Date(fixture.starting_at).getTime() / 1000);
-      const chain = await this.onchain.ensureContest(fixtureId, kickoff, 4);
-      if (Number(chain.joinDeadline) !== kickoff) throw new ForbiddenException('The on-chain contest deadline does not match the match start time.');
-      return { ...contest, totalSpots: null, unlimited: true, chain };
-    }
-
     const fixture = await this.sportmonks.getFixture(fixtureId);
     const kickoff = Math.floor(new Date(fixture.starting_at).getTime() / 1000);
+
     if (!contest) {
       const otherActive = await this.prisma.contest.findFirst({ where: { status: { in: ['UPCOMING', 'LIVE'] } } });
       if (otherActive) return null;
+
       let scoringRuleSet = await this.prisma.scoringRuleSet.findFirst({
         where: { matchType: String(fixture.type ?? 'T20').toUpperCase() },
         orderBy: { createdAt: 'asc' },
       });
+
       if (!scoringRuleSet) {
         const format = String(fixture.type ?? 'T20').toUpperCase();
-        const rules = format.includes('ODI')
-          ? ODI_RULES
-          : format.includes('T10')
-            ? T10_RULES
-            : T20_RULES;
+        const rules = format.includes('ODI') ? ODI_RULES : format.includes('T10') ? T10_RULES : T20_RULES;
         scoringRuleSet = await this.prisma.scoringRuleSet.create({
           data: {
             name: `CrickX Default ${format} Rules`,
@@ -84,17 +75,36 @@ export class ContestService {
           },
         });
       }
-      contest = await this.create({
-        sportmonksFixtureId: fixtureId,
-        name: 'CrickX Champions Contest',
-        entryFee: 4,
-        totalSpots: 0,
-        scoringRuleSetId: scoringRuleSet.id,
-        prizeDistribution: [],
+
+      contest = await this.prisma.contest.create({
+        data: {
+          id: `contest_${fixtureId}`,
+          sportmonksFixtureId: fixtureId,
+          name: 'CrickX Champions Contest',
+          entryFee: 4,
+          totalSpots: null,
+          filledSpots: 0,
+          prizePoolTotal: 0,
+          prizeDistribution: [],
+          scoringRuleSetId: scoringRuleSet.id,
+          lineupLockAt: fixture.starting_at,
+          maxTeamsPerUser: 1,
+        },
       });
     }
-    const chain = await this.onchain.ensureContest(fixtureId, kickoff, 4);
-    if (Number(chain.joinDeadline) !== kickoff) throw new ForbiddenException('The on-chain contest deadline does not match the match start time.');
+
+    let chain;
+    try {
+      chain = await this.onchain.ensureContest(fixtureId, kickoff, 4);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ServiceUnavailableException(`CRX contest blockchain setup failed: ${message}`);
+    }
+
+    if (Number(chain.joinDeadline) !== kickoff) {
+      throw new ForbiddenException('The on-chain contest deadline does not match the match start time.');
+    }
+
     return { ...contest, totalSpots: null, unlimited: true, chain };
   }
 
