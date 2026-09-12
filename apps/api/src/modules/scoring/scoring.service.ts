@@ -187,7 +187,11 @@ export class ScoringService {
     // The contract determines the winner count as top 30% of entrants. We use
     // the number currently on-chain to select exactly the required number of
     // winners. One fantasy entry per wallet keeps rankings unique.
-    const summary = await this.onchain.summary(contest.sportmonksFixtureId);
+    const chainContestId = Number((contest as any).chainContestId);
+    if (!Number.isFinite(chainContestId) || chainContestId < 0) {
+      throw new BadRequestException(`Contest ${contestId} has no on-chain contest ID.`);
+    }
+    const summary = await this.onchain.summary(chainContestId);
     if (summary.stage >= 4) {
       await this.prisma.contest.update({ where: { id: contestId }, data: { status: 'COMPLETED' } });
       return;
@@ -200,7 +204,7 @@ export class ScoringService {
 
     const winners = rankedEntries.slice(0, winnerCount);
     const winnerWallets = winners.map((entry: any) => entry.walletAddress as string);
-    const settlement = await this.onchain.settleFinal(contest.sportmonksFixtureId, winnerWallets);
+    const settlement = await this.onchain.settleFinal(chainContestId, winnerWallets);
     const winnerSet = new Set(winners.map((entry: any) => entry.id));
     const equalWinnerPrize = (summary.totalPool * 0.9) / winnerCount;
 
