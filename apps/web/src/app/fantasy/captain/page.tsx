@@ -77,11 +77,10 @@ function CaptainPicker() {
         captainSportmonksPlayerId: captain,
         viceCaptainSportmonksPlayerId: viceCaptain,
       };
-      await api.saveFantasyDraft(fixtureId, payload);
       const existing = teams.find((team: any) => Number(team.sportmonksFixtureId) === fixtureId);
       const savedTeam = existing?.id ? await api.editFantasyTeam(existing.id, payload) : await api.createFantasyTeam(payload);
       const savedTeamId = (savedTeam as any)?.id || existing?.id || '';
-      setMessage('Captain and vice-captain saved. Opening the contest…');
+      setMessage('Creating your fantasy team…');
       router.push(`/contest?fixtureId=${fixtureId}&teamId=${savedTeamId}`);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Unable to save the fantasy team.');
