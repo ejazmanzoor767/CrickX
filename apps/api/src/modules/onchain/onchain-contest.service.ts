@@ -23,19 +23,15 @@ const CRX_ABI = parseAbi([
 ]);
 
 const POOL_ABI = parseAbi([
-  'function createContest(uint256 contestId, uint256 entryFee, uint256 joinDeadline)',
-  'function contestExists(uint256 contestId) view returns (bool)',
+  'function nextContestId() view returns (uint256)',
+  'function createContest(uint256 entryFee) returns (uint256 contestId)',
   'function entryFee(uint256 contestId) view returns (uint256)',
-  'function stage(uint256 contestId) view returns (uint8)',
-  'function participantCount(uint256 contestId) view returns (uint256)',
-  'function winnerCount(uint256 contestId) view returns (uint256)',
-  'function totalPool(uint256 contestId) view returns (uint256)',
-  'function joinDeadline(uint256 contestId) view returns (uint256)',
+  'function getContestSummary(uint256 contestId) view returns (uint256 entryFee, uint8 stage, uint256 participantCount, uint256 winnerCount, uint256 totalPool, uint256 companyPaid, bool companyPayoutSent)',
   'function hasEntered(uint256 contestId, address participant) view returns (bool)',
   'function joinContest(uint256 contestId)',
   'function lockContest(uint256 contestId)',
-  'function setPrizeTable(uint256 contestId, uint16[] bps)',
-  'function finalizeRanking(uint256 contestId, address[] winners)',
+  'function setPrizeTable(uint256 contestId, uint16[] prizeBps)',
+  'function finalizeRanking(uint256 contestId, address[] ranking)',
   'function distributePrizes(uint256 contestId)',
 ]);
 
@@ -82,41 +78,77 @@ export class OnchainContestService {
     }
   }
 
-  async ensureContest(contestId: number, joinDeadlineUnix: number, entryFeeCrx = 4) {
+  async createContest(entryFeeCrx = 4) {
     this.requireConfigured();
     this.requireOwner();
-    const id = BigInt(contestId);
-    const exists = Boolean(await this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'contestExists', args: [id] }));
-    if (exists) return this.summary(contestId);
-    const now = Math.floor(Date.now() / 1000);
-    if (joinDeadlineUnix <= now) throw new BadRequestException('Contest deadline must be in the future.');
-    const decimals = Number(await this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'decimals' }));
+
+    const decimals = Number(await this.publicClient.readContract({
+      address: this.tokenAddress!,
+      abi: CRX_ABI,
+      functionName: 'decimals',
+    }));
     const fee = BigInt(Math.round(entryFeeCrx * 10 ** decimals));
-    const hash = await this.walletClient!.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'createContest', args: [id, fee, BigInt(joinDeadlineUnix)] });
+
+    // The supplied CRXContestPool generates its own sequential contest ID.
+    // Read it immediately before creation, then verify the emitted on-chain state
+    // after the transaction confirms.
+    const chainContestId = BigInt(await this.publicClient.readContract({
+      address: this.poolAddress!,
+      abi: POOL_ABI,
+      functionName: 'nextContestId',
+    }));
+
+    const hash = await this.walletClient!.writeContract({
+      address: this.poolAddress!,
+      abi: POOL_ABI,
+      functionName: 'createContest',
+      args: [fee],
+    });
     await this.publicClient.waitForTransactionReceipt({ hash });
-    return { ...(await this.summary(contestId)), createTxHash: String(hash) };
+
+    const summary = await this.summary(Number(chainContestId));
+    return { ...summary, chainContestId: Number(chainContestId), createTxHash: String(hash) };
   }
 
-  async summary(contestId: number) {
+  async summary(chainContestId: number) {
     this.requireConfigured();
-    const id = BigInt(contestId);
-    const [exists, entryFee, stage, participantCount, winnerCount, totalPool, joinDeadline] = await Promise.all([
-      this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'contestExists', args: [id] }),
-      this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'entryFee', args: [id] }),
-      this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'stage', args: [id] }),
-      this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'participantCount', args: [id] }),
-      this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'winnerCount', args: [id] }),
-      this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'totalPool', args: [id] }),
-      this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'joinDeadline', args: [id] }),
+    const id = BigInt(chainContestId);
+
+    const [summaryRaw, decimals] = await Promise.all([
+      this.publicClient.readContract({
+        address: this.poolAddress!,
+        abi: POOL_ABI,
+        functionName: 'getContestSummary',
+        args: [id],
+      }),
+      this.publicClient.readContract({
+        address: this.tokenAddress!,
+        abi: CRX_ABI,
+        functionName: 'decimals',
+      }),
     ]);
-    const decimals = Number(await this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'decimals' }));
+
+    const [entryFee, stage, participantCount, winnerCount, totalPool, companyPaid, companyPayoutSent] =
+      summaryRaw as readonly [bigint, number, bigint, bigint, bigint, bigint, boolean];
+
     return {
-      contestId: contestId.toString(), exists: Boolean(exists), poolAddress: this.poolAddress, tokenAddress: this.tokenAddress,
-      entryFee: Number(formatUnits(entryFee as bigint, decimals)), entryFeeBaseUnits: String(entryFee), stage: Number(stage),
-      participantCount: Number(participantCount), winnerCount: Number(winnerCount), totalPool: Number(formatUnits(totalPool as bigint, decimals)),
-      tokenDecimals: decimals, joinDeadline: Number(joinDeadline),
+      contestId: chainContestId.toString(),
+      exists: true,
+      chainContestId,
+      poolAddress: this.poolAddress,
+      tokenAddress: this.tokenAddress,
+      entryFee: Number(formatUnits(entryFee, Number(decimals))),
+      entryFeeBaseUnits: String(entryFee),
+      stage: Number(stage),
+      participantCount: Number(participantCount),
+      winnerCount: Number(winnerCount),
+      totalPool: Number(formatUnits(totalPool, Number(decimals))),
+      companyPaid: Number(formatUnits(companyPaid, Number(decimals))),
+      companyPayoutSent: Boolean(companyPayoutSent),
+      tokenDecimals: Number(decimals),
     };
   }
+
 
   async walletInfo(contestId: number, address: string) {
     this.requireConfigured();
@@ -139,15 +171,14 @@ export class OnchainContestService {
     const hash = input.txHash as Hex;
     const expectedUser = getAddress(input.userWallet);
     const [tx, receipt, summary] = await Promise.all([
-      this.publicClient.getTransaction({ hash }), this.publicClient.getTransactionReceipt({ hash }), this.summary(input.contestId),
+      this.publicClient.getTransaction({ hash }),
+      this.publicClient.getTransactionReceipt({ hash }),
+      this.summary(input.contestId),
     ]);
     if (!summary.exists) throw new BadRequestException('The on-chain contest does not exist.');
     if (!tx.to || getAddress(tx.to) !== this.poolAddress) throw new BadRequestException('Transaction is not for the CRX contest pool.');
     if (getAddress(tx.from) !== expectedUser) throw new BadRequestException('Transaction wallet does not match your connected wallet.');
     if (receipt.status !== 'success') throw new BadRequestException('The blockchain transaction failed.');
-    const block = await this.publicClient.getBlock({ blockNumber: receipt.blockNumber });
-    if (Number(block.timestamp) >= summary.joinDeadline) throw new BadRequestException('The blockchain transaction was mined after the contest entry deadline.');
-
     const decoded = decodeFunctionData({ abi: POOL_ABI, data: tx.input });
     if (decoded.functionName !== 'joinContest') throw new BadRequestException('Transaction is not a contest-entry transaction.');
     const decodedContestId = BigInt((decoded.args as readonly [bigint])[0]);
@@ -164,7 +195,7 @@ export class OnchainContestService {
 
     const already = Boolean(await this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'hasEntered', args: [BigInt(input.contestId), expectedUser] }));
     if (!already) throw new BadRequestException('The contest contract did not record your entry.');
-    return { txHash: input.txHash, walletAddress: expectedUser, entryFee: summary.entryFee, participantCount: summary.participantCount, contestId: input.contestId };
+    return { txHash: input.txHash, walletAddress: expectedUser, entryFee: summary.entryFee, participantCount: summary.participantCount, contestId: input.contestId, chainContestId: input.contestId };
   }
 
   async settleFinal(contestId: number, rankingWallets: string[]) {
