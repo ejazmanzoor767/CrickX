@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
