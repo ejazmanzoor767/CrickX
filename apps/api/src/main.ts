@@ -17,11 +17,21 @@ async function bootstrap() {
   // with `credentials: true`.
   // Reflect the browser origin for CORS. This avoids preflight failures from
   // stale/misconfigured origin allowlists while keeping credentials enabled.
+  const configuredOrigins = (process.env.CORS_ORIGIN || 'https://crickx-3d806.web.app')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: true,
+    origin: (requestOrigin, callback) => {
+      // Allow non-browser/server-to-server requests with no Origin header.
+      if (!requestOrigin) return callback(null, true);
+      if (configuredOrigins.includes(requestOrigin)) return callback(null, true);
+      return callback(new Error('CORS origin not allowed'), false);
+    },
     credentials: true,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Authorization, Accept, Origin, X-Requested-With',
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
     optionsSuccessStatus: 204,
   });
 
