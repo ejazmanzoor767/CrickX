@@ -25,10 +25,12 @@ export class ContestService {
       throw new BadRequestException('Cannot create a contest for a fixture that has already started.');
     }
 
-    const created = await this.prisma.contest.create({
+    const chain = await this.onchain.createContest(4);
+    return this.prisma.contest.create({
       data: {
         id: `contest_${dto.sportmonksFixtureId}`,
         sportmonksFixtureId: dto.sportmonksFixtureId,
+        chainContestId: chain.chainContestId,
         name: dto.name || 'CrickX Champions Contest',
         entryFee: 4,
         totalSpots: null,
@@ -40,9 +42,6 @@ export class ContestService {
         maxTeamsPerUser: 1,
       },
     });
-    const kickoff = Math.floor(new Date(fixture.starting_at).getTime() / 1000);
-    await this.onchain.ensureContest(dto.sportmonksFixtureId, kickoff, 4);
-    return created;
   }
 
   async listForFixture(fixtureId: number) {
@@ -95,14 +94,18 @@ export class ContestService {
 
     let chain;
     try {
-      chain = await this.onchain.ensureContest(fixtureId, kickoff, 4);
+      if ((contest as any).chainContestId === undefined || (contest as any).chainContestId === null) {
+        chain = await this.onchain.createContest(4);
+        contest = await this.prisma.contest.update({
+          where: { id: contest.id },
+          data: { chainContestId: chain.chainContestId },
+        });
+      } else {
+        chain = await this.onchain.summary(Number((contest as any).chainContestId));
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ServiceUnavailableException(`CRX contest blockchain setup failed: ${message}`);
-    }
-
-    if (Number(chain.joinDeadline) !== kickoff) {
-      throw new ForbiddenException('The on-chain contest deadline does not match the match start time.');
     }
 
     return { ...contest, totalSpots: null, unlimited: true, chain };
@@ -123,11 +126,13 @@ export class ContestService {
     const existingPair = await this.prisma.contestEntry.findFirst({ where: { contestId: contest.id, fantasyTeamId: dto.fantasyTeamId } });
     if (existingPair) throw new ForbiddenException('This fantasy team has already joined the contest.');
 
-    const fixture = await this.sportmonks.getFixture(contest.sportmonksFixtureId);
-    const kickoff = Math.floor(new Date(fixture.starting_at).getTime() / 1000);
-    const chain = await this.onchain.ensureContest(contest.sportmonksFixtureId, kickoff, 4);
+    if ((contest as any).chainContestId === undefined || (contest as any).chainContestId === null) {
+      throw new ServiceUnavailableException('The on-chain contest is not initialized for this match yet.');
+    }
+    const chainContestId = Number((contest as any).chainContestId);
+    const chain = await this.onchain.summary(chainContestId);
     if (chain.stage !== 0) throw new ForbiddenException('The on-chain contest is not open for entries.');
-    const alreadyEntered = Boolean((await this.onchain.walletInfo(contest.sportmonksFixtureId, dto.walletAddress)).hasEntered);
+    const alreadyEntered = Boolean((await this.onchain.walletInfo(chainContestId, dto.walletAddress)).hasEntered);
     if (alreadyEntered) throw new ForbiddenException('This wallet has already joined the contest.');
 
     return {
@@ -139,6 +144,7 @@ export class ContestService {
       poolAddress: chain.poolAddress,
       tokenAddress: chain.tokenAddress,
       participantCount: chain.participantCount,
+      chainContestId,
       unlimited: true,
     };
   }
@@ -162,7 +168,7 @@ export class ContestService {
       return existingTx;
     }
 
-    const verified = await this.onchain.verifyJoinTransaction({ contestId: contest.sportmonksFixtureId, txHash: dto.transactionHash, userWallet: dto.walletAddress });
+    const verified = await this.onchain.verifyJoinTransaction({ contestId: Number((contest as any).chainContestId), txHash: dto.transactionHash, userWallet: dto.walletAddress });
 
     const entry = await this.prisma.contestEntry.create({
       data: {
