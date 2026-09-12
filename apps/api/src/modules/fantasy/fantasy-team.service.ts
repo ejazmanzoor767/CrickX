@@ -16,12 +16,13 @@ export class FantasyTeamService {
   ) {}
 
   private async assertSquadEligible(fixtureId: number, playerIds: number[]) {
-    const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
-    const status = String(fixture.status ?? '').toLowerCase();
-    if (fixture.live === 1 || status.includes('finish') || status.includes('aband') || status.includes('cancel')) {
+    const squadData = await this.sportmonks.getFixtureSquads(fixtureId);
+    const status = String((squadData as any)?.status ?? '').toLowerCase();
+    const startingAt = (squadData as any)?.startingAt ? new Date((squadData as any).startingAt).getTime() : NaN;
+    const started = Number.isFinite(startingAt) && startingAt <= Date.now();
+    if (started && (status.includes('finish') || status.includes('aband') || status.includes('cancel') || status.includes('live'))) {
       throw new ForbiddenException('Team creation is locked because this match has entered its live/completed state.');
     }
-    const squadData = await this.sportmonks.getFixtureSquads(fixtureId);
     const squadTeams = Array.isArray((squadData as any)?.teams) ? (squadData as any).teams : [];
     if (squadTeams.length < 2) throw new BadRequestException('The match squad is not available yet.');
     const squadPlayers = squadTeams.flatMap((team: any) => (Array.isArray(team.players) ? team.players : []).map((player: any) => ({
@@ -40,9 +41,14 @@ export class FantasyTeamService {
   private async ensureCredits(fixtureId: number, playerIds: number[]) {
     const credits = await this.prisma.playerFixtureCredit.findMany({ where: { sportmonksFixtureId: fixtureId, sportmonksPlayerId: { in: playerIds } } });
     const creditByPlayer = new Map<number, number>(credits.map((c) => [Number(c.sportmonksPlayerId), Number(c.credits)]));
-    for (const playerId of playerIds) if (!creditByPlayer.has(Number(playerId))) {
-      await this.prisma.playerFixtureCredit.create({ data: { sportmonksFixtureId: fixtureId, sportmonksPlayerId: playerId, credits: DEFAULT_PLAYER_CREDITS } });
-      creditByPlayer.set(playerId, DEFAULT_PLAYER_CREDITS);
+    const missing = playerIds.filter((playerId) => !creditByPlayer.has(Number(playerId)));
+    if (missing.length) {
+      await Promise.all(missing.map(async (playerId) => {
+        await this.prisma.playerFixtureCredit.create({
+          data: { sportmonksFixtureId: fixtureId, sportmonksPlayerId: playerId, credits: DEFAULT_PLAYER_CREDITS },
+        });
+        creditByPlayer.set(playerId, DEFAULT_PLAYER_CREDITS);
+      }));
     }
     return creditByPlayer;
   }
