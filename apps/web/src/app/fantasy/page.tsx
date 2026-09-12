@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
 
@@ -65,6 +65,7 @@ function FantasyBuilder() {
   const [savingDraft, setSavingDraft] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const draftSaveRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     if (!hasFixture) {
@@ -122,21 +123,30 @@ function FantasyBuilder() {
 
   const displayedPlayers = useMemo(() => players.filter((player: any) => player.category === category), [players, category]);
 
-  async function persistDraft(nextSelected: number[]) {
-    if (!hasFixture) return;
+  function persistDraft(nextSelected: number[]) {
+    if (!hasFixture) return Promise.resolve();
+    const write = async () => {
+      try {
+        await api.saveFantasyDraft(fixtureId, {
+          name: 'My CrickX XI',
+          sportmonksPlayerIds: nextSelected,
+          captainSportmonksPlayerId: null,
+          viceCaptainSportmonksPlayerId: null,
+        });
+      } catch {
+        // Keep the selection usable locally when the draft endpoint is temporarily unavailable.
+      }
+    };
+    const queued = (draftSaveRef.current ?? Promise.resolve()).then(write, write);
+    draftSaveRef.current = queued;
     setSavingDraft(true);
-    try {
-      await api.saveFantasyDraft(fixtureId, {
-        name: 'My CrickX XI',
-        sportmonksPlayerIds: nextSelected,
-        captainSportmonksPlayerId: null,
-        viceCaptainSportmonksPlayerId: null,
-      });
-    } catch {
-      // Keep the selection usable locally when the draft endpoint is temporarily unavailable.
-    } finally {
-      setSavingDraft(false);
-    }
+    void queued.finally(() => {
+      if (draftSaveRef.current === queued) {
+        draftSaveRef.current = null;
+        setSavingDraft(false);
+      }
+    });
+    return queued;
   }
 
   function togglePlayer(player: any) {
@@ -217,7 +227,17 @@ function FantasyBuilder() {
 
     <div className="card" style={{ position: 'sticky', bottom: 12, zIndex: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 12 }}>
       <div><strong>{selected.length}/11</strong><span className="section-subtitle" style={{ marginLeft: 8 }}>{savingDraft ? 'Saving…' : 'players selected'}</span></div>
-      <Link className="primary-button" style={{ padding: '11px 20px' }} href={selected.length === 11 ? `/fantasy/captain?fixtureId=${fixtureId}` : '#'} onClick={(event) => { if (selected.length !== 11) { event.preventDefault(); setError('Select exactly 11 players before continuing.'); } }}>Next →</Link>
+      <Link className={selected.length === 11 && !savingDraft ? 'primary-button' : 'secondary-button'} style={{ padding: '11px 20px', pointerEvents: selected.length === 11 && !savingDraft ? 'auto' : 'none', opacity: selected.length === 11 && !savingDraft ? 1 : .65 }} href={selected.length === 11 && !savingDraft ? `/fantasy/captain?fixtureId=${fixtureId}` : '#'} onClick={(event) => {
+        if (selected.length !== 11) {
+          event.preventDefault();
+          setError('Select exactly 11 players before continuing.');
+          return;
+        }
+        if (savingDraft) {
+          event.preventDefault();
+          setError('Saving your XI. Please wait, then continue.');
+        }
+      }}>Next →</Link>
     </div>
   </section>;
 }
