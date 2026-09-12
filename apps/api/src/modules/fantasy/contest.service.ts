@@ -3,6 +3,7 @@ import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { OnchainContestService } from '../onchain/onchain-contest.service';
 import { CreateContestDto, JoinContestDto, PrepareJoinContestDto } from './dto';
+import { T20_RULES, T10_RULES, ODI_RULES } from '../scoring/scoring.rules';
 
 @Injectable()
 export class ContestService {
@@ -56,9 +57,33 @@ export class ContestService {
     if (!contest) {
       const otherActive = await this.prisma.contest.findFirst({ where: { status: { in: ['UPCOMING', 'LIVE'] } } });
       if (otherActive) return null;
-      const scoringRuleSet = await this.prisma.scoringRuleSet.findFirst({ orderBy: { createdAt: 'asc' } });
-      if (!scoringRuleSet) throw new NotFoundException('Scoring rules are not configured yet.');
-      contest = await this.create({ sportmonksFixtureId: fixtureId, name: 'CrickX Champions Contest', entryFee: 4, totalSpots: 0, scoringRuleSetId: scoringRuleSet.id, prizeDistribution: [] });
+      let scoringRuleSet = await this.prisma.scoringRuleSet.findFirst({
+        where: { matchType: String(fixture.type ?? 'T20').toUpperCase() },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (!scoringRuleSet) {
+        const format = String(fixture.type ?? 'T20').toUpperCase();
+        const rules = format.includes('ODI')
+          ? ODI_RULES
+          : format.includes('T10')
+            ? T10_RULES
+            : T20_RULES;
+        scoringRuleSet = await this.prisma.scoringRuleSet.create({
+          data: {
+            name: `CrickX Default ${format} Rules`,
+            matchType: format.includes('ODI') ? 'ODI' : format.includes('T10') ? 'T10' : 'T20',
+            rules,
+          },
+        });
+      }
+      contest = await this.create({
+        sportmonksFixtureId: fixtureId,
+        name: 'CrickX Champions Contest',
+        entryFee: 4,
+        totalSpots: 0,
+        scoringRuleSetId: scoringRuleSet.id,
+        prizeDistribution: [],
+      });
     }
     const chain = await this.onchain.ensureContest(fixtureId, kickoff, 4);
     if (Number(chain.joinDeadline) !== kickoff) throw new ForbiddenException('The on-chain contest deadline does not match the match start time.');
