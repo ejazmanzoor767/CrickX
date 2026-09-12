@@ -48,7 +48,10 @@ function CaptainPicker() {
     return () => { active = false; };
   }, [fixtureId, hasFixture]);
 
-  const selectedIds = useMemo(() => Array.isArray(draft?.sportmonksPlayerIds) ? draft.sportmonksPlayerIds.map(Number).filter(Number.isFinite) : [], [draft]);
+  const selectedIds = useMemo(() => {
+    const raw = Array.isArray(draft?.sportmonksPlayerIds) ? draft.sportmonksPlayerIds : [];
+    return [...new Set(raw.map(Number).filter(Number.isFinite))];
+  }, [draft]);
   const players = useMemo(() => {
     const sourceTeams = Array.isArray(squad?.teams) ? squad.teams : [];
     return sourceTeams.flatMap((team: any) => (team.players ?? []).map((player: any) => ({
@@ -57,10 +60,14 @@ function CaptainPicker() {
     }))).filter((player: any) => selectedIds.includes(Number(player.player_id)));
   }, [squad, selectedIds]);
 
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
   async function saveTeam() {
     if (selectedIds.length !== 11) return setMessage('Go back and select exactly 11 players.');
+    if (players.length !== 11) return setMessage('Your XI could not be loaded completely. Go back and verify all 11 players.');
     if (!captain || !viceCaptain) return setMessage('Select both captain and vice-captain.');
     if (captain === viceCaptain) return setMessage('Captain and vice-captain must be different players.');
+    if (!selectedSet.has(captain) || !selectedSet.has(viceCaptain)) return setMessage('Captain and vice-captain must both belong to your selected XI.');
     setSaving(true); setMessage('');
     try {
       const payload = {
@@ -103,7 +110,7 @@ function CaptainPicker() {
     {message && <div className="notice">{message}</div>}
     <div className="card" style={{ position: 'sticky', bottom: 12, zIndex: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 12 }}>
       <div><strong>{captain ? 'Captain selected' : 'Captain missing'}</strong><span className="section-subtitle" style={{ display: 'block' }}>{viceCaptain ? 'Vice-captain selected' : 'Vice-captain missing'}</span></div>
-      <button className="primary-button" onClick={saveTeam} disabled={saving || players.length !== 11}>{saving ? 'Saving…' : 'Save XI'}</button>
+      <button className="primary-button" onClick={saveTeam} disabled={saving || selectedIds.length !== 11 || players.length !== 11 || !captain || !viceCaptain || captain === viceCaptain}>{saving ? 'Saving…' : 'Save XI'}</button>
     </div>
   </section>;
 }
