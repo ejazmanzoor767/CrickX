@@ -132,7 +132,7 @@ function FantasyBuilder() {
         name: 'My CrickX XI',
         sportmonksPlayerIds: nextSelected,
         captainSportmonksPlayerId: null,
-        viceCaptainSportmonkPlayerId: null,
+        viceCaptainSportmonksPlayerId: null,
       });
     } finally {
       setSavingDraft(false);
