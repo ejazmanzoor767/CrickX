@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
 
 const DEFAULT_CREDITS = 9;
@@ -54,6 +54,7 @@ function TeamBadge({ team, align = 'left' }: { team: any; align?: 'left' | 'righ
 
 function FantasyBuilder() {
   const params = useSearchParams();
+  const router = useRouter();
   const fixtureId = Number(params.get('fixtureId'));
   const hasFixture = Number.isFinite(fixtureId) && fixtureId > 0;
 
@@ -65,7 +66,6 @@ function FantasyBuilder() {
   const [savingDraft, setSavingDraft] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const draftSaveRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     if (!hasFixture) {
@@ -123,30 +123,20 @@ function FantasyBuilder() {
 
   const displayedPlayers = useMemo(() => players.filter((player: any) => player.category === category), [players, category]);
 
-  function persistDraft(nextSelected: number[]) {
-    if (!hasFixture) return Promise.resolve();
-    const write = async () => {
-      try {
-        await api.saveFantasyDraft(fixtureId, {
-          name: 'My CrickX XI',
-          sportmonksPlayerIds: nextSelected,
-          captainSportmonksPlayerId: null,
-          viceCaptainSportmonksPlayerId: null,
-        });
-      } catch {
-        // Keep the selection usable locally when the draft endpoint is temporarily unavailable.
-      }
-    };
-    const queued = (draftSaveRef.current ?? Promise.resolve()).then(write, write);
-    draftSaveRef.current = queued;
+  async function saveDraft(nextSelected: number[]) {
+    if (!hasFixture) return;
     setSavingDraft(true);
-    void queued.finally(() => {
-      if (draftSaveRef.current === queued) {
-        draftSaveRef.current = null;
-        setSavingDraft(false);
-      }
-    });
-    return queued;
+    setError('');
+    try {
+      await api.saveFantasyDraft(fixtureId, {
+        name: 'My CrickX XI',
+        sportmonksPlayerIds: nextSelected,
+        captainSportmonksPlayerId: null,
+        viceCaptainSportmonkPlayerId: null,
+      });
+    } finally {
+      setSavingDraft(false);
+    }
   }
 
   function togglePlayer(player: any) {
@@ -157,7 +147,6 @@ function FantasyBuilder() {
     if (selected.includes(id)) {
       const next = selected.filter((value) => value !== id);
       setSelected(next);
-      void persistDraft(next);
       return;
     }
     if (selected.length >= 11) return setError('You can select exactly 11 players.');
@@ -227,17 +216,21 @@ function FantasyBuilder() {
 
     <div className="card" style={{ position: 'sticky', bottom: 12, zIndex: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 12 }}>
       <div><strong>{selected.length}/11</strong><span className="section-subtitle" style={{ marginLeft: 8 }}>{savingDraft ? 'Saving…' : 'players selected'}</span></div>
-      <Link className={selected.length === 11 && !savingDraft ? 'primary-button' : 'secondary-button'} style={{ padding: '11px 20px', pointerEvents: selected.length === 11 && !savingDraft ? 'auto' : 'none', opacity: selected.length === 11 && !savingDraft ? 1 : .65 }} href={selected.length === 11 && !savingDraft ? `/fantasy/captain?fixtureId=${fixtureId}` : '#'} onClick={(event) => {
+      <button className={selected.length === 11 && !savingDraft ? 'primary-button' : 'secondary-button'} style={{ padding: '11px 20px', opacity: selected.length === 11 && !savingDraft ? 1 : .65 }} disabled={selected.length !== 11 || savingDraft} onClick={async () => {
         if (selected.length !== 11) {
-          event.preventDefault();
           setError('Select exactly 11 players before continuing.');
           return;
         }
-        if (savingDraft) {
-          event.preventDefault();
-          setError('Saving your XI. Please wait, then continue.');
+        setMessage('Saving your XI…');
+        try {
+          await saveDraft(selected);
+          setMessage('');
+          router.push('/fantasy/captain?fixtureId=' + fixtureId);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Unable to save your XI. Please try again.');
+          setMessage('');
         }
-      }}>Next →</Link>
+      }}>{savingDraft ? 'Saving…' : 'Next →'}</button>
     </div>
   </section>;
 }
