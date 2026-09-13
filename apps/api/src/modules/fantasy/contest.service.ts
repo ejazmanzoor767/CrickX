@@ -53,8 +53,27 @@ export class ContestService {
     let contest = await this.prisma.contest.findFirst({ where: { sportmonksFixtureId: fixtureId } });
     const fixture = await this.sportmonks.getFixture(fixtureId);
     const kickoff = Math.floor(new Date(fixture.starting_at).getTime() / 1000);
+    const providerStatus = String(fixture.status ?? '').toLowerCase();
+    const providerFinished =
+      providerStatus.includes('finish') ||
+      providerStatus.includes('abandon') ||
+      providerStatus.includes('cancel');
+    const providerLive = fixture.live === 1 && !providerFinished;
+
+    if (contest) {
+      const desiredStatus = providerFinished ? 'COMPLETED' : providerLive ? 'LIVE' : 'UPCOMING';
+      if (contest.status !== desiredStatus && contest.status !== 'CANCELLED') {
+        contest = await this.prisma.contest.update({
+          where: { id: contest.id },
+          data: { status: desiredStatus as any },
+        });
+      }
+    }
 
     if (!contest) {
+      if (providerFinished) {
+        throw new ForbiddenException('This match has already finished or been cancelled, so entries cannot be opened.');
+      }
       const otherActive = await this.prisma.contest.findFirst({ where: { status: { in: ['UPCOMING', 'LIVE'] } } });
       if (otherActive) return null;
 
@@ -114,9 +133,20 @@ export class ContestService {
   async prepareJoin(userId: string, dto: PrepareJoinContestDto) {
     const contest = await this.prisma.contest.findUnique({ where: { id: dto.contestId } });
     if (!contest) throw new NotFoundException('Contest not found.');
-    if (contest.status !== 'UPCOMING') throw new ForbiddenException('Contest is no longer open for entries.');
-    if (new Date() >= contest.lineupLockAt) throw new ForbiddenException('Entries are locked — match has started.');
-    if (contest.status === 'COMPLETED' || contest.status === 'CANCELLED') throw new ForbiddenException('Contest is already closed.');
+    const liveFixture = await this.sportmonks.getFixture(contest.sportmonksFixtureId, { forceLive: true });
+    const liveStatus = String(liveFixture.status ?? '').toLowerCase();
+    const liveFinished =
+      liveStatus.includes('finish') ||
+      liveStatus.includes('abandon') ||
+      liveStatus.includes('cancel');
+    const matchLive = liveFixture.live === 1 && !liveFinished;
+
+    if (liveFinished) throw new ForbiddenException('Entries are closed because the match is finished or cancelled.');
+    if (matchLive) throw new ForbiddenException('Entries are closed because the match has started.');
+    if (contest.status !== 'UPCOMING' && contest.status !== 'CANCELLED') {
+      await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING' } });
+    }
+    if (contest.status === 'CANCELLED') throw new ForbiddenException('Contest is cancelled.');
 
     const team = await this.prisma.fantasyTeam.findUnique({ where: { id: dto.fantasyTeamId } });
     if (!team || team.userId !== userId) throw new NotFoundException('Fantasy team not found.');
