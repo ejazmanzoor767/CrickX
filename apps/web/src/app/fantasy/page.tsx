@@ -102,17 +102,58 @@ function FantasyBuilder() {
     return fallback;
   }, [squadData, fixtureData]);
 
-  const players = useMemo(() => teams.flatMap((team: any) => (team.players ?? []).map((player: any) => ({
-    ...player,
-    teamId: Number(player.team_id ?? player.teamId ?? teamIdFor(team)),
-    realTeamName: team.name ?? team.short_code ?? team.code ?? 'Team',
-    teamFlag: flagFor(team),
-    teamImage: imageFor(team),
-    creditValue: Number(player.credits ?? player.credit ?? DEFAULT_CREDITS),
-    category: roleCategory(player),
-  }))), [teams]);
+  const players = useMemo(() => {
+    const byPlayerId = new Map<number, any>();
 
-  const selectedPlayers = useMemo(() => selected.map((id) => players.find((player: any) => Number(player.player_id) === id)).filter(Boolean) as any[], [selected, players]);
+    for (const team of teams) {
+      for (const rawPlayer of (team.players ?? [])) {
+        const playerId = Number(rawPlayer?.player_id ?? rawPlayer?.id);
+        if (!Number.isFinite(playerId) || playerId <= 0) continue;
+
+        const player = {
+          ...rawPlayer,
+          player_id: playerId,
+          teamId: Number(rawPlayer.team_id ?? rawPlayer.teamId ?? teamIdFor(team)),
+          realTeamName: team.name ?? team.short_code ?? team.code ?? 'Team',
+          teamFlag: flagFor(team),
+          teamImage: imageFor(team),
+          creditValue: Number(rawPlayer.credits ?? rawPlayer.credit ?? DEFAULT_CREDITS),
+          category: roleCategory(rawPlayer),
+        };
+
+        // Sportmonks can expose the same player more than once through
+        // squad/lineup merges. Keep exactly one UI row per player ID.
+        if (!byPlayerId.has(playerId)) {
+          byPlayerId.set(playerId, player);
+        } else {
+          // Prefer the row that has richer role/team metadata.
+          const existing = byPlayerId.get(playerId);
+          byPlayerId.set(playerId, {
+            ...existing,
+            ...player,
+            teamId: Number(player.teamId) || existing.teamId,
+            creditValue: Number.isFinite(player.creditValue) ? player.creditValue : existing.creditValue,
+            category: player.category || existing.category,
+          });
+        }
+      }
+    }
+
+    return Array.from(byPlayerId.values());
+  }, [teams]);
+
+  const selectedPlayers = useMemo(() => {
+    const seen = new Set<number>();
+    return selected
+      .map((id) => players.find((player: any) => Number(player.player_id) === id))
+      .filter((player: any) => {
+        if (!player) return false;
+        const id = Number(player.player_id);
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      }) as any[];
+  }, [selected, players]);
   const totalCredits = selectedPlayers.reduce((sum, player) => sum + Number(player.creditValue ?? DEFAULT_CREDITS), 0);
   const remainingCredits = Math.max(0, 100 - totalCredits);
   const teamCounts = useMemo(() => selectedPlayers.reduce<Record<number, number>>((acc, player) => {
