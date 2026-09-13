@@ -22,16 +22,37 @@ async function bootstrap() {
     .map((value) => value.trim())
     .filter(Boolean);
 
+  const allowedHeaders = 'Content-Type, Authorization, Accept, Origin, X-Requested-With';
+  const allowedMethods = 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS';
+
+  // Handle browser preflight explicitly before Nest routes/guards. This makes
+  // Firebase -> Render OPTIONS requests succeed even when no controller matches
+  // the target URL yet.
+  app.use((req: any, res: any, next: any) => {
+    const requestOrigin = req.headers?.origin;
+    if (requestOrigin) {
+      const allowed = configuredOrigins.includes(requestOrigin) || requestOrigin.endsWith('.web.app');
+      if (allowed) {
+        res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Methods', allowedMethods);
+        res.setHeader('Access-Control-Allow-Headers', allowedHeaders);
+      }
+    }
+    if (req.method === 'OPTIONS') {
+      if (requestOrigin && (configuredOrigins.includes(requestOrigin) || requestOrigin.endsWith('.web.app'))) {
+        return res.status(204).end();
+      }
+    }
+    next();
+  });
+
   app.enableCors({
-    origin: (requestOrigin, callback) => {
-      // Allow non-browser/server-to-server requests with no Origin header.
-      if (!requestOrigin) return callback(null, true);
-      if (configuredOrigins.includes(requestOrigin)) return callback(null, true);
-      return callback(new Error('CORS origin not allowed'), false);
-    },
+    origin: true,
     credentials: true,
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+    methods: allowedMethods,
+    allowedHeaders,
     optionsSuccessStatus: 204,
   });
 
