@@ -111,21 +111,9 @@ export class ContestService {
       });
     }
 
-    let chain;
-    try {
-      if ((contest as any).chainContestId === undefined || (contest as any).chainContestId === null) {
-        chain = await this.onchain.createContest(4);
-        contest = await this.prisma.contest.update({
-          where: { id: contest.id },
-          data: { chainContestId: chain.chainContestId },
-        });
-      } else {
-        chain = await this.onchain.summary(Number((contest as any).chainContestId));
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new ServiceUnavailableException(`CRX contest blockchain setup failed: ${message}`);
-    }
+    const chain = (contest as any).chainContestId !== undefined && (contest as any).chainContestId !== null
+      ? await this.onchain.summary(Number((contest as any).chainContestId))
+      : null;
 
     return { ...contest, totalSpots: null, unlimited: true, chain };
   }
@@ -156,11 +144,24 @@ export class ContestService {
     const existingPair = await this.prisma.contestEntry.findFirst({ where: { contestId: contest.id, fantasyTeamId: dto.fantasyTeamId } });
     if (existingPair) throw new ForbiddenException('This fantasy team has already joined the contest.');
 
-    if ((contest as any).chainContestId === undefined || (contest as any).chainContestId === null) {
-      throw new ServiceUnavailableException('The on-chain contest is not initialized for this match yet.');
+    let chainContestId = Number((contest as any).chainContestId);
+    let chain;
+    try {
+      if (!Number.isFinite(chainContestId) || chainContestId < 0) {
+        const created = await this.onchain.createContest(4);
+        chainContestId = Number(created.chainContestId);
+        contest = await this.prisma.contest.update({
+          where: { id: contest.id },
+          data: { chainContestId },
+        });
+        chain = created;
+      } else {
+        chain = await this.onchain.summary(chainContestId);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ServiceUnavailableException(`Unable to initialize the CRX blockchain contest: ${message}`);
     }
-    const chainContestId = Number((contest as any).chainContestId);
-    const chain = await this.onchain.summary(chainContestId);
     if (chain.stage !== 0) throw new ForbiddenException('The on-chain contest is not open for entries.');
     const alreadyEntered = Boolean((await this.onchain.walletInfo(chainContestId, dto.walletAddress)).hasEntered);
     if (alreadyEntered) throw new ForbiddenException('This wallet has already joined the contest.');
