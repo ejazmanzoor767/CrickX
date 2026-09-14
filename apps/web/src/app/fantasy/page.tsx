@@ -216,7 +216,6 @@ function FantasyBuilder() {
     </div>
 
     <div className="card" style={{ padding: 14 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><span className="demo-pill">{totalCredits.toFixed(1)} / 100 CREDITS</span></div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'center' }}>
         <div><TeamBadge team={teamA} align="left" /><div className="section-subtitle" style={{ marginTop: 7 }}>{countA} selected</div></div>
         <strong style={{ color: '#98a0b3', fontSize: 16 }}>{countA} - {countB}</strong>
