@@ -17,43 +17,33 @@ async function bootstrap() {
   // with `credentials: true`.
   // Reflect the browser origin for CORS. This avoids preflight failures from
   // stale/misconfigured origin allowlists while keeping credentials enabled.
-  const configuredOrigins = (process.env.CORS_ORIGIN || 'https://crickx-3d806.web.app')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-
+  // The browser authenticates with a Firebase Bearer token, not a cookie.
+  // Keep CORS deterministic for the single production web origin.
+  const frontendOrigin = process.env.CORS_ORIGIN || 'https://crickx-3d806.web.app';
   const allowedHeaders = 'Content-Type, Authorization, Accept, Origin, X-Requested-With';
   const allowedMethods = 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS';
 
-  // Handle browser preflight explicitly before Nest routes/guards. This makes
-  // Firebase -> Render OPTIONS requests succeed even when no controller matches
-  // the target URL yet.
-  app.use((req: any, res: any, next: any) => {
-    const requestOrigin = req.headers?.origin;
-    if (requestOrigin) {
-      const allowed = configuredOrigins.includes(requestOrigin) || requestOrigin.endsWith('.web.app');
-      if (allowed) {
-        res.setHeader('Access-Control-Allow-Origin', requestOrigin);
-        res.setHeader('Vary', 'Origin');
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-        res.setHeader('Access-Control-Allow-Methods', allowedMethods);
-        res.setHeader('Access-Control-Allow-Headers', allowedHeaders);
-      }
-    }
-    if (req.method === 'OPTIONS') {
-      if (requestOrigin && (configuredOrigins.includes(requestOrigin) || requestOrigin.endsWith('.web.app'))) {
-        return res.status(204).end();
-      }
-    }
-    next();
-  });
-
   app.enableCors({
-    origin: true,
-    credentials: true,
+    origin: frontendOrigin,
+    credentials: false,
     methods: allowedMethods,
     allowedHeaders,
     optionsSuccessStatus: 204,
+  });
+
+  // Explicitly answer preflight requests before auth guards/controllers.
+  app.use((req: any, res: any, next: any) => {
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Origin', frontendOrigin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Methods', allowedMethods);
+      res.setHeader('Access-Control-Allow-Headers', allowedHeaders);
+      return res.status(204).end();
+    }
+
+    res.setHeader('Access-Control-Allow-Origin', frontendOrigin);
+    res.setHeader('Vary', 'Origin');
+    next();
   });
 
   app.setGlobalPrefix('api/v1');
