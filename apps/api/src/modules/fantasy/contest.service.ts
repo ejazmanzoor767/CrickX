@@ -119,7 +119,7 @@ export class ContestService {
   }
 
   async prepareJoin(userId: string, dto: PrepareJoinContestDto) {
-    const contest = await this.prisma.contest.findUnique({ where: { id: dto.contestId } });
+    let contest = await this.prisma.contest.findUnique({ where: { id: dto.contestId } });
     if (!contest) throw new NotFoundException('Contest not found.');
     const liveFixture = await this.sportmonks.getFixture(contest.sportmonksFixtureId, { forceLive: true });
     const liveStatus = String(liveFixture.status ?? '').toLowerCase();
