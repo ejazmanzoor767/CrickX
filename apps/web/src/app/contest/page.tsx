@@ -67,8 +67,10 @@ function ContestContent() {
   if (!contest) return <section className="app-page"><div className="card skeleton-card">Loading the single contest…</div>{error && <div className="card"><p className="error-text">{error}</p></div>}</section>;
 
   const alreadyJoined = Boolean(wallet?.hasEntered);
-  const stage = Number(contest?.chain?.stage ?? 0);
-  const open = stage === 0 && contest.status === 'UPCOMING';
+  const stage = contest?.chain ? Number(contest.chain.stage) : 0;
+  // A contest can render as open before its on-chain contest is initialized.
+  // The blockchain transaction is created only when the user chooses to join.
+  const open = contest.status === 'UPCOMING' && stage === 0;
 
   return <section className="app-page" style={{ maxWidth: 980, paddingBottom: 96 }}>
     <div className="page-intro"><div><p className="eyebrow">CRICKX FANTASY CONTEST</p><h1 className="section-title">{contest.name}</h1><p className="section-subtitle">There is one contest for this match. Anyone can join while entries are open — there is no spot limit.</p></div><Link className="secondary-button" href={`/matches/detail?fixtureId=${fixtureId}`}>Match</Link></div>
