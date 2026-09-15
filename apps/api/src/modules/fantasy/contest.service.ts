@@ -50,14 +50,10 @@ export class ContestService {
   }
 
   async active(fixtureId: number) {
-    // Contest IDs are deterministic, so use the direct document lookup on the
-    // normal path instead of scanning contests by fixture ID.
     const contestId = `contest_${fixtureId}`;
     let contest = await this.prisma.contest.findUnique({ where: { id: contestId } });
 
     if (!contest) {
-      // Only the first request for a brand-new fixture needs Sportmonks data
-      // to create the off-chain contest and select the scoring rule set.
       const fixture = await this.sportmonks.getFixture(fixtureId);
       const providerStatus = String(fixture.status ?? '').toLowerCase();
       const providerFinished =
@@ -106,8 +102,6 @@ export class ContestService {
       });
     }
 
-    // No Sportmonks or Polygon call here. Join performs authoritative live and
-    // blockchain checks only when the user actually clicks Join Contest.
     return {
       ...contest,
       totalSpots: null,
@@ -210,7 +204,10 @@ export class ContestService {
         paymentStatus: 'VERIFIED',
       },
     });
-    await this.prisma.contest.update({ where: { id: contest.id }, data: { filledSpots: { increment: 1 }, prizePoolTotal: { increment: verified.entryFee } });
+    await this.prisma.contest.update({
+      where: { id: contest.id },
+      data: { filledSpots: { increment: 1 }, prizePoolTotal: { increment: verified.entryFee } },
+    });
     return { ...entry, onchain: verified };
   }
 
