@@ -82,7 +82,12 @@ export class ContestService {
     const liveFixture = await this.sportmonks.getFixture(contest.sportmonksFixtureId, { forceLive: true });
     const liveStatus = String(liveFixture.status ?? '').toLowerCase();
     const liveFinished = liveStatus.includes('finish') || liveStatus.includes('abandon') || liveStatus.includes('cancel');
-    const matchLive = liveFixture.live === 1 && !liveFinished;
+    const startingAtMs = new Date(liveFixture.starting_at).getTime();
+    const kickoffReached = Number.isFinite(startingAtMs) ? Date.now() >= startingAtMs : true;
+    // Sportmonks exposes `live` as the in-progress indicator. Require the
+    // scheduled instant to have arrived too, so an early/stale live flag
+    // cannot close entries before the actual match start.
+    const matchLive = liveFixture.live === 1 && !liveFinished && kickoffReached;
     if (liveFinished) throw new ForbiddenException('Entries are closed because the match is finished or cancelled.');
     if (matchLive) throw new ForbiddenException('Entries are closed because the match has started.');
     if (contest.status !== 'UPCOMING' && contest.status !== 'CANCELLED') contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING' } });
