@@ -19,9 +19,8 @@ async function bootstrap() {
   // stale/misconfigured origin allowlists while keeping credentials enabled.
   // Firebase uses a Bearer Authorization header, so cookies are not needed.
   // Normalize the configured production origin to avoid a trailing-slash mismatch.
-  const frontendOrigin = (process.env.CORS_ORIGIN || 'https://crickx-3d806.web.app')
-    .trim()
-    .replace(/\\/$/, '');
+  let frontendOrigin = (process.env.CORS_ORIGIN || 'https://crickx-3d806.web.app').trim();
+  if (frontendOrigin.endsWith('/')) frontendOrigin = frontendOrigin.slice(0, -1);
   const allowedHeaders = 'Content-Type, Authorization, Accept, Origin, X-Requested-With';
   const allowedMethods = 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS';
 
