@@ -17,32 +17,29 @@ async function bootstrap() {
   // with `credentials: true`.
   // Reflect the browser origin for CORS. This avoids preflight failures from
   // stale/misconfigured origin allowlists while keeping credentials enabled.
-  // The browser authenticates with a Firebase Bearer token, not a cookie.
-  // Keep CORS deterministic for the single production web origin.
-  const frontendOrigin = process.env.CORS_ORIGIN || 'https://crickx-3d806.web.app';
+  // Firebase uses a Bearer Authorization header, so cookies are not needed.
+  // Normalize the configured production origin to avoid a trailing-slash mismatch.
+  const frontendOrigin = (process.env.CORS_ORIGIN || 'https://crickx-3d806.web.app')
+    .trim()
+    .replace(/\\/$/, '');
   const allowedHeaders = 'Content-Type, Authorization, Accept, Origin, X-Requested-With';
   const allowedMethods = 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS';
 
-  app.enableCors({
-    origin: frontendOrigin,
-    credentials: false,
-    methods: allowedMethods,
-    allowedHeaders,
-    optionsSuccessStatus: 204,
-  });
-
-  // Explicitly answer preflight requests before auth guards/controllers.
+  // Handle CORS ourselves. This runs before Nest routes/guards and does not
+  // depend on the cors package accepting the configured origin.
   app.use((req: any, res: any, next: any) => {
-    if (req.method === 'OPTIONS') {
+    const origin = String(req.headers?.origin || '');
+    if (origin === frontendOrigin) {
       res.setHeader('Access-Control-Allow-Origin', frontendOrigin);
       res.setHeader('Vary', 'Origin');
       res.setHeader('Access-Control-Allow-Methods', allowedMethods);
       res.setHeader('Access-Control-Allow-Headers', allowedHeaders);
+    }
+
+    if (req.method === 'OPTIONS' && origin === frontendOrigin) {
       return res.status(204).end();
     }
 
-    res.setHeader('Access-Control-Allow-Origin', frontendOrigin);
-    res.setHeader('Vary', 'Origin');
     next();
   });
 
