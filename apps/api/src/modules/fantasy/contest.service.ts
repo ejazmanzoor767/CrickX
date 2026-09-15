@@ -50,9 +50,10 @@ export class ContestService {
   }
 
   async active(fixtureId: number) {
-    // Fast path: an existing contest is already enough to render the page.
-    // Do not block the initial request on Sportmonks or Polygon RPC.
-    let contest = await this.prisma.contest.findFirst({ where: { sportmonksFixtureId: fixtureId } });
+    // Contest IDs are deterministic, so use the direct document lookup on the
+    // normal path instead of scanning contests by fixture ID.
+    const contestId = `contest_${fixtureId}`;
+    let contest = await this.prisma.contest.findUnique({ where: { id: contestId } });
 
     if (!contest) {
       // Only the first request for a brand-new fixture needs Sportmonks data
@@ -90,7 +91,7 @@ export class ContestService {
 
       contest = await this.prisma.contest.create({
         data: {
-          id: `contest_${fixtureId}`,
+          id: contestId,
           sportmonksFixtureId: fixtureId,
           name: 'CrickX Champions Contest',
           entryFee: 4,
@@ -105,8 +106,8 @@ export class ContestService {
       });
     }
 
-    // Intentionally no blockchain read here. On-chain initialization and
-    // wallet checks happen only when the user clicks Join Contest.
+    // No Sportmonks or Polygon call here. Join performs authoritative live and
+    // blockchain checks only when the user actually clicks Join Contest.
     return {
       ...contest,
       totalSpots: null,
@@ -209,7 +210,7 @@ export class ContestService {
         paymentStatus: 'VERIFIED',
       },
     });
-    await this.prisma.contest.update({ where: { id: contest.id }, data: { filledSpots: { increment: 1 }, prizePoolTotal: { increment: verified.entryFee } } });
+    await this.prisma.contest.update({ where: { id: contest.id }, data: { filledSpots: { increment: 1 }, prizePoolTotal: { increment: verified.entryFee } });
     return { ...entry, onchain: verified };
   }
 
