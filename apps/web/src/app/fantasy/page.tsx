@@ -197,7 +197,6 @@ function FantasyBuilder() {
     if (totalCredits + cost > 100) return setError('Your XI exceeds the 100 credit limit.');
     const next = [...selected, id];
     setSelected(next);
-    void persistDraft(next);
   }
 
   if (!hasFixture) return <section className="app-page"><div className="card empty-state"><strong>Choose a match first.</strong><span>Open an upcoming match and choose Create Team.</span><Link className="primary-button" href="/matches">Go to matches</Link></div></section>;
