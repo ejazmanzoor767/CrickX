@@ -50,30 +50,24 @@ export class ContestService {
   }
 
   async active(fixtureId: number) {
+    // Fast path: an existing contest is already enough to render the page.
+    // Do not block the initial request on Sportmonks or Polygon RPC.
     let contest = await this.prisma.contest.findFirst({ where: { sportmonksFixtureId: fixtureId } });
-    const fixture = await this.sportmonks.getFixture(fixtureId);
-    const kickoff = Math.floor(new Date(fixture.starting_at).getTime() / 1000);
-    const providerStatus = String(fixture.status ?? '').toLowerCase();
-    const providerFinished =
-      providerStatus.includes('finish') ||
-      providerStatus.includes('abandon') ||
-      providerStatus.includes('cancel');
-    const providerLive = fixture.live === 1 && !providerFinished;
-
-    if (contest) {
-      const desiredStatus = providerFinished ? 'COMPLETED' : providerLive ? 'LIVE' : 'UPCOMING';
-      if (contest.status !== desiredStatus && contest.status !== 'CANCELLED') {
-        contest = await this.prisma.contest.update({
-          where: { id: contest.id },
-          data: { status: desiredStatus as any },
-        });
-      }
-    }
 
     if (!contest) {
+      // Only the first request for a brand-new fixture needs Sportmonks data
+      // to create the off-chain contest and select the scoring rule set.
+      const fixture = await this.sportmonks.getFixture(fixtureId);
+      const providerStatus = String(fixture.status ?? '').toLowerCase();
+      const providerFinished =
+        providerStatus.includes('finish') ||
+        providerStatus.includes('abandon') ||
+        providerStatus.includes('cancel');
+
       if (providerFinished) {
         throw new ForbiddenException('This match has already finished or been cancelled, so entries cannot be opened.');
       }
+
       const otherActive = await this.prisma.contest.findFirst({ where: { status: { in: ['UPCOMING', 'LIVE'] } } });
       if (otherActive) return null;
 
@@ -111,11 +105,14 @@ export class ContestService {
       });
     }
 
-    const chain = (contest as any).chainContestId !== undefined && (contest as any).chainContestId !== null
-      ? await this.onchain.summary(Number((contest as any).chainContestId))
-      : null;
-
-    return { ...contest, totalSpots: null, unlimited: true, chain };
+    // Intentionally no blockchain read here. On-chain initialization and
+    // wallet checks happen only when the user clicks Join Contest.
+    return {
+      ...contest,
+      totalSpots: null,
+      unlimited: true,
+      chain: null,
+    };
   }
 
   async prepareJoin(userId: string, dto: PrepareJoinContestDto) {
