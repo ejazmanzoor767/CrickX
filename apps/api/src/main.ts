@@ -24,18 +24,17 @@ async function bootstrap() {
   const allowedHeaders = 'Content-Type, Authorization, Accept, Origin, X-Requested-With';
   const allowedMethods = 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS';
 
-  // Handle CORS ourselves. This runs before Nest routes/guards and does not
-  // depend on the cors package accepting the configured origin.
-  app.use((req: any, res: any, next: any) => {
-    const origin = String(req.headers?.origin || '');
-    if (origin === frontendOrigin) {
-      res.setHeader('Access-Control-Allow-Origin', frontendOrigin);
-      res.setHeader('Vary', 'Origin');
-      res.setHeader('Access-Control-Allow-Methods', allowedMethods);
-      res.setHeader('Access-Control-Allow-Headers', allowedHeaders);
-    }
+  // Firebase sends a Bearer Authorization header, not cookies, so wildcard
+  // CORS is safe for this API and avoids origin/env mismatches.
+  const allowedHeaders = 'Content-Type, Authorization, Accept, Origin, X-Requested-With';
+  const allowedMethods = 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS';
 
-    if (req.method === 'OPTIONS' && origin === frontendOrigin) {
+  app.use((req: any, res: any, next: any) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', allowedMethods);
+    res.setHeader('Access-Control-Allow-Headers', allowedHeaders);
+
+    if (req.method === 'OPTIONS') {
       return res.status(204).end();
     }
 
