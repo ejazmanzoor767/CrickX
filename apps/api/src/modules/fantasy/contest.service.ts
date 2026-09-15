@@ -46,14 +46,16 @@ export class ContestService {
   async active(fixtureId: number) {
     const contestId = `contest_${fixtureId}`;
     let contest = await this.prisma.contest.findUnique({ where: { id: contestId } });
+    let fixtureForClock: any = null;
+
     if (!contest) {
-      const fixture = await this.sportmonks.getFixture(fixtureId);
-      const providerStatus = String(fixture.status ?? '').toLowerCase();
+      fixtureForClock = await this.sportmonks.getFixture(fixtureId);
+      const providerStatus = String(fixtureForClock.status ?? '').toLowerCase();
       const providerFinished = providerStatus.includes('finish') || providerStatus.includes('abandon') || providerStatus.includes('cancel');
       if (providerFinished) throw new ForbiddenException('This match has already finished or been cancelled, so entries cannot be opened.');
-      let scoringRuleSet = await this.prisma.scoringRuleSet.findFirst({ where: { matchType: String(fixture.type ?? 'T20').toUpperCase() }, orderBy: { createdAt: 'asc' } });
+      let scoringRuleSet = await this.prisma.scoringRuleSet.findFirst({ where: { matchType: String(fixtureForClock.type ?? 'T20').toUpperCase() }, orderBy: { createdAt: 'asc' } });
       if (!scoringRuleSet) {
-        const format = String(fixture.type ?? 'T20').toUpperCase();
+        const format = String(fixtureForClock.type ?? 'T20').toUpperCase();
         const rules = format.includes('ODI') ? ODI_RULES : format.includes('T10') ? T10_RULES : T20_RULES;
         scoringRuleSet = await this.prisma.scoringRuleSet.create({ data: { name: `CrickX Default ${format} Rules`, matchType: format.includes('ODI') ? 'ODI' : format.includes('T10') ? 'T10' : 'T20', rules } });
       }
@@ -68,11 +70,17 @@ export class ContestService {
           prizePoolTotal: 0,
           prizeDistribution: [],
           scoringRuleSetId: scoringRuleSet.id,
-          lineupLockAt: fixture.starting_at,
+          lineupLockAt: fixtureForClock.starting_at,
           maxTeamsPerUser: 1,
         },
       });
     }
+
+    const startingAtMs = new Date((contest as any).lineupLockAt ?? fixtureForClock?.starting_at).getTime();
+    if (Number.isFinite(startingAtMs) && Date.now() < startingAtMs && contest.status !== 'UPCOMING' && contest.status !== 'CANCELLED') {
+      contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING' } });
+    }
+
     return { ...contest, totalSpots: null, unlimited: true, chain: null };
   }
 
@@ -84,9 +92,6 @@ export class ContestService {
     const liveFinished = liveStatus.includes('finish') || liveStatus.includes('abandon') || liveStatus.includes('cancel');
     const startingAtMs = new Date(liveFixture.starting_at).getTime();
     const kickoffReached = Number.isFinite(startingAtMs) ? Date.now() >= startingAtMs : true;
-    // Sportmonks exposes `live` as the in-progress indicator. Require the
-    // scheduled instant to have arrived too, so an early/stale live flag
-    // cannot close entries before the actual match start.
     const matchLive = liveFixture.live === 1 && !liveFinished && kickoffReached;
     if (liveFinished) throw new ForbiddenException('Entries are closed because the match is finished or cancelled.');
     if (matchLive) throw new ForbiddenException('Entries are closed because the match has started.');
