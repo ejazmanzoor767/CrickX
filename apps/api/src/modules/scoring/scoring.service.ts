@@ -61,11 +61,14 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    for (const contest of contests) {
-      const fixtureId = Number(contest.sportmonksFixtureId);
-      if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
+    // Process contests independently. One slow/stuck fixture or blockchain call
+    // must never prevent later contests (for example 71245) from being settled.
+    await Promise.allSettled(
+      contests.map(async (contest) => {
+        const fixtureId = Number(contest.sportmonksFixtureId);
+        if (!Number.isFinite(fixtureId) || fixtureId <= 0) return;
 
-      try {
+        try {
         const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
         if (!isFinished(fixture.status, fixture.live)) continue;
 
@@ -90,8 +93,14 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
           'Finished-contest sweep failed for fixture=' + fixtureId + ', contest=' + contest.id,
           err instanceof Error ? err.stack : String(err),
         );
-      }
-    }
+        } catch (err) {
+          this.logger.error(
+            'Finished-contest sweep failed for fixture=' + fixtureId + ', contest=' + contest.id,
+            err instanceof Error ? err.stack : String(err),
+          );
+        }
+      }),
+    );
   }
 
   private calculateTeamPoints(
