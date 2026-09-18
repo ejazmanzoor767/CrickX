@@ -51,7 +51,67 @@ export class FirestoreService implements OnModuleInit, OnModuleDestroy {
   private uniqueDirectId(model: string, where: any): string | null { if (!where) return null; if (typeof where.id === 'string') return where.id; if (model === 'cachedFixture' && where.sportmonksFixtureId !== undefined) return String(where.sportmonksFixtureId); if (model === 'cachedPlayer' && where.sportmonksPlayerId !== undefined) return String(where.sportmonksPlayerId); if (model === 'wallet' && where.userId !== undefined) return String(where.userId); return null; }
   private async readDoc(model: string, id: string) { const tx = this.transactionContext.getStore(); const snap = tx ? await tx.get(this.ref(model, id)) : await this.ref(model, id).get(); return snap.exists ? decorateRecord(model, { id: snap.id, ...(snap.data() as any) }) : null; }
   private async getAll(model: string): Promise<any[]> { const docs = (await this.col(model).get()).docs; return docs.map((d) => decorateRecord(model, { id: d.id, ...(d.data() as any) })); }
-  private async findRows(model: string, args: any = {}) { let rows = await this.getAll(model); rows = rows.filter((r) => whereMatches(r, this.expandWhere(args?.where))); rows = sortRows(rows, args?.orderBy); if (args?.skip) rows = rows.slice(Number(args.skip)); if (args?.take !== undefined) rows = rows.slice(0, Number(args.take)); return rows; }
+  private async findRows(model: string, args: any = {}) {
+    const where = this.expandWhere(args?.where);
+
+    // Most application queries are simple single-field lookups (fixture ID,
+    // contest ID, status, user ID, etc.). The old adapter loaded the entire
+    // collection for every findMany/findFirst/count call, which multiplied
+    // Firestore reads and eventually exhausted the free quota. Push simple
+    // predicates to Firestore so only matching documents are read.
+    const entries = where && typeof where === 'object' ? Object.entries(where) : [];
+    const canUseServerFilter =
+      entries.length === 1 &&
+      !('AND' in where) &&
+      !('OR' in where);
+
+    let rows: any[];
+
+    if (canUseServerFilter) {
+      const [field, expected] = entries[0] as [string, any];
+      let query: any = this.col(model);
+
+      if (
+        expected &&
+        typeof expected === 'object' &&
+        !(expected instanceof Date) &&
+        !Array.isArray(expected) &&
+        !(expected instanceof FirestoreDecimal)
+      ) {
+        if ('in' in expected) query = query.where(field, 'in', (expected as any).in);
+        else if ('notIn' in expected) query = query.where(field, 'not-in', (expected as any).notIn);
+        else if ('lt' in expected) query = query.where(field, '<', (expected as any).lt);
+        else if ('lte' in expected) query = query.where(field, '<=', (expected as any).lte);
+        else if ('gt' in expected) query = query.where(field, '>', (expected as any).gt);
+        else if ('gte' in expected) query = query.where(field, '>=', (expected as any).gte);
+        else if ('equals' in expected) query = query.where(field, '==', (expected as any).equals);
+        else query = null;
+      } else if (expected instanceof FirestoreDecimal) {
+        query = query.where(field, '==', expected.toNumber());
+      } else if (expected instanceof Date) {
+        query = query.where(field, '==', expected);
+      } else {
+        query = query.where(field, '==', expected);
+      }
+
+      if (query) {
+        const snapshot = await query.get();
+        rows = snapshot.docs.map((d: any) =>
+          decorateRecord(model, { id: d.id, ...(d.data() as any) }),
+        );
+      } else {
+        rows = await this.getAll(model);
+      }
+    } else {
+      rows = await this.getAll(model);
+    }
+
+    rows = rows.filter((r) => whereMatches(r, where));
+    rows = sortRows(rows, args?.orderBy);
+    if (args?.skip) rows = rows.slice(Number(args.skip));
+    if (args?.take !== undefined) rows = rows.slice(0, Number(args.take));
+    return rows;
+  }
   async findUnique(model: string, args: any) { const where = this.expandWhere(args?.where); let row = null; const direct = this.uniqueDirectId(model, where); if (direct) row = await this.readDoc(model, direct); if (!row) row = (await this.findRows(model, { where }))[0] ?? null; return row ? this.hydrate(model, row, args?.include, args?.select) : null; }
   async findFirstOp(model: string, args: any) { const row = (await this.findRows(model, args))[0] ?? null; return row ? this.hydrate(model, row, args?.include, args?.select) : null; }
   async findMany(model: string, args: any = {}) { return Promise.all((await this.findRows(model, args)).map((r) => this.hydrate(model, r, args?.include, args?.select))); }
