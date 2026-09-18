@@ -23,6 +23,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ScoringService.name);
   private readonly settlingContests = new Set<string>();
   private settlementSweepTimer: ReturnType<typeof setInterval> | null = null;
+  private settlementSweepRunning = false;
 
   constructor(
     private readonly prisma: FirestoreService,
@@ -47,55 +48,72 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async runFinishedContestSweep() {
-    let contests: any[] = [];
-    try {
-      contests = await this.prisma.contest.findMany({
-        where: { status: { in: ['UPCOMING', 'LIVE'] } },
-        select: { id: true, sportmonksFixtureId: true, lineupLockAt: true },
-      });
-    } catch (err) {
-      this.logger.error(
-        'Finished-contest sweep could not read Firestore contests',
-        err instanceof Error ? err.stack : String(err),
-      );
-      return;
-    }
+    if (this.settlementSweepRunning) return;
+    this.settlementSweepRunning = true;
 
-    // Process contests independently. One slow/stuck fixture or blockchain call
-    // must never prevent later contests (for example 71245) from being settled.
-    await Promise.allSettled(
-      contests.map(async (contest) => {
+    try {
+      // Avoid FirestoreService.findMany() here: it materializes the entire
+      // contests collection in memory. Query only the small set of fields needed
+      // for the sweep, then process fixtures sequentially so one sweep cannot
+      // exhaust the Render instance.
+      const snapshot = await this.prisma.db
+        .collection('contests')
+        .where('status', 'in', ['UPCOMING', 'LIVE'])
+        .select('sportmonksFixtureId', 'lineupLockAt')
+        .get();
+
+      const now = Date.now();
+      const contests = snapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          const lockValue = data.lineupLockAt;
+          const lockMs =
+            lockValue && typeof lockValue.toDate === 'function'
+              ? lockValue.toDate().getTime()
+              : lockValue instanceof Date
+                ? lockValue.getTime()
+                : Number.NaN;
+          return {
+            id: doc.id,
+            sportmonksFixtureId: data.sportmonksFixtureId,
+            lineupLockAt: lockMs,
+          };
+        })
+        .filter((contest) => {
+          const lockMs = Number(contest.lineupLockAt);
+          return !Number.isFinite(lockMs) || lockMs <= now;
+        });
+
+      for (const contest of contests) {
         const fixtureId = Number(contest.sportmonksFixtureId);
-        if (!Number.isFinite(fixtureId) || fixtureId <= 0) return;
+        if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
 
         try {
           const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
-          if (!isFinished(fixture.status, fixture.live)) return;
+          if (!isFinished(fixture.status, fixture.live)) continue;
 
           this.logger.log(
             'Finished-contest sweep found terminal fixture=' + fixtureId + ', contest=' + contest.id,
           );
 
-          // Re-score first when possible so the final totalPoints/ranks are fresh.
-          // Settlement is attempted independently below even when scoring fails.
-          try {
-            await this.scoreFixture(fixtureId);
-          } catch (err) {
-            this.logger.error(
-              'Final scoring refresh failed for fixture=' + fixtureId + '; attempting settlement anyway',
-              err instanceof Error ? err.stack : String(err),
-            );
-          }
-
-          await this.settleContest(contest.id);
+          // Use the normal scorer for exactly one terminal fixture at a time.
+          // scoreFixture() already calls settleContest() when final=true.
+          await this.scoreFixture(fixtureId);
         } catch (err) {
           this.logger.error(
             'Finished-contest sweep failed for fixture=' + fixtureId + ', contest=' + contest.id,
             err instanceof Error ? err.stack : String(err),
           );
         }
-      }),
-    );
+      }
+    } catch (err) {
+      this.logger.error(
+        'Finished-contest sweep could not read Firestore contests',
+        err instanceof Error ? err.stack : String(err),
+      );
+    } finally {
+      this.settlementSweepRunning = false;
+    }
   }
 
   private calculateTeamPoints(
@@ -352,12 +370,35 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     // Score every fixture for which at least one fantasy team exists. The old
     // implementation only selected locked teams, which meant newly created
     // teams were never scored and could never reach the leaderboard.
-    const teams = await this.prisma.fantasyTeam.findMany({ select: { sportmonksFixtureId: true } });
-    const contests = await this.prisma.contest.findMany({ where: { status: { in: ['UPCOMING', 'LIVE'] }, lineupLockAt: { lte: new Date() } }, select: { sportmonksFixtureId: true } });
+    // Use lightweight Firestore projections instead of materializing entire
+    // collections. The custom Prisma-compatible adapter is intentionally broad,
+    // while this scoring loop needs only fixture IDs and the lock timestamp.
+    const [teamSnapshot, contestSnapshot] = await Promise.all([
+      this.prisma.db.collection('fantasyTeams').select('sportmonksFixtureId').get(),
+      this.prisma.db
+        .collection('contests')
+        .where('status', 'in', ['UPCOMING', 'LIVE'])
+        .select('sportmonksFixtureId', 'lineupLockAt')
+        .get(),
+    ]);
 
+    const now = Date.now();
     const fixtureIds = new Set<number>();
-    for (const row of teams) fixtureIds.add(Number(row.sportmonksFixtureId));
-    for (const row of contests) fixtureIds.add(Number(row.sportmonksFixtureId));
+    for (const doc of teamSnapshot.docs) {
+      fixtureIds.add(Number((doc.data() as any).sportmonksFixtureId));
+    }
+    for (const doc of contestSnapshot.docs) {
+      const data = doc.data() as any;
+      const lockValue = data.lineupLockAt;
+      const lockMs =
+        lockValue && typeof lockValue.toDate === 'function'
+          ? lockValue.toDate().getTime()
+          : lockValue instanceof Date
+            ? lockValue.getTime()
+            : Number.NaN;
+      if (Number.isFinite(lockMs) && lockMs > now) continue;
+      fixtureIds.add(Number(data.sportmonksFixtureId));
+    }
 
     for (const fixtureId of fixtureIds) {
       if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
@@ -367,14 +408,6 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         this.logger.error(`Scoring failed for fixture ${fixtureId}`, err instanceof Error ? err.stack : String(err));
       }
 
-      try {
-        await this.recoverFinishedContests(fixtureId);
-      } catch (err) {
-        this.logger.error(
-          `Finished-contest recovery check failed for fixture ${fixtureId}`,
-          err instanceof Error ? err.stack : String(err),
-        );
-      }
     }
   }
 }
