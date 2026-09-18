@@ -21,6 +21,7 @@ function isFinished(status: string | null | undefined, live: 0 | 1) {
 @Injectable()
 export class ScoringService {
   private readonly logger = new Logger(ScoringService.name);
+  private readonly settlingContests = new Set<string>();
 
   constructor(
     private readonly prisma: FirestoreService,
@@ -181,65 +182,101 @@ export class ScoringService {
   }
 
   private async settleContest(contestId: string) {
-    const contest = await this.prisma.contest.findUnique({ where: { id: contestId }, include: { entries: true } });
-    if (!contest || contest.status === 'COMPLETED') return;
+    if (this.settlingContests.has(contestId)) {
+      this.logger.warn(`Contest ${contestId} settlement is already in progress; skipping duplicate attempt.`);
+      return;
+    }
 
-    const rankedEntries = [...(contest.entries ?? [])]
+    this.settlingContests.add(contestId);
+    try {
+      const contest = await this.prisma.contest.findUnique({ where: { id: contestId }, include: { entries: true } });
+      if (!contest || contest.status === 'COMPLETED') return;
+
+      const rankedEntries = [...(contest.entries ?? [])]
       .filter((entry: any) => entry.walletAddress && entry.totalPoints !== null && entry.totalPoints !== undefined)
       .sort((a: any, b: any) => Number(b.totalPoints) - Number(a.totalPoints));
 
-    if (rankedEntries.length === 0) {
-      this.logger.warn(`Contest ${contestId} has no scored entries; postponing on-chain settlement.`);
-      return;
-    }
+      if (rankedEntries.length === 0) {
+        this.logger.warn(`Contest ${contestId} has no scored entries; postponing on-chain settlement.`);
+        return;
+      }
 
     // The contract determines the winner count as top 30% of entrants. We use
     // the number currently on-chain to select exactly the required number of
     // winners. One fantasy entry per wallet keeps rankings unique.
-    const chainContestId = Number((contest as any).chainContestId);
-    if (!Number.isFinite(chainContestId) || chainContestId < 0) {
-      throw new BadRequestException(`Contest ${contestId} has no on-chain contest ID.`);
-    }
-    const summary = await this.onchain.summary(chainContestId);
-    this.logger.log(
-      'Settlement check contest=' + contestId + ': chainContestId=' + chainContestId + ', entries=' + rankedEntries.length + ', participants=' + summary.participantCount + ', winnerCount=' + summary.winnerCount + ', stage=' + summary.stage + ', totalPool=' + summary.totalPool,
-    );
-    if (summary.stage >= 4) {
-      await this.prisma.contest.update({ where: { id: contestId }, data: { status: 'COMPLETED' } });
-      return;
-    }
-    const winnerCount = Math.max(1, Math.floor(summary.participantCount * 0.3));
-    if (rankedEntries.length < winnerCount) {
-      this.logger.warn(`Contest ${contestId} requires ${winnerCount} winners but only ${rankedEntries.length} scored entries exist; postponing settlement.`);
-      return;
-    }
+      const chainContestId = Number((contest as any).chainContestId);
+      if (!Number.isFinite(chainContestId) || chainContestId < 0) {
+        throw new BadRequestException(`Contest ${contestId} has no on-chain contest ID.`);
+      }
+      const summary = await this.onchain.summary(chainContestId);
+      this.logger.log(
+        'Settlement check contest=' + contestId + ': chainContestId=' + chainContestId + ', entries=' + rankedEntries.length + ', participants=' + summary.participantCount + ', winnerCount=' + summary.winnerCount + ', stage=' + summary.stage + ', totalPool=' + summary.totalPool,
+      );
+      if (summary.stage >= 4) {
+        await this.prisma.contest.update({ where: { id: contestId }, data: { status: 'COMPLETED' } });
+        return;
+      }
+      const winnerCount = Math.max(1, Math.floor(summary.participantCount * 0.3));
+      if (rankedEntries.length < winnerCount) {
+        this.logger.warn(`Contest ${contestId} requires ${winnerCount} winners but only ${rankedEntries.length} scored entries exist; postponing settlement.`);
+        return;
+      }
 
-    const winners = rankedEntries.slice(0, winnerCount);
-    const winnerWallets = winners.map((entry: any) => entry.walletAddress as string);
-    this.logger.log(
-      'Submitting on-chain settlement contest=' + contestId + ', chainContestId=' + chainContestId + ', winners=' + winnerWallets.length,
-    );
-    const settlement = await this.onchain.settleFinal(chainContestId, winnerWallets);
-    const winnerSet = new Set(winners.map((entry: any) => entry.id));
-    const equalWinnerPrize = (summary.totalPool * 0.9) / winnerCount;
+      const winners = rankedEntries.slice(0, winnerCount);
+      const winnerWallets = winners.map((entry: any) => entry.walletAddress as string);
+      this.logger.log(
+        'Submitting on-chain settlement contest=' + contestId + ', chainContestId=' + chainContestId + ', winners=' + winnerWallets.length,
+      );
+      const settlement = await this.onchain.settleFinal(chainContestId, winnerWallets);
+      const winnerSet = new Set(winners.map((entry: any) => entry.id));
+      const equalWinnerPrize = (summary.totalPool * 0.9) / winnerCount;
 
-    for (let index = 0; index < rankedEntries.length; index++) {
-      const entry: any = rankedEntries[index];
-      await this.prisma.contestEntry.update({
-        where: { id: entry.id },
-        data: {
-          rank: index + 1,
-          prizeWon: winnerSet.has(entry.id) ? Math.floor(equalWinnerPrize * 1000000) / 1000000 : 0,
-        },
+      for (let index = 0; index < rankedEntries.length; index++) {
+        const entry: any = rankedEntries[index];
+        await this.prisma.contestEntry.update({
+          where: { id: entry.id },
+          data: {
+            rank: index + 1,
+            prizeWon: winnerSet.has(entry.id) ? Math.floor(equalWinnerPrize * 1000000) / 1000000 : 0,
+          },
+        });
+      }
+
+      await this.prisma.contest.update({
+        where: { id: contestId },
+        data: { status: 'COMPLETED', prizePoolTotal: summary.totalPool },
       });
-    }
 
-    await this.prisma.contest.update({
-      where: { id: contestId },
-      data: { status: 'COMPLETED', prizePoolTotal: summary.totalPool },
+      this.logger.log(`Contest ${contestId} settled on-chain. tx=${settlement.payoutHash}`);
+    } finally {
+      this.settlingContests.delete(contestId);
+    }
+  }
+
+  private async recoverFinishedContests(fixtureId: number) {
+    const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+    const final = isFinished(fixture.status, fixture.live);
+    if (!final) return;
+
+    const contests = await this.prisma.contest.findMany({
+      where: {
+        sportmonksFixtureId: fixtureId,
+        status: { in: ['UPCOMING', 'LIVE'] },
+      },
+      select: { id: true },
     });
 
-    this.logger.log(`Contest ${contestId} settled on-chain. tx=${settlement.payoutHash}`);
+    for (const row of contests) {
+      try {
+        this.logger.log('Finished-contest recovery for fixture=' + fixtureId + ', contest=' + row.id);
+        await this.settleContest(row.id);
+      } catch (err) {
+        this.logger.error(
+          'Finished-contest recovery failed for fixture=' + fixtureId + ', contest=' + row.id,
+          err instanceof Error ? err.stack : String(err),
+        );
+      }
+    }
   }
 
   @Cron(CronExpression.EVERY_30_SECONDS)
@@ -260,6 +297,15 @@ export class ScoringService {
         await this.scoreFixture(fixtureId);
       } catch (err) {
         this.logger.error(`Scoring failed for fixture ${fixtureId}`, err instanceof Error ? err.stack : String(err));
+      }
+
+      try {
+        await this.recoverFinishedContests(fixtureId);
+      } catch (err) {
+        this.logger.error(
+          `Finished-contest recovery check failed for fixture ${fixtureId}`,
+          err instanceof Error ? err.stack : String(err),
+        );
       }
     }
   }
