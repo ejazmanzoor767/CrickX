@@ -7,9 +7,15 @@ import { LeaderboardService } from './leaderboard.service';
 import { ScoringRules, applyCaptaincy, computePlayerPoints, rulesForFormat } from './scoring.rules';
 
 function isFinished(status: string | null | undefined, live: 0 | 1) {
-  if (live === 1) return false;
+  // Sportmonks can briefly keep the live flag set while publishing a terminal
+  // match status. An explicit terminal status must therefore take precedence.
   const value = String(status ?? '').toLowerCase();
-  return value.includes('finish') || value.includes('aband') || value.includes('cancel');
+
+  return (
+    value.includes('finish') ||
+    value.includes('aband') ||
+    value.includes('cancel')
+  );
 }
 
 @Injectable()
@@ -58,6 +64,9 @@ export class ScoringService {
     const bowling = fixture.bowling ?? [];
     const balls = fixture.balls ?? [];
     const final = isFinished(fixture.status, fixture.live);
+    this.logger.log(
+      'Fixture ' + fixtureId + ' scoring check: status=' + String(fixture.status ?? '') + ', live=' + fixture.live + ', final=' + final,
+    );
 
     const fantasyTeams = await this.prisma.fantasyTeam.findMany({
       where: { sportmonksFixtureId: fixtureId },
@@ -151,7 +160,7 @@ export class ScoringService {
       const ranked = await this.prisma.contestEntry.findMany({ where: { contestId: contest.id }, orderBy: { totalPoints: 'desc' } });
       await this.prisma.$transaction(ranked.map((entry, index) => this.prisma.contestEntry.update({ where: { id: entry.id }, data: { rank: index + 1 } })));
 
-      if (fixture.live === 1 && contest.status === 'UPCOMING') {
+      if (!final && fixture.live === 1 && contest.status === 'UPCOMING') {
         await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE' } });
       }
       await this.prisma.leaderboardSnapshot.create({
@@ -192,6 +201,9 @@ export class ScoringService {
       throw new BadRequestException(`Contest ${contestId} has no on-chain contest ID.`);
     }
     const summary = await this.onchain.summary(chainContestId);
+    this.logger.log(
+      'Settlement check contest=' + contestId + ': chainContestId=' + chainContestId + ', entries=' + rankedEntries.length + ', participants=' + summary.participantCount + ', winnerCount=' + summary.winnerCount + ', stage=' + summary.stage + ', totalPool=' + summary.totalPool,
+    );
     if (summary.stage >= 4) {
       await this.prisma.contest.update({ where: { id: contestId }, data: { status: 'COMPLETED' } });
       return;
@@ -204,6 +216,9 @@ export class ScoringService {
 
     const winners = rankedEntries.slice(0, winnerCount);
     const winnerWallets = winners.map((entry: any) => entry.walletAddress as string);
+    this.logger.log(
+      'Submitting on-chain settlement contest=' + contestId + ', chainContestId=' + chainContestId + ', winners=' + winnerWallets.length,
+    );
     const settlement = await this.onchain.settleFinal(chainContestId, winnerWallets);
     const winnerSet = new Set(winners.map((entry: any) => entry.id));
     const equalWinnerPrize = (summary.totalPool * 0.9) / winnerCount;
