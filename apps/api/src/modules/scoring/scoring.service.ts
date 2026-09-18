@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
@@ -19,9 +19,10 @@ function isFinished(status: string | null | undefined, live: 0 | 1) {
 }
 
 @Injectable()
-export class ScoringService {
+export class ScoringService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ScoringService.name);
   private readonly settlingContests = new Set<string>();
+  private settlementSweepTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly prisma: FirestoreService,
@@ -29,6 +30,69 @@ export class ScoringService {
     private readonly onchain: OnchainContestService,
     private readonly leaderboard: LeaderboardService,
   ) {}
+
+  onModuleInit() {
+    // Do not depend solely on @Cron for prize settlement. Render/container
+    // restarts and scheduler registration can otherwise leave a finished contest
+    // untouched. Run an immediate sweep, then repeat every 30 seconds.
+    void this.runFinishedContestSweep();
+    this.settlementSweepTimer = setInterval(() => {
+      void this.runFinishedContestSweep();
+    }, 30_000);
+  }
+
+  onModuleDestroy() {
+    if (this.settlementSweepTimer) clearInterval(this.settlementSweepTimer);
+    this.settlementSweepTimer = null;
+  }
+
+  private async runFinishedContestSweep() {
+    let contests: any[] = [];
+    try {
+      contests = await this.prisma.contest.findMany({
+        where: { status: { in: ['UPCOMING', 'LIVE'] } },
+        select: { id: true, sportmonksFixtureId: true, lineupLockAt: true },
+      });
+    } catch (err) {
+      this.logger.error(
+        'Finished-contest sweep could not read Firestore contests',
+        err instanceof Error ? err.stack : String(err),
+      );
+      return;
+    }
+
+    for (const contest of contests) {
+      const fixtureId = Number(contest.sportmonksFixtureId);
+      if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
+
+      try {
+        const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+        if (!isFinished(fixture.status, fixture.live)) continue;
+
+        this.logger.log(
+          'Finished-contest sweep found terminal fixture=' + fixtureId + ', contest=' + contest.id,
+        );
+
+        // Re-score first when possible so the final totalPoints/ranks are fresh.
+        // Settlement is attempted independently below even when scoring fails.
+        try {
+          await this.scoreFixture(fixtureId);
+        } catch (err) {
+          this.logger.error(
+            'Final scoring refresh failed for fixture=' + fixtureId + '; attempting settlement anyway',
+            err instanceof Error ? err.stack : String(err),
+          );
+        }
+
+        await this.settleContest(contest.id);
+      } catch (err) {
+        this.logger.error(
+          'Finished-contest sweep failed for fixture=' + fixtureId + ', contest=' + contest.id,
+          err instanceof Error ? err.stack : String(err),
+        );
+      }
+    }
+  }
 
   private calculateTeamPoints(
     team: any,
