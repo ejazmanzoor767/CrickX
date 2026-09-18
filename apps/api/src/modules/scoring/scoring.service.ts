@@ -96,9 +96,10 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
             'Finished-contest sweep found terminal fixture=' + fixtureId + ', contest=' + contest.id,
           );
 
-          // Use the normal scorer for exactly one terminal fixture at a time.
-          // scoreFixture() already calls settleContest() when final=true.
-          await this.scoreFixture(fixtureId);
+          // The scheduled scorer is responsible for final statistics/ranking.
+          // The recovery sweep only retries settlement after confirming the fixture
+          // is terminal, avoiding duplicate heavy Sportmonks scoring requests.
+          await this.settleContest(contest.id);
         } catch (err) {
           this.logger.error(
             'Finished-contest sweep failed for fixture=' + fixtureId + ', contest=' + contest.id,
