@@ -69,30 +69,25 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         if (!Number.isFinite(fixtureId) || fixtureId <= 0) return;
 
         try {
-        const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
-        if (!isFinished(fixture.status, fixture.live)) continue;
+          const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+          if (!isFinished(fixture.status, fixture.live)) return;
 
-        this.logger.log(
-          'Finished-contest sweep found terminal fixture=' + fixtureId + ', contest=' + contest.id,
-        );
-
-        // Re-score first when possible so the final totalPoints/ranks are fresh.
-        // Settlement is attempted independently below even when scoring fails.
-        try {
-          await this.scoreFixture(fixtureId);
-        } catch (err) {
-          this.logger.error(
-            'Final scoring refresh failed for fixture=' + fixtureId + '; attempting settlement anyway',
-            err instanceof Error ? err.stack : String(err),
+          this.logger.log(
+            'Finished-contest sweep found terminal fixture=' + fixtureId + ', contest=' + contest.id,
           );
-        }
 
-        await this.settleContest(contest.id);
-      } catch (err) {
-        this.logger.error(
-          'Finished-contest sweep failed for fixture=' + fixtureId + ', contest=' + contest.id,
-          err instanceof Error ? err.stack : String(err),
-        );
+          // Re-score first when possible so the final totalPoints/ranks are fresh.
+          // Settlement is attempted independently below even when scoring fails.
+          try {
+            await this.scoreFixture(fixtureId);
+          } catch (err) {
+            this.logger.error(
+              'Final scoring refresh failed for fixture=' + fixtureId + '; attempting settlement anyway',
+              err instanceof Error ? err.stack : String(err),
+            );
+          }
+
+          await this.settleContest(contest.id);
         } catch (err) {
           this.logger.error(
             'Finished-contest sweep failed for fixture=' + fixtureId + ', contest=' + contest.id,
