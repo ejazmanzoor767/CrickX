@@ -117,28 +117,45 @@ export class SportmonksDataService {
   }
 
   async getFixture(fixtureId: number, opts: { forceLive?: boolean } = {}): Promise<SportmonksFixture> {
-    const cached = await this.prisma.cachedFixture.findUnique({ where: { sportmonksFixtureId: fixtureId } });
-    if (cached && cached.expiresAt > new Date() && !opts.forceLive) return normalizeFixture(cached.payload as unknown as SportmonksFixture);
+    // Live/terminal scoring must not perform a Firestore read/write on every poll.
+    // The previous implementation cached the full ball-by-ball payload in
+    // Firestore, multiplying reads/writes and repeatedly serializing a large
+    // object. Use the persistent cache only for normal/non-live lookups.
+    if (!opts.forceLive) {
+      const cached = await this.prisma.cachedFixture.findUnique({
+        where: { sportmonksFixtureId: fixtureId },
+      });
+      if (cached && cached.expiresAt > new Date()) {
+        return normalizeFixture(cached.payload as unknown as SportmonksFixture);
+      }
+    }
 
     const includes = opts.forceLive ? LIVE_FIXTURE_INCLUDES : FIXTURE_INCLUDES;
-    const envelope = await this.client.get<SportmonksFixture>(`/fixtures/${fixtureId}`, { include: includes });
+    const envelope = await this.client.get<SportmonksFixture>(
+      `/fixtures/${fixtureId}`,
+      { include: includes },
+    );
     const incoming = normalizeFixture(envelope.data);
 
-    // Never throw away previously observed deliveries during a live refresh.
-    // Some live responses can be shorter/rolling; retaining the union makes
-    // recent-ball history and fall-of-wicket detection independent of a single
-    // polling response.
-    const previousPayload = cached?.payload as unknown as SportmonksFixture | undefined;
-    const previousBalls = asRows(previousPayload?.balls);
-    const currentBalls = asRows(incoming.balls);
-    if (previousBalls.length || currentBalls.length) (incoming as any).balls = mergeBallHistory(previousBalls, currentBalls);
+    // Only persist non-live snapshots. High-frequency live/terminal refreshes
+    // return the provider response directly and do not write the huge ball list
+    // back to Firestore.
+    if (!opts.forceLive) {
+      const ttlMs = incoming.live === 1 ? TTL_LIVE_MS : TTL_UPCOMING_MS;
+      await this.prisma.cachedFixture.upsert({
+        where: { sportmonksFixtureId: fixtureId },
+        create: {
+          sportmonksFixtureId: fixtureId,
+          payload: incoming as unknown as object,
+          expiresAt: new Date(Date.now() + ttlMs),
+        },
+        update: {
+          payload: incoming as unknown as object,
+          expiresAt: new Date(Date.now() + ttlMs),
+        },
+      });
+    }
 
-    const ttlMs = incoming.live === 1 ? TTL_LIVE_MS : TTL_UPCOMING_MS;
-    await this.prisma.cachedFixture.upsert({
-      where: { sportmonksFixtureId: fixtureId },
-      create: { sportmonksFixtureId: fixtureId, payload: incoming as unknown as object, expiresAt: new Date(Date.now() + ttlMs) },
-      update: { payload: incoming as unknown as object, expiresAt: new Date(Date.now() + ttlMs) },
-    });
     return incoming;
   }
 
