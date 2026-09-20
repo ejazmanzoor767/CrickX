@@ -99,10 +99,10 @@ export class ContestService {
     const providerFinished = providerStatus.includes('finish') || providerStatus.includes('abandon') || providerStatus.includes('cancel');
     const started = Number.isFinite(startingAtMs) && Date.now() >= startingAtMs;
     const isOpen = !providerFinished && !started && contest.status !== 'COMPLETED' && contest.status !== 'CANCELLED';
-    if (contest.status !== (isOpen ? 'UPCOMING' : contest.status)) {
-      if (isOpen) {
-        contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING', entryFee: 0 } });
-      }
+    if (isOpen && contest.status !== 'UPCOMING') {
+      contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING', entryFee: 0 } });
+    } else if (started && !providerFinished && contest.status === 'UPCOMING') {
+      contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE', entryFee: 0 } });
     }
 
     return {
