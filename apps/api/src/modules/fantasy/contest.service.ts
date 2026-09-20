@@ -149,7 +149,15 @@ export class ContestService {
     if (existingPair) throw new ForbiddenException('This fantasy team has already joined the contest.');
 
     let chainContestId = Number((contest as any).chainContestId);
-    if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
+    let chainExists = false;
+    if (Number.isFinite(chainContestId) && chainContestId > 0) {
+      try {
+        chainExists = Boolean((await this.onchain.summary(chainContestId)).exists);
+      } catch {
+        chainExists = false;
+      }
+    }
+    if (!chainExists) {
       try {
         const created = await this.onchain.createContest(Math.floor(new Date(liveFixture.starting_at).getTime() / 1000));
         chainContestId = Number(created.chainContestId);
