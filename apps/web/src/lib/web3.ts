@@ -127,20 +127,12 @@ export async function readCrxWallet(address: Address) {
   return { address, decimals, balanceRaw, allowanceRaw, balance: Number(formatUnits(balanceRaw, decimals)), allowance: Number(formatUnits(allowanceRaw, decimals)) };
 }
 
-export async function approveContestPool(amount: string | number, decimals = 18) {
-  if (!CRX_CONTEST_POOL_ADDRESS) throw new Error('CRX contest pool address is not configured.');
-  if (!CRX_TOKEN_ADDRESS) throw new Error('CRX token address is not configured.');
-  const ethereum = await getEthereumProvider(true);
-  const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
-  const [account] = await walletClient.requestAddresses();
-  const hash = await walletClient.writeContract({ account, chain: polygon, address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'approve', args: [CRX_CONTEST_POOL_ADDRESS, parseUnits(String(amount), decimals)] });
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
-}
+export async function approveContestPool(_amount: string | number, _decimals = 18) { throw new Error('Contest entry is free. User CRX approval is not required.'); }
 
 export async function joinOnchainContest(_contestId: number) { throw new Error('Contest entry is free. No CRX blockchain payment is required.'); }
 
 export async function sendCrx(to: string, amount: string, decimals = 18) {
+  if (!CRX_TOKEN_ADDRESS) throw new Error('CRX token address is not configured.');
   if (!isAddress(to)) throw new Error('Enter a valid wallet address.');
   const ethereum = await getEthereumProvider(true);
   const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
