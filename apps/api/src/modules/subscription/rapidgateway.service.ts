@@ -7,6 +7,8 @@ export type RapidCheckoutInput = {
   amount: number;
   basketId: string;
   successUrl: string;
+  customerPhone?: string;
+  customerEmail?: string;
 };
 
 @Injectable()
