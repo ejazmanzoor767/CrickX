@@ -42,3 +42,19 @@ services:
         sync: false
       - key: CRX_CONTEST_OWNER_PRIVATE_KEY
         sync: false
+      - key: CRX_PRIZE_DISTRIBUTION_BATCH_SIZE
+        value: '50'
+      - key: RAPIDGATEWAY_BASE_URL
+        value: https://secure.rapid-gateway.com
+      - key: RAPIDGATEWAY_ENVIRONMENT
+        value: LIVE
+      - key: RAPIDGATEWAY_MERCHANT_ID
+        sync: false
+      - key: RAPIDGATEWAY_MERCHANT_NAME
+        value: CrickX
+      - key: RAPIDGATEWAY_CLIENT_SECRET
+        sync: false
+      - key: RAPIDGATEWAY_WEBHOOK_SECRET
+        sync: false
+      - key: CRICKX_WEB_URL
+        value: https://crickx-3d806.web.app
