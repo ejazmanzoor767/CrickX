@@ -8,6 +8,7 @@ const primaryItems = [
   { href: '/matches', label: 'Matches', icon: '▣' },
   { href: '/fantasy-home', label: 'Fantasy', icon: '◆' },
   { href: '/wallet', label: 'Wallet', icon: '◈' },
+  { href: '/subscription', label: 'Subscribe', icon: '₹' },
   { href: '/profile', label: 'Profile', icon: '●' },
 ];
 
