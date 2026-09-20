@@ -432,63 +432,104 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       if (!contest || contest.status === 'COMPLETED') return;
 
       const rankedEntries = [...(contest.entries ?? [])]
-      .filter((entry: any) => entry.walletAddress && entry.totalPoints !== null && entry.totalPoints !== undefined)
-      .sort((a: any, b: any) => Number(b.totalPoints) - Number(a.totalPoints));
+        .filter((entry: any) => entry.walletAddress && entry.totalPoints !== null && entry.totalPoints !== undefined)
+        .sort((a: any, b: any) => Number(b.totalPoints) - Number(a.totalPoints));
 
       if (rankedEntries.length === 0) {
         this.logger.warn(`Contest ${contestId} has no scored entries; postponing on-chain settlement.`);
         return;
       }
 
-    // The contract determines the winner count as top 30% of entrants. We use
-    // the number currently on-chain to select exactly the required number of
-    // winners. One fantasy entry per wallet keeps rankings unique.
       const chainContestId = Number((contest as any).chainContestId);
-      if (!Number.isFinite(chainContestId) || chainContestId < 0) {
+      if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
         throw new BadRequestException(`Contest ${contestId} has no on-chain contest ID.`);
       }
-      const summary = await this.onchain.summary(chainContestId);
-      this.logger.log(
-        'Settlement check contest=' + contestId + ': chainContestId=' + chainContestId + ', entries=' + rankedEntries.length + ', participants=' + summary.participantCount + ', winnerCount=' + summary.winnerCount + ', stage=' + summary.stage + ', totalPool=' + summary.totalPool,
-      );
-      if (summary.stage >= 4) {
-        await this.prisma.contest.update({ where: { id: contestId }, data: { status: 'COMPLETED' } });
-        return;
-      }
-      const winnerCount = Math.max(1, Math.floor(summary.participantCount * 0.3));
-      if (rankedEntries.length < winnerCount) {
-        this.logger.warn(`Contest ${contestId} requires ${winnerCount} winners but only ${rankedEntries.length} scored entries exist; postponing settlement.`);
-        return;
-      }
 
-      const winners = rankedEntries.slice(0, winnerCount);
-      const winnerWallets = winners.map((entry: any) => entry.walletAddress as string);
+      let summary = await this.onchain.summary(chainContestId);
       this.logger.log(
-        'Submitting on-chain settlement contest=' + contestId + ', chainContestId=' + chainContestId + ', winners=' + winnerWallets.length,
+        'Settlement check contest=' + contestId +
+        ': chainContestId=' + chainContestId +
+        ', entries=' + rankedEntries.length +
+        ', onchainParticipants=' + summary.participantCount +
+        ', stage=' + summary.stage +
+        ', totalPool=' + summary.totalPool,
       );
-      const settlement = await this.onchain.settleFinal(chainContestId, winnerWallets);
-      const winnerSet = new Set(winners.map((entry: any) => entry.id));
-      const equalWinnerPrize = (summary.totalPool * 0.9) / winnerCount;
 
-      for (let index = 0; index < rankedEntries.length; index++) {
-        const entry: any = rankedEntries[index];
-        await this.prisma.contestEntry.update({
-          where: { id: entry.id },
-          data: {
-            rank: index + 1,
-            prizeWon: winnerSet.has(entry.id) ? Math.floor(equalWinnerPrize * 1000000) / 1000000 : 0,
-          },
+      if (summary.stage >= 2) {
+        await this.markSettledEntries(contestId, rankedEntries, summary.totalPool, summary.participantCount);
+        await this.prisma.contest.update({
+          where: { id: contestId },
+          data: { status: 'COMPLETED', prizePoolTotal: summary.totalPool, entryFee: 0 },
         });
+        return;
       }
+
+      if (summary.stage === 1 && summary.participantCount !== rankedEntries.length) {
+        throw new BadRequestException(
+          `On-chain participant count (${summary.participantCount}) does not match scored entries (${rankedEntries.length}).`,
+        );
+      }
+
+      const winnerWallets = rankedEntries.map((entry: any) => entry.walletAddress as string);
+      this.logger.log(
+        'Submitting on-chain settlement contest=' + contestId +
+        ', chainContestId=' + chainContestId +
+        ', participants=' + winnerWallets.length,
+      );
+
+      const settlement = await this.onchain.settleFinal(chainContestId, winnerWallets);
+      summary = await this.onchain.summary(chainContestId);
+
+      if (summary.stage !== 2) {
+        throw new BadRequestException(`On-chain contest did not reach Distributed stage. Current stage=${summary.stage}.`);
+      }
+
+      await this.markSettledEntries(contestId, rankedEntries, summary.totalPool, summary.participantCount);
 
       await this.prisma.contest.update({
         where: { id: contestId },
-        data: { status: 'COMPLETED', prizePoolTotal: summary.totalPool },
+        data: {
+          status: 'COMPLETED',
+          prizePoolTotal: summary.totalPool,
+          entryFee: 0,
+        },
       });
 
-      this.logger.log(`Contest ${contestId} settled on-chain. tx=${settlement.payoutHash}`);
+      this.logger.log(
+        `Contest ${contestId} settled on-chain. participants=${summary.participantCount} tx=${settlement.finalPrizeTxHash}`,
+      );
     } finally {
       this.settlingContests.delete(contestId);
+    }
+  }
+
+  private async markSettledEntries(contestId: string, rankedEntries: any[], totalPool: number, participantCount: number) {
+    if (participantCount !== rankedEntries.length) {
+      throw new BadRequestException(
+        `Cannot write final prizes: on-chain participants=${participantCount}, ranked entries=${rankedEntries.length}.`,
+      );
+    }
+
+    const n = participantCount;
+    const denominator = (n * (n + 1)) / 2;
+
+    for (let index = 0; index < rankedEntries.length; index++) {
+      const entry: any = rankedEntries[index];
+      const rank = index + 1;
+      const amount = rank === n
+        ? totalPool - rankedEntries.slice(0, n - 1).reduce((sum: number, _entry: any, i: number) => {
+            return sum + (totalPool * (n - i)) / denominator;
+          }, 0)
+        : (totalPool * (n - index)) / denominator;
+
+      await this.prisma.contestEntry.update({
+        where: { id: entry.id },
+        data: {
+          rank,
+          prizeWon: Math.max(0, Math.floor(amount * 1_000_000) / 1_000_000),
+          paymentStatus: 'SUBSCRIPTION_ACTIVE',
+        },
+      });
     }
   }
 
