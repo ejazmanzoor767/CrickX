@@ -10,12 +10,15 @@ export default function Footer() {
           <p className="footer-copy" style={{ marginTop: 10 }}>
             <strong>Email:</strong> <a href="mailto:ejazchouhan27@gmail.com">ejazchouhan27@gmail.com</a><br />
             <strong>Phone:</strong> <a href="tel:03197789243">03197789243</a><br />
-            <strong>Business Address:</strong> chah bakshay wala p/o pakka shahnawaz tehsil &amp; District Dera ghazi khan, chah bakshay wala p/o pakka shahnawaz tehsil &amp; District Dera ghazi khan, dera ghazi khan
+            <strong>Business Address:</strong> chah bakshay wala p/o pakka shahnawaz tehsil &amp; District Dera ghazi khan, dera ghazi khan
           </p>
         </div>
         <div className="footer-meta" style={{ alignItems: 'flex-end' }}>
           <span>1 CrickX = PKR 5</span>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <Link href="/subscription">Weekly Subscription</Link>
+            <Link href="/profile/game-rules">Game Rules</Link>
+            <Link href="/profile/scoring">Fantasy Point Calculation</Link>
             <Link href="/business-information">Business Information</Link>
             <Link href="/payment-and-checkout">Payment &amp; Checkout</Link>
             <Link href="/profile/privacy">Privacy Policy</Link>
