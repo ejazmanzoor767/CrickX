@@ -233,10 +233,14 @@ function SavedTeamView() {
         };
       }
       const legacy = scoringForPlayer({ ...(fixture ?? {}), lineup: fixture?.lineup }, id, multiplier);
+      const legacyTotal = num(legacy.total);
+      const legacyPowerup = legacyTotal === null || multiplier <= 1
+        ? 0
+        : Math.round((legacyTotal - legacyTotal / multiplier) * 10) / 10;
       return {
         ...legacy,
-        powerup: legacy.powerup,
-        total: legacy.total,
+        powerup: legacyPowerup,
+        total: legacyTotal,
       };
     });
   }, [players, fixture, team]);
