@@ -58,6 +58,13 @@ export class SubscriptionService {
     const current = await this.status(userId);
     if (current.active) throw new ConflictException(`Your subscription is already active until ${new Date(current.expiresAt).toLocaleString('en-PK')}.`);
 
+    if (current.status === 'PENDING' && current.basketId) {
+      const pendingPayment = await this.firestore.subscriptionPayment.findFirst({ where: { basketId: current.basketId } });
+      if (pendingPayment?.checkoutUrl) {
+        return { checkoutUrl: pendingPayment.checkoutUrl, basketId: current.basketId, amount: PRICE_PKR, currency: 'PKR', durationDays: 7 };
+      }
+    }
+
     const user = await this.firestore.user.findUnique({ where: { id: userId } });
     if (!user) throw new ForbiddenException('User account not found.');
     const mobile = customerMobile || user.phone;
@@ -143,6 +150,20 @@ export class SubscriptionService {
 
     if (payment.status === 'SUCCEEDED' || payment.status === 'FAILED') {
       return { received: true, duplicate: true };
+    }
+
+    const configuredMerchantId = this.config.get<string>('RAPIDGATEWAY_MERCHANT_ID', '').trim();
+    const payloadMerchantId = payload?.merchantId !== undefined ? String(payload.merchantId) : '';
+    const configuredEnvironment = this.config.get<string>('RAPIDGATEWAY_ENVIRONMENT', 'LIVE').toUpperCase();
+    const payloadEnvironment = payload?.environment ? String(payload.environment).toUpperCase() : configuredEnvironment;
+    if (configuredMerchantId && payloadMerchantId && payloadMerchantId !== configuredMerchantId) {
+      return { received: true, rejected: true };
+    }
+    if (payloadEnvironment !== configuredEnvironment) {
+      return { received: true, rejected: true };
+    }
+    if (String(payload?.currency || 'PKR').toUpperCase() !== 'PKR') {
+      return { received: true, rejected: true };
     }
 
     const amount = Number(payload?.amount);
