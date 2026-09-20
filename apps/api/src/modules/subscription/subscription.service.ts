@@ -54,6 +54,14 @@ export class SubscriptionService {
     };
   }
 
+  private toE164(phone: string) {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.startsWith('92')) return `+${digits}`;
+    if (digits.startsWith('0')) return `+92${digits.slice(1)}`;
+    if (digits.startsWith('3')) return `+92${digits}`;
+    return phone;
+  }
+
   async checkout(userId: string) {
     const current = await this.status(userId);
     if (current.active) throw new ConflictException(`Your subscription is already active until ${new Date(current.expiresAt).toLocaleString('en-PK')}.`);
@@ -98,6 +106,8 @@ export class SubscriptionService {
       const checkoutUrl = await this.rapid.createHostedCheckout({
         amount: PRICE_PKR,
         basketId,
+        customerPhone: user.phone ? this.toE164(String(user.phone)) : undefined,
+        customerEmail: String(user.email || ''),
         successUrl: `${this.webUrl()}/subscription/return?basket=${encodeURIComponent(basketId)}`,
       });
 
