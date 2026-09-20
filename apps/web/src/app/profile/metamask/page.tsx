@@ -50,8 +50,9 @@ export default function MetaMaskPage() {
         <h2>Send your CRX to any Polygon wallet</h2>
         <p className="section-subtitle" style={{ lineHeight: 1.75 }}>
           You can send CRX from the CrickX Wallet section to another Polygon-compatible wallet such as
-          MetaMask. This is a normal on-chain token transfer, so MetaMask will ask you to confirm the
-          transaction and the wallet sending CRX needs enough POL for network gas.
+          <strong>MetaMask, Trust Wallet, or Coinbase Wallet</strong>. This is a normal on-chain token
+          transfer, so MetaMask will ask you to confirm the transaction and the wallet sending CRX needs
+          enough POL for network gas.
         </p>
         <ol style={{ lineHeight: 1.8, marginTop: 16 }}>
           <li>Open <strong>CrickX → Wallet</strong> and connect your MetaMask wallet.</li>
@@ -67,9 +68,9 @@ export default function MetaMaskPage() {
         <p className="eyebrow">RECEIVER WALLET</p>
         <h2>How the receiver sees CRX</h2>
         <p className="section-subtitle" style={{ lineHeight: 1.75 }}>
-          In the receiver's MetaMask wallet, switch to <strong>Polygon Mainnet</strong>. Open the Tokens
-          section and choose <strong>Import tokens</strong> / <strong>Add custom token</strong>. Paste the
-          official CRX contract address above and confirm.
+          In the receiver's wallet — for example <strong>MetaMask, Trust Wallet, or Coinbase Wallet</strong> —
+          switch to <strong>Polygon Mainnet</strong>. Open the Tokens section and choose the option to import
+          or add a custom token. Paste the official CRX contract address above and confirm.
         </p>
         <p style={{ marginTop: 14, fontSize: 18 }}>
           <strong>Congratulations!</strong> Once the Polygon transfer is confirmed, the receiver can see the
