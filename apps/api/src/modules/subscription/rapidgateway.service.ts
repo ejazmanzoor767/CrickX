@@ -40,7 +40,13 @@ export class RapidGatewayService {
         {
           amount: input.amount,
           currency: 'PKR',
+          methods: ['card', 'raast', 'jazzcash', 'easypaisa'],
+          customer: {
+            ...(input.customerPhone ? { phone: input.customerPhone } : {}),
+            ...(input.customerEmail ? { email: input.customerEmail } : {}),
+          },
           return_url: input.successUrl,
+          webhook_url: `${this.config.get<string>('CRICKX_WEB_URL', '').replace(/\/$/, '')}/api/v1/subscription/webhook`,
         },
         {
           headers: {
