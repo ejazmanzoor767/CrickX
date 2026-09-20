@@ -216,9 +216,10 @@ function LeaderboardPageInner() {
     });
   }, [fixture, squadMap, team]);
 
-  const storedTeamPoints = num(team?.points, team?.totalPoints, team?.fantasyPoints);
   const leaderboardTeamPoints = rows.find((row: any) => String(row?.userId ?? row?.id) === String(team?.userId ?? ''))?.points;
-  const totalPoints = storedTeamPoints ?? leaderboardTeamPoints ?? playerRows.reduce((sum, row) => sum + (row.points ?? 0), 0);
+  const totalPoints = playerRows.length
+    ? playerRows.reduce((sum, row) => sum + (row.points ?? 0), 0)
+    : leaderboardTeamPoints ?? 0;
   const fixtureTitle = scopedToFixture ? `${fixture?.localteam?.name ?? 'Home'} vs ${fixture?.visitorteam?.name ?? 'Away'}` : 'Overall CrickX fantasy standings';
   const topThree = rows.slice(0, 3);
   const rest = rows.slice(3);
