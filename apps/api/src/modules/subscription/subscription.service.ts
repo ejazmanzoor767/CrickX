@@ -20,7 +20,7 @@ export class SubscriptionService {
   }
 
   private webUrl() {
-    return (this.config.get<string>('CRICKX_WEB_URL') || 'https://crickx-3d806.web.app').replace(/\\/$/, '');
+    return (this.config.get<string>('CRICKX_WEB_URL') || 'https://crickx-3d806.web.app').replace(/\/$/, '');
   }
 
   private async latest(userId: string) {
