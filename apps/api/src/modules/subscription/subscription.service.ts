@@ -54,7 +54,7 @@ export class SubscriptionService {
     };
   }
 
-  async checkout(userId: string, customerMobile?: string) {
+  async checkout(userId: string) {
     const current = await this.status(userId);
     if (current.active) throw new ConflictException(`Your subscription is already active until ${new Date(current.expiresAt).toLocaleString('en-PK')}.`);
 
@@ -67,14 +67,6 @@ export class SubscriptionService {
 
     const user = await this.firestore.user.findUnique({ where: { id: userId } });
     if (!user) throw new ForbiddenException('User account not found.');
-    const mobile = customerMobile || user.phone;
-    if (!mobile || !/^03\d{9}$/.test(String(mobile))) {
-      throw new ForbiddenException('Add a valid Pakistani mobile number (03XXXXXXXXX) before purchasing the subscription.');
-    }
-
-    if (customerMobile && customerMobile !== user.phone) {
-      await this.firestore.user.update({ where: { id: userId }, data: { phone: customerMobile } });
-    }
 
     const basketId = this.basketId();
     const subscription = await this.firestore.subscription.create({
@@ -104,15 +96,9 @@ export class SubscriptionService {
 
     try {
       const checkoutUrl = await this.rapid.createHostedCheckout({
-        merchantId: this.config.get<string>('RAPIDGATEWAY_MERCHANT_ID', ''),
-        merchantName: this.config.get<string>('RAPIDGATEWAY_MERCHANT_NAME', 'CrickX'),
         amount: PRICE_PKR,
-        customerMobile: String(mobile),
-        customerEmail: String(user.email),
         basketId,
         successUrl: `${this.webUrl()}/subscription/return?basket=${encodeURIComponent(basketId)}`,
-        failureUrl: `${this.webUrl()}/subscription/return?basket=${encodeURIComponent(basketId)}`,
-        checkoutUrl: `${this.webUrl()}/subscription`,
       });
 
       await this.firestore.subscriptionPayment.update({ where: { id: payment.id }, data: { checkoutUrl } });

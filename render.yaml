@@ -45,14 +45,14 @@ services:
       - key: CRX_PRIZE_DISTRIBUTION_BATCH_SIZE
         value: '50'
       - key: RAPIDGATEWAY_BASE_URL
-        value: https://secure.rapid-gateway.com
+        value: https://api.rapidgateway.pk
       - key: RAPIDGATEWAY_ENVIRONMENT
         value: LIVE
       - key: RAPIDGATEWAY_MERCHANT_ID
         sync: false
       - key: RAPIDGATEWAY_MERCHANT_NAME
         value: CrickX
-      - key: RAPIDGATEWAY_CLIENT_SECRET
+      - key: RAPIDGATEWAY_SECRET_KEY
         sync: false
       - key: RAPIDGATEWAY_WEBHOOK_SECRET
         sync: false
