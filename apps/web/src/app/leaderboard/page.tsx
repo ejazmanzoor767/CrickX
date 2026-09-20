@@ -63,7 +63,10 @@ function playerScore(fixture: any, id: number, multiplier: number) {
   const batting = list(fixture?.batting).filter((row) => playerIdOf(row) === id);
   const bowling = list(fixture?.bowling).filter((row) => playerIdOf(row) === id);
   const fielding = list(fixture?.fielding ?? fixture?.fielding_stats ?? fixture?.fieldingStats).filter((row) => playerIdOf(row) === id);
-  let total = 0;
+  let battingPoints = 0;
+  let bowlingPoints = 0;
+  let fieldingPoints = 0;
+  let bonusPoints = 0;
   let hasStats = false;
 
   if (batting.length) {
@@ -77,7 +80,7 @@ function playerScore(fixture: any, id: number, multiplier: number) {
     const duck = dismissed && runs === 0 ? (format === 'T10' ? -30 : -10) : 0;
     const milestone = format === 'T10' ? 20 : format === 'T20' ? 25 : 50;
     const milestonePts = format === 'T10' ? 25 : 20;
-    total += runs + fours * 5 + sixes * 10 + duck + Math.floor(runs / milestone) * milestonePts + (sr === null ? 0 : strikeRatePoints(sr, format));
+    battingPoints += runs + fours * 5 + sixes * 10 + duck + Math.floor(runs / milestone) * milestonePts + (sr === null ? 0 : strikeRatePoints(sr, format));
   }
 
   if (bowling.length) {
@@ -88,7 +91,7 @@ function playerScore(fixture: any, id: number, multiplier: number) {
     const balls = bowling.reduce((s, r) => s + parseOversToBalls(r?.overs ?? r?.bowled_overs), 0);
     const conceded = bowling.reduce((s, r) => s + (num(r?.runs, r?.runs_conceded, r?.conceded) ?? 0), 0);
     const economy = num(bowling[0]?.econ, bowling[0]?.economy, bowling[0]?.economy_rate) ?? (balls > 0 ? conceded / (balls / 6) : null);
-    total += wickets * (format === 'ODI' ? 25 : 30) + dots * (format === 'T10' ? 5 : format === 'T20' ? 3 : 1) + maidens * (format === 'T10' ? 40 : format === 'T20' ? 20 : 10) + (economy === null ? 0 : economyPoints(economy, format));
+    bowlingPoints += wickets * (format === 'ODI' ? 25 : 30) + dots * (format === 'T10' ? 5 : format === 'T20' ? 3 : 1) + maidens * (format === 'T10' ? 40 : format === 'T20' ? 20 : 10) + (economy === null ? 0 : economyPoints(economy, format));
   }
 
   if (fielding.length) {
@@ -96,18 +99,30 @@ function playerScore(fixture: any, id: number, multiplier: number) {
     const catches = fielding.reduce((s, r) => s + (num(r?.catches, r?.catch, r?.number_of_catches) ?? 0), 0);
     const runOuts = fielding.reduce((s, r) => s + (num(r?.run_outs, r?.runouts, r?.run_out, r?.runout) ?? 0), 0);
     const stumpings = fielding.reduce((s, r) => s + (num(r?.stumpings, r?.stumps, r?.stumping) ?? 0), 0);
-    total += (catches + runOuts) * 10 + stumpings * 20;
+    fieldingPoints += (catches + runOuts) * 10 + stumpings * 20;
   }
 
   if (format === 'T20') {
     const winnerTeamId = num(fixture?.winner_team_id, fixture?.winning_team_id, fixture?.winnerTeamId);
     const playerTeamId = num([...list(fixture?.lineup), ...list(fixture?.players)].find((row) => playerIdOf(row) === id)?.team_id);
     const potmId = num(fixture?.man_of_match_id, fixture?.man_of_the_match_id, fixture?.player_of_the_match_id, fixture?.potm_player_id, fixture?.man_of_match?.player_id, fixture?.player_of_the_match?.player_id);
-    if (winnerTeamId !== null && playerTeamId !== null && Number(winnerTeamId) === Number(playerTeamId)) total += 5;
-    if (potmId !== null && Number(potmId) === id) total += 25;
+    if (winnerTeamId !== null && playerTeamId !== null && Number(winnerTeamId) === Number(playerTeamId)) bonusPoints += 5;
+    if (potmId !== null && Number(potmId) === id) bonusPoints += 25;
   }
 
-  return hasStats ? total * multiplier : null;
+  if (!hasStats) return null;
+  const baseTotal = battingPoints + bowlingPoints + fieldingPoints + bonusPoints;
+  const total = baseTotal * multiplier;
+  return {
+    batting: battingPoints,
+    bowling: bowlingPoints,
+    fielding: fieldingPoints,
+    bonus: bonusPoints,
+    baseTotal,
+    multiplier,
+    powerupPoints: total - baseTotal,
+    total,
+  };
 }
 
 function LeaderboardPageInner() {
@@ -180,7 +195,8 @@ function LeaderboardPageInner() {
       const captain = Number(team?.captainSportmonksPlayerId) === id;
       const viceCaptain = Number(team?.viceCaptainSportmonksPlayerId) === id;
       const multiplier = captain ? 2 : viceCaptain ? 1.5 : 1;
-      return { id, name: info?.fullname ?? info?.full_name ?? info?.name ?? `Player ${id}`, image: info?.image_path ?? info?.image ?? null, role: info?.position_name ?? info?.role ?? 'Fantasy player', captain, viceCaptain, multiplier, points: playerScore(fixture, id, multiplier) };
+      const score = playerScore(fixture, id, multiplier);
+      return { id, name: info?.fullname ?? info?.full_name ?? info?.name ?? `Player ${id}`, image: info?.image_path ?? info?.image ?? null, role: info?.position_name ?? info?.role ?? 'Fantasy player', captain, viceCaptain, multiplier, score, points: score?.total ?? null };
     });
   }, [fixture, squadMap, team]);
 
@@ -259,7 +275,12 @@ function LeaderboardPageInner() {
                   </div>
                 </div>
               </button>
-              {expandedPlayer === player.id && <div style={{ padding: '0 15px 14px 68px' }}><div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(155,255,71,.045)', border: '1px solid rgba(155,255,71,.1)', color: '#cfd6e2', fontSize: 12 }}>{player.captain ? 'Captain · 2× multiplier' : player.viceCaptain ? 'Vice-captain · 1.5× multiplier' : 'Fantasy player'}{player.points !== null ? ` · ${formatPoints(player.points)} points` : ' · Score pending'}</div></div>}
+              {expandedPlayer === player.id && <div style={{ padding: '0 15px 14px 68px' }}>
+                <div style={{ borderRadius: 12, overflow: 'hidden', background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)' }}>
+                  {player.multiplier > 1 && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 13px', borderBottom: '1px solid rgba(255,255,255,.06)' }}><span>Powerup Points</span><strong>+{formatPoints(player.score?.powerupPoints ?? 0)} ({player.multiplier}×)</strong></div>}
+                  {[['Batting Points', player.score?.batting], ['Bowling Points', player.score?.bowling], ['Fielding Points', player.score?.fielding], ['Bonus Points', player.score?.bonus], ['Total Points', player.score?.total]].map(([label, value], index, items) => <div key={String(label)} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 13px', borderBottom: index === items.length - 1 ? '0' : '1px solid rgba(255,255,255,.045)', fontWeight: label === 'Total Points' ? 900 : 400 }}><span>{label}</span><strong>{value === null || value === undefined ? '—' : formatPoints(value)}</strong></div>)}
+                </div>
+              </div>}
             </div>)}
           </div>
           <div className="card" style={{ marginTop: 10, padding: '14px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
