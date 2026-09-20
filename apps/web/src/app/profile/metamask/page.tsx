@@ -1,39 +1,83 @@
 import Link from 'next/link';
+import { CRX_TOKEN_ADDRESS } from '../../../lib/web3';
 
 export default function MetaMaskPage() {
+  const tokenAddress = CRX_TOKEN_ADDRESS || 'CRX token address is not configured yet';
+
   return (
-    <section className="app-page" style={{ maxWidth: 860 }}>
+    <section className="app-page" style={{ maxWidth: 900 }}>
       <div className="page-intro">
         <div>
           <p className="eyebrow">CRICKX WEB3</p>
           <h1 className="section-title">CRX in MetaMask</h1>
-          <p className="section-subtitle">How to add the CrickX token to MetaMask and view your on-chain CRX balance.</p>
+          <p className="section-subtitle">
+            View your CRX prize balance in MetaMask and send CRX to any Polygon wallet.
+          </p>
         </div>
-        <Link className="secondary-button" href="/profile">← Profile</Link>
+        <Link className="secondary-button" href="/wallet">Open CRX Wallet</Link>
       </div>
 
-      <div className="card" style={{ lineHeight: 1.75 }}>
-        <h2>How to add CRX to MetaMask</h2>
-        <ol>
-          <li>Open MetaMask and switch to <strong>Polygon Mainnet</strong>.</li>
-          <li>Open the <strong>Tokens</strong> section.</li>
-          <li>Select <strong>Import tokens</strong> or <strong>Add custom token</strong>.</li>
-          <li>Copy the <strong>CRX token contract address</strong> shown in the CrickX Wallet section.</li>
-          <li>Paste the contract address into MetaMask and confirm the token.</li>
-          <li>CRX uses <strong>18 decimals</strong>.</li>
-        </ol>
-
-        <h2>How to see your prize</h2>
-        <p>
-          When you win a contest, the CRX contest smart contract sends the prize directly to the
-          wallet address used for your contest entry. Open MetaMask on Polygon Mainnet and refresh
-          the CRX token balance to see the received tokens.
+      <div className="card" style={{ padding: 28, marginBottom: 16 }}>
+        <p className="eyebrow">CRX TOKEN</p>
+        <h2>Add CRX to MetaMask</h2>
+        <p className="section-subtitle" style={{ marginBottom: 14 }}>
+          Use Polygon Mainnet and the official CRX token contract address below. Never use an address from an unofficial source.
         </p>
+        <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,.18)', border: '1px solid rgba(255,255,255,.08)', wordBreak: 'break-all' }}>
+          <small style={{ display: 'block', color: 'var(--muted)', marginBottom: 6 }}>CRX CONTRACT ADDRESS</small>
+          <strong>{tokenAddress}</strong>
+        </div>
+        <ol style={{ lineHeight: 1.8, marginTop: 18 }}>
+          <li>Open MetaMask and switch to <strong>Polygon Mainnet</strong>.</li>
+          <li>Open <strong>Tokens</strong>, then choose <strong>Import tokens</strong> or <strong>Add custom token</strong>.</li>
+          <li>Paste the CRX contract address shown above.</li>
+          <li>Confirm the token import. CRX uses <strong>18 decimals</strong>.</li>
+        </ol>
+      </div>
 
-        <h2>Important</h2>
-        <p>
-          Only use the official CRX token contract address displayed by CrickX. Never share your
-          MetaMask recovery phrase or private key.
+      <div className="card" style={{ padding: 28, marginBottom: 16 }}>
+        <p className="eyebrow">WINNING PRIZES</p>
+        <h2>See your CRX prize in MetaMask</h2>
+        <p className="section-subtitle" style={{ lineHeight: 1.75 }}>
+          When you win a CrickX contest, the CRX contest smart contract sends the prize directly to the
+          payout wallet used for your contest entry. Open MetaMask on Polygon Mainnet, open the CRX token,
+          and refresh the balance. No manual claim is required for a successfully distributed prize.
+        </p>
+      </div>
+
+      <div className="card" style={{ padding: 28, marginBottom: 16 }}>
+        <p className="eyebrow">SEND CRX</p>
+        <h2>Send your CRX to any Polygon wallet</h2>
+        <p className="section-subtitle" style={{ lineHeight: 1.75 }}>
+          You can send CRX from the CrickX Wallet section to another Polygon-compatible wallet such as
+          MetaMask. This is a normal on-chain token transfer, so MetaMask will ask you to confirm the
+          transaction and the wallet sending CRX needs enough POL for network gas.
+        </p>
+        <ol style={{ lineHeight: 1.8, marginTop: 16 }}>
+          <li>Open <strong>CrickX → Wallet</strong> and connect your MetaMask wallet.</li>
+          <li>In <strong>Transfer CRX to another wallet</strong>, paste the receiver's Polygon wallet address.</li>
+          <li>Enter the amount of CRX you want to send.</li>
+          <li>Click <strong>Send CRX</strong>.</li>
+          <li>Review the recipient address and amount in MetaMask, then click <strong>Confirm</strong>.</li>
+          <li>Wait for the Polygon transaction to confirm.</li>
+        </ol>
+      </div>
+
+      <div className="card" style={{ padding: 28 }}>
+        <p className="eyebrow">RECEIVER WALLET</p>
+        <h2>How the receiver sees CRX</h2>
+        <p className="section-subtitle" style={{ lineHeight: 1.75 }}>
+          In the receiver's MetaMask wallet, switch to <strong>Polygon Mainnet</strong>. Open the Tokens
+          section and choose <strong>Import tokens</strong> / <strong>Add custom token</strong>. Paste the
+          official CRX contract address above and confirm.
+        </p>
+        <p style={{ marginTop: 14, fontSize: 18 }}>
+          <strong>Congratulations!</strong> Once the Polygon transfer is confirmed, the receiver can see the
+          CRX tokens in that wallet.
+        </p>
+        <p className="section-subtitle" style={{ marginTop: 14 }}>
+          Only send CRX to a Polygon-compatible address. Always double-check the recipient address before
+          confirming a blockchain transaction. Never share a MetaMask recovery phrase or private key.
         </p>
       </div>
     </section>
