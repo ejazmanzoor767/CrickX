@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '../../../lib/api';
 
-export default function SubscriptionReturnPage() {
+function SubscriptionReturnContent() {
   const params = useSearchParams();
   const basket = params.get('basket') || '';
   const [result, setResult] = useState<any>(null);
@@ -85,4 +85,9 @@ export default function SubscriptionReturnPage() {
       {basket && <small style={{ display: 'block', color: 'var(--muted)', marginTop: 22, wordBreak: 'break-all' }}>Payment reference: {basket}</small>}
     </div>
   </section>;
+}
+
+
+export default function SubscriptionReturnPage() {
+  return <Suspense fallback={<section className="app-page"><div className="card skeleton-card">Confirming payment…</div></section>}><SubscriptionReturnContent /></Suspense>;
 }
