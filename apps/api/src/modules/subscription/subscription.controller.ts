@@ -24,8 +24,8 @@ export class SubscriptionController {
 
   @Post('checkout')
   @UseGuards(JwtAuthGuard)
-  checkout(@Req() req: Request, @Body() dto: CreateSubscriptionCheckoutDto) {
-    return this.subscriptions.checkout(uid(req), dto.customerMobile);
+  checkout(@Req() req: Request, @Body() _dto: CreateSubscriptionCheckoutDto) {
+    return this.subscriptions.checkout(uid(req));
   }
 
   @Get('status')
