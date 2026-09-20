@@ -112,18 +112,16 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
 
         uint256 n = c.ranking.length;
         uint256 denominator = (n * (n + 1)) / 2;
-        uint256 distributed;
+        uint256 start = c.distributedCount;
+        uint256 end = start + maxRecipients;
+        if (end > n) end = n;
 
         for (uint256 i = start; i < end; i++) {
             require(!c.prizePaid[i], "prize already paid");
-            uint256 amount;
-            if (i == n - 1) {
-                amount = c.totalPool - distributed;
-            } else {
-                amount = (c.totalPool * (n - i)) / denominator;
-            }
+            uint256 amount = i == n - 1
+                ? c.totalPool - c.distributedAmount
+                : (c.totalPool * (n - i)) / denominator;
             c.prizePaid[i] = true;
-            distributed += amount;
             c.distributedAmount += amount;
             c.distributedCount += 1;
             if (amount > 0) crxToken.safeTransfer(c.ranking[i], amount);
@@ -133,8 +131,8 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
         if (c.distributedCount == n) {
             require(c.distributedAmount == c.totalPool, "pool not fully distributed");
             c.stage = Stage.Distributed;
+            emit ContestDistributed(contestId, c.totalPool);
         }
-        emit ContestDistributed(contestId, c.totalPool);
     }
 
     function cancelContest(uint256 contestId) external onlyOwner {
