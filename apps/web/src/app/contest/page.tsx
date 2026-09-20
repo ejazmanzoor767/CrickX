@@ -93,7 +93,7 @@ function ContestContent() {
     return <section className="app-page"><div className="card skeleton-card">Loading the single contest…</div>{error && <div className="card"><p className="error-text">{error}</p></div>}</section>;
   }
 
-  const open = contest.status === 'UPCOMING';
+  const open = contest.entriesOpen !== false && contest.status === 'UPCOMING';
   const participantCount = Number(contest.filledSpots || 0);
   const prizePool = participantCount * 10;
   const subscriptionActive = Boolean(subscription?.active);
