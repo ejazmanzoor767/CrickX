@@ -436,6 +436,15 @@ model FantasyTeamPlayer {
   sportmonksTeamId      Int         // which of the 2 fixture teams this player belongs to
   creditsAtSelection    Decimal     @db.Decimal(5, 2) // fantasy "credit cost" snapshot at pick time
 
+  // Canonical per-player fantasy score breakdown updated by the scoring engine.
+  // Total is always batting + bowling + fielding + bonus + powerup.
+  battingPoints         Decimal     @default(0) @db.Decimal(10, 2)
+  bowlingPoints         Decimal     @default(0) @db.Decimal(10, 2)
+  fieldingPoints        Decimal     @default(0) @db.Decimal(10, 2)
+  bonusPoints           Decimal     @default(0) @db.Decimal(10, 2)
+  powerupPoints         Decimal     @default(0) @db.Decimal(10, 2)
+  totalPoints           Decimal     @default(0) @db.Decimal(10, 2)
+
   @@unique([fantasyTeamId, sportmonksPlayerId])
 }
 
