@@ -61,7 +61,7 @@ export class SubscriptionService {
     const user = await this.firestore.user.findUnique({ where: { id: userId } });
     if (!user) throw new ForbiddenException('User account not found.');
     const mobile = customerMobile || user.phone;
-    if (!mobile || !/^03\\d{9}$/.test(String(mobile))) {
+    if (!mobile || !/^03\d{9}$/.test(String(mobile))) {
       throw new ForbiddenException('Add a valid Pakistani mobile number (03XXXXXXXXX) before purchasing the subscription.');
     }
 
