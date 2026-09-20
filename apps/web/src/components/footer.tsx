@@ -26,6 +26,7 @@ export default function Footer() {
               <Link href="/profile/terms">Terms &amp; Conditions</Link>
               <Link href="/profile/refund">Refund Policy</Link>
               <Link href="/profile/shipping">Shipping Policy</Link>
+              <Link href="/profile/metamask">CRX in MetaMask</Link>
             </div>
             <p className="footer-copy" style={{ margin: '12px 0 0', textAlign: 'right' }}>
               <strong>See your CRX in MetaMask:</strong> connect MetaMask to <strong>Polygon Mainnet</strong>, open the Tokens section, choose <strong>Import tokens</strong>, paste the CrickX token contract address shown in the CrickX Wallet page, and confirm the token import. CRX uses <strong>18 decimals</strong>. After a prize is paid by the CRX contest smart contract, refresh MetaMask to see the updated CRX balance.
