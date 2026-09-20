@@ -166,9 +166,13 @@ export class ContestService {
 
     let chainContestId = Number((contest as any).chainContestId);
     let chainExists = false;
+    const expectedJoinDeadline = Math.floor(new Date(liveFixture.starting_at).getTime() / 1000);
     if (Number.isFinite(chainContestId) && chainContestId > 0) {
       try {
-        chainExists = Boolean((await this.onchain.summary(chainContestId)).exists);
+        const chainSummary = await this.onchain.summary(chainContestId);
+        chainExists =
+          Boolean(chainSummary.exists) &&
+          Math.abs(Number(chainSummary.joinDeadline) - expectedJoinDeadline) <= 60;
       } catch {
         chainExists = false;
       }
