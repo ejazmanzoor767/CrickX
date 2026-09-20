@@ -213,12 +213,9 @@ function LeaderboardPageInner() {
         {!rows.length && <div className="empty-state" style={{ margin: 18 }}><strong>No leaderboard entries yet.</strong><span>Standings will appear as fantasy scores are recorded.</span></div>}
       </> : <div style={{ padding: 18 }}>
         {!team ? <div className="empty-state"><strong>No saved fantasy team.</strong><span>Create a CrickX XI from an upcoming match to see your team here.</span></div> : <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-            <div style={{ minWidth: 0 }}>
-              <p className="eyebrow" style={{ marginBottom: 2 }}>CRICKX FANTASY</p>
-              <h2 style={{ margin: 0, fontSize: 24 }}>Fantasy Team</h2>
-            </div>
-            {scopedToFixture && <Link className="secondary-button" href={`/fantasy/view?fixtureId=${fixtureId}`} style={{ padding: '9px 13px', fontSize: 12, flexShrink: 0 }}>Open Full View</Link>}
+          <div style={{ marginBottom: 14 }}>
+            <p className="eyebrow" style={{ marginBottom: 2 }}>CRICKX FANTASY</p>
+            <h2 style={{ margin: 0, fontSize: 24 }}>Fantasy Team</h2>
           </div>
 
           {scopedToFixture && <div className="card" style={{ padding: 14, marginBottom: 10 }}>
@@ -270,7 +267,7 @@ function LeaderboardPageInner() {
             <strong style={{ fontSize: 18 }}>{formatPoints(totalPoints)}</strong>
           </div>
         </>}
-      </div>}}
+      </div>}
     </div>
   </section>;
 }
