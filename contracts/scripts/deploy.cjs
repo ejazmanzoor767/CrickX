@@ -1,10 +1,11 @@
 const { ethers } = require('hardhat');
 require('dotenv').config();
 
-const CRX_TOKEN_ADDRESS = process.env.CRX_TOKEN_ADDRESS || '0x0706508638A6cBaaC482f971326299eCdd2D0731';
+const CRX_TOKEN_ADDRESS = process.env.CRX_TOKEN_ADDRESS || '';
 const FUNDING_WALLET = process.env.FUNDING_WALLET || '';
 
 async function main() {
+  if (!CRX_TOKEN_ADDRESS) throw new Error('Set CRX_TOKEN_ADDRESS before deploying.');
   const [deployer] = await ethers.getSigners();
   const fundingWallet = FUNDING_WALLET || deployer.address;
   console.log('Deploying from:', deployer.address);
