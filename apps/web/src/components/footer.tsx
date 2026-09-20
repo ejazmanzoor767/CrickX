@@ -15,7 +15,9 @@ export default function Footer() {
         </div>
         <div className="footer-meta" style={{ alignItems: 'flex-end' }}>
           <span>1 CrickX = PKR 5</span>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div style={{ width: '100%', marginTop: 10, marginBottom: 4 }}>
+            <strong style={{ display: 'block', marginBottom: 8 }}>Help &amp; Information</strong>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <Link href="/subscription">Weekly Subscription</Link>
             <Link href="/profile/game-rules">Game Rules</Link>
             <Link href="/profile/scoring">Fantasy Point Calculation</Link>
@@ -25,6 +27,7 @@ export default function Footer() {
             <Link href="/profile/terms">Terms &amp; Conditions</Link>
             <Link href="/profile/refund">Refund Policy</Link>
             <Link href="/profile/shipping">Shipping Policy</Link>
+            </div>
           </div>
           <span>© {new Date().getFullYear()} CrickX</span>
         </div>
