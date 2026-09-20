@@ -6,7 +6,7 @@ export default function PaymentAndCheckoutPage() {
       <h2>Weekly subscription payment</h2>
       <p>CrickX uses RapidGateway to collect the 50 PKR weekly subscription payment. One successful payment gives the customer 7 days of access to subscriber fantasy features. The payment gateway is separate from blockchain prize settlement.</p>
       <h2>What the customer sees</h2>
-      <p>The customer selects the Weekly Subscription, reviews the 50 PKR price, enters the required mobile number and proceeds to RapidGateway checkout to complete the PKR payment.</p>
+      <p>The customer selects the Weekly Subscription, reviews the 50 PKR price and proceeds to RapidGateway's hosted checkout to complete the PKR payment.</p>
       <h2>Payment confirmation</h2>
       <p>CrickX activates the subscription only after receiving and verifying RapidGateway's signed <code>transaction.completed</code> webhook. A browser redirect by itself does not activate access.</p>
       <h2>Blockchain prizes are separate</h2>
