@@ -41,8 +41,12 @@ async function compressAvatar(file: File) {
 const helpItems = [
   ['/profile/game-rules', 'Game Rules', 'Team creation, match states, entries and wallet rules.', '▣'],
   ['/profile/scoring', 'Fantasy Point Calculation', 'T20, T10 and ODI scoring in one place.', '★'],
+  ['/business-information', 'Business Information', 'Business model, services and complete customer journey.', '◆'],
+  ['/payment-and-checkout', 'Payment & Checkout', 'PKR checkout use case and payment confirmation flow.', '₹'],
   ['/profile/terms', 'Terms & Conditions', 'Rules and responsibilities for using CrickX.', '◈'],
   ['/profile/privacy', 'Privacy Policy', 'How account and profile data is handled.', '●'],
+  ['/profile/refund', 'Refund Policy', 'Refund and payment issue handling for digital services.', '↩'],
+  ['/profile/shipping', 'Shipping Policy', 'Digital delivery information; no physical shipping.', '◇'],
 ];
 
 export default function ProfilePage() {
