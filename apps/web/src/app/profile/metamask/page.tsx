@@ -1,7 +1,10 @@
+'use client';
 import Link from 'next/link';
+import { useState } from 'react';
 import { CRX_TOKEN_ADDRESS } from '../../../lib/web3';
 
 export default function MetaMaskPage() {
+  const [copied, setCopied] = useState(false);
   const tokenAddress = CRX_TOKEN_ADDRESS || 'CRX token address is not configured yet';
 
   return (
@@ -23,9 +26,29 @@ export default function MetaMaskPage() {
         <p className="section-subtitle" style={{ marginBottom: 14 }}>
           Use Polygon Mainnet and the official CRX token contract address below. Never use an address from an unofficial source.
         </p>
-        <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,.18)', border: '1px solid rgba(255,255,255,.08)', wordBreak: 'break-all' }}>
-          <small style={{ display: 'block', color: 'var(--muted)', marginBottom: 6 }}>CRX CONTRACT ADDRESS</small>
-          <strong>{tokenAddress}</strong>
+        <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,.18)', border: '1px solid rgba(255,255,255,.08)' }}>
+          <small style={{ display: 'block', color: 'var(--muted)', marginBottom: 8 }}>CRX CONTRACT ADDRESS</small>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <strong style={{ wordBreak: 'break-all', flex: '1 1 420px' }}>{tokenAddress}</strong>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={async () => {
+                if (!navigator.clipboard) return;
+                try {
+                  await navigator.clipboard.writeText(tokenAddress);
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1800);
+                } catch {
+                  setCopied(false);
+                }
+              }}
+              disabled={!navigator.clipboard}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {copied ? 'Copied ✓' : 'Copy address'}
+            </button>
+          </div>
         </div>
         <ol style={{ lineHeight: 1.8, marginTop: 18 }}>
           <li>Open MetaMask and switch to <strong>Polygon Mainnet</strong>.</li>
