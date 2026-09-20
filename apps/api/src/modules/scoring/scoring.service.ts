@@ -513,20 +513,21 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     const n = participantCount;
     const denominator = (n * (n + 1)) / 2;
 
+    let distributed = 0;
     for (let index = 0; index < rankedEntries.length; index++) {
       const entry: any = rankedEntries[index];
       const rank = index + 1;
-      const amount = rank === n
-        ? totalPool - rankedEntries.slice(0, n - 1).reduce((sum: number, _entry: any, i: number) => {
-            return sum + (totalPool * (n - i)) / denominator;
-          }, 0)
+      const rawAmount = rank === n
+        ? totalPool - distributed
         : (totalPool * (n - index)) / denominator;
+      const amount = Math.max(0, Math.floor(rawAmount * 1_000_000) / 1_000_000);
+      distributed += rawAmount;
 
       await this.prisma.contestEntry.update({
         where: { id: entry.id },
         data: {
           rank,
-          prizeWon: Math.max(0, Math.floor(amount * 1_000_000) / 1_000_000),
+          prizeWon: amount,
           paymentStatus: 'SUBSCRIPTION_ACTIVE',
         },
       });
