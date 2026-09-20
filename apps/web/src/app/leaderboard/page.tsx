@@ -201,7 +201,7 @@ function LeaderboardPageInner() {
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-        {(['leaderboard', 'team'] as const).map((tab) => <button key={tab} type="button" onClick={() => setActiveTab(tab)} style={{ position: 'relative', border: 0, background: activeTab === tab ? 'rgba(255,255,255,.025)' : 'transparent', color: activeTab === tab ? '#edf2f8' : '#98a0b3', padding: '18px 12px', fontSize: 16, fontWeight: 900, cursor: 'pointer' }}>{tab === 'leaderboard' ? 'Leaderboard' : 'My Team'}<span style={{ position: 'absolute', left: 0, right: 0, bottom: -1, height: 2, background: activeTab === tab ? '#99f43e' : 'transparent' }} /></button>)}
+        {(['leaderboard', 'team'] as const).map((tab) => <button key={tab} type="button" onClick={() => setActiveTab(tab)} style={{ position: 'relative', border: 0, background: activeTab === tab ? 'rgba(255,255,255,.025)' : 'transparent', color: activeTab === tab ? '#edf2f8' : '#98a0b3', padding: '18px 12px', fontSize: 16, fontWeight: 900, cursor: 'pointer' }}>{tab === 'leaderboard' ? 'Leaderboard' : 'View Team'}<span style={{ position: 'absolute', left: 0, right: 0, bottom: -1, height: 2, background: activeTab === tab ? '#99f43e' : 'transparent' }} /></button>)}
       </div>
 
       {error && <div style={{ padding: '10px 18px', color: '#ffb6b6', fontSize: 13 }}>{error}</div>}
@@ -212,24 +212,65 @@ function LeaderboardPageInner() {
         {rest.map((row: any, index: number) => <div key={`${row.userId ?? row.id ?? index}`} style={{ display: 'grid', gridTemplateColumns: '54px 1fr 84px', gap: 8, alignItems: 'center', minHeight: 76, padding: '0 18px', borderTop: '1px solid rgba(255,255,255,.05)' }}><strong style={{ fontSize: 18 }}>{num(row.rank, index + 4)}</strong><div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><Avatar name={row.displayName} url={row.avatarUrl} size={46} /><span style={{ minWidth: 0, color: '#eef2f7', fontSize: 15, fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.displayName}</span></div><strong style={{ textAlign: 'right' }}>{formatPoints(row.points)}</strong></div>)}
         {!rows.length && <div className="empty-state" style={{ margin: 18 }}><strong>No leaderboard entries yet.</strong><span>Standings will appear as fantasy scores are recorded.</span></div>}
       </> : <div style={{ padding: 18 }}>
-        {!team ? <div className="empty-state"><strong>No saved fantasy team.</strong><span>Create a CrickX XI from an upcoming match to see the team here.</span></div> : <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '16px 18px', borderRadius: 18, background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)' }}><div><span className="section-subtitle">TEAM</span><h2 style={{ margin: '3px 0 0', fontSize: 24 }}>{team.name ?? 'My CrickX XI'}</h2></div><div style={{ textAlign: 'right' }}><span className="section-subtitle">POINTS</span><strong style={{ display: 'block', marginTop: 3, fontSize: 28 }}>{formatPoints(totalPoints)}</strong></div></div>
-          <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,.06)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, padding: '13px 15px', background: 'rgba(255,255,255,.035)', borderBottom: '1px solid rgba(255,255,255,.07)' }}><strong style={{ fontSize: 13 }}>PLAYERS</strong><strong style={{ fontSize: 13 }}>POINTS</strong></div>
+        {!team ? <div className="empty-state"><strong>No saved fantasy team.</strong><span>Create a CrickX XI from an upcoming match to see your team here.</span></div> : <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+            <div style={{ minWidth: 0 }}>
+              <p className="eyebrow" style={{ marginBottom: 2 }}>CRICKX FANTASY</p>
+              <h2 style={{ margin: 0, fontSize: 24 }}>Fantasy Team</h2>
+            </div>
+            {scopedToFixture && <Link className="secondary-button" href={`/fantasy/view?fixtureId=${fixtureId}`} style={{ padding: '9px 13px', fontSize: 12, flexShrink: 0 }}>Open Full View</Link>}
+          </div>
+
+          {scopedToFixture && <div className="card" style={{ padding: 14, marginBottom: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 10, alignItems: 'center' }}>
+              <div style={{ minWidth: 0 }}>
+                <strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fixture?.localteam?.name ?? 'Home'}</strong>
+                <span className="section-subtitle">{fixture?.localteam?.short_code ?? fixture?.localteam?.code ?? 'HOME'}</span>
+              </div>
+              <span className="vs-badge">VS</span>
+              <div style={{ textAlign: 'right', minWidth: 0 }}>
+                <strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fixture?.visitorteam?.name ?? 'Away'}</strong>
+                <span className="section-subtitle">{fixture?.visitorteam?.short_code ?? fixture?.visitorteam?.code ?? 'AWAY'}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+              <span className="section-subtitle">{team.name ?? 'My CrickX XI'}</span>
+              <span className="demo-pill">{playerRows.length}/11 PLAYERS</span>
+            </div>
+          </div>}
+
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '13px 15px', background: 'rgba(255,255,255,.035)', borderBottom: '1px solid rgba(255,255,255,.07)', display: 'grid', gridTemplateColumns: '1fr auto', gap: 12 }}>
+              <strong style={{ fontSize: 13, letterSpacing: '.04em' }}>PLAYERS</strong>
+              <strong style={{ fontSize: 13, letterSpacing: '.04em' }}>POINTS</strong>
+            </div>
             {playerRows.map((player) => <div key={player.id} style={{ borderBottom: '1px solid rgba(255,255,255,.055)' }}>
-              <button type="button" onClick={() => setExpandedPlayer(expandedPlayer === player.id ? null : player.id)} style={{ width: '100%', border: 0, background: 'transparent', color: 'inherit', textAlign: 'left', padding: '13px 15px', cursor: 'pointer' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '46px minmax(0,1fr) auto', gap: 11, alignItems: 'center' }}>
-                  <Avatar name={player.name} url={player.image} size={46} />
-                  <div style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{player.name}</strong><div style={{ display: 'flex', gap: 5, marginTop: 4, alignItems: 'center' }}><span style={{ color: '#98a0b3', fontSize: 11 }}>{player.role}</span>{player.captain && <span className="badge-live" style={{ minWidth: 31, textAlign: 'center' }}>C</span>}{player.viceCaptain && <span className="demo-pill" style={{ minWidth: 33, textAlign: 'center' }}>VC</span>}</div></div>
-                  <div style={{ textAlign: 'right', minWidth: 55 }}><strong style={{ display: 'block', fontSize: 17 }}>{player.points === null ? '—' : formatPoints(player.points)}</strong><span style={{ display: 'block', color: '#98a0b3', fontSize: 16, transform: expandedPlayer === player.id ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>⌄</span></div>
+              <button type="button" onClick={() => setExpandedPlayer(expandedPlayer === player.id ? null : player.id)} style={{ width: '100%', background: 'transparent', border: 0, color: 'inherit', textAlign: 'left', padding: '14px 15px', cursor: 'pointer' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '42px minmax(0,1fr) auto', gap: 11, alignItems: 'center' }}>
+                  <Avatar name={player.name} url={player.image} size={42} />
+                  <div style={{ minWidth: 0 }}>
+                    <strong style={{ display: 'block', fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{player.name}</strong>
+                    <div style={{ display: 'flex', gap: 5, marginTop: 4, alignItems: 'center' }}>
+                      <span style={{ color: '#98a0b3', fontSize: 11 }}>{player.role}</span>
+                      {player.captain && <span className="badge-live" style={{ minWidth: 31, textAlign: 'center' }}>C</span>}
+                      {player.viceCaptain && <span className="demo-pill" style={{ minWidth: 33, textAlign: 'center' }}>VC</span>}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', minWidth: 55 }}>
+                    <strong style={{ display: 'block', fontSize: 17 }}>{player.points === null ? '—' : formatPoints(player.points)}</strong>
+                    <span style={{ display: 'block', color: '#98a0b3', fontSize: 16, transform: expandedPlayer === player.id ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>⌄</span>
+                  </div>
                 </div>
               </button>
-              {expandedPlayer === player.id && <div style={{ padding: '0 15px 14px 72px' }}><div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(155,255,71,.045)', border: '1px solid rgba(155,255,71,.1)', color: '#cfd6e2', fontSize: 12 }}>{player.captain ? 'Captain · 2× multiplier' : player.viceCaptain ? 'Vice-captain · 1.5× multiplier' : 'Fantasy player'}{player.points !== null ? ` · ${formatPoints(player.points)} points` : ' · Score pending'}</div></div>}
+              {expandedPlayer === player.id && <div style={{ padding: '0 15px 14px 68px' }}><div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(155,255,71,.045)', border: '1px solid rgba(155,255,71,.1)', color: '#cfd6e2', fontSize: 12 }}>{player.captain ? 'Captain · 2× multiplier' : player.viceCaptain ? 'Vice-captain · 1.5× multiplier' : 'Fantasy player'}{player.points !== null ? ` · ${formatPoints(player.points)} points` : ' · Score pending'}</div></div>}
             </div>)}
           </div>
-          <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}><Link className="secondary-button" href={`/fantasy/view?fixtureId=${fixtureId}`}>View Team</Link><button type="button" className="primary-button" onClick={() => setActiveTab('leaderboard')}>Leaderboard</button></div>
+          <div className="card" style={{ marginTop: 10, padding: '14px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong style={{ fontSize: 16 }}>Total Points</strong>
+            <strong style={{ fontSize: 18 }}>{formatPoints(totalPoints)}</strong>
+          </div>
         </>}
-      </div>}
+      </div>}}
     </div>
   </section>;
 }
