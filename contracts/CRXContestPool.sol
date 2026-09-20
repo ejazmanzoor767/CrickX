@@ -104,7 +104,7 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
     /// @notice Rank-weighted distribution across every participant:
     ///         rank 1 gets N weight, rank N gets 1 weight. Integer dust is sent
     ///         to the last ranked participant so the full pool is distributed.
-    function distributePrizes(uint256 contestId) external onlyOwner nonReentrant {
+    function distributePrizes(uint256 contestId, uint256 maxRecipients) external onlyOwner nonReentrant {
         Contest storage c = contests[contestId];
         require(contestExists[contestId], "contest not found");
         require(c.stage == Stage.Ranked, "ranking not finalized");
@@ -114,7 +114,7 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
         uint256 denominator = (n * (n + 1)) / 2;
         uint256 distributed;
 
-        for (uint256 i = 0; i < n; i++) {
+        for (uint256 i = start; i < end; i++) {
             require(!c.prizePaid[i], "prize already paid");
             uint256 amount;
             if (i == n - 1) {
@@ -130,8 +130,10 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
             emit PrizePaid(contestId, i + 1, c.ranking[i], amount);
         }
 
-        require(distributed == c.totalPool, "pool not fully distributed");
-        c.stage = Stage.Distributed;
+        if (c.distributedCount == n) {
+            require(c.distributedAmount == c.totalPool, "pool not fully distributed");
+            c.stage = Stage.Distributed;
+        }
         emit ContestDistributed(contestId, c.totalPool);
     }
 
