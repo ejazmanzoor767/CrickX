@@ -39,6 +39,7 @@ async function compressAvatar(file: File) {
 }
 
 const helpItems = [
+  ['/subscription', 'Weekly Subscription', '50 PKR for 7 days of CrickX fantasy access.', '✓'],
   ['/profile/game-rules', 'Game Rules', 'Team creation, match states, entries and wallet rules.', '▣'],
   ['/profile/scoring', 'Fantasy Point Calculation', 'T20, T10 and ODI scoring in one place.', '★'],
   ['/business-information', 'Business Information', 'Business model, services and complete customer journey.', '◆'],
