@@ -38,17 +38,6 @@ async function compressAvatar(file: File) {
   }
 }
 
-const helpItems = [
-  ['/subscription', 'Weekly Subscription', '50 PKR for 7 days of CrickX fantasy access.', '✓'],
-  ['/profile/game-rules', 'Game Rules', 'Team creation, match states, entries and wallet rules.', '▣'],
-  ['/profile/scoring', 'Fantasy Point Calculation', 'T20, T10 and ODI scoring in one place.', '★'],
-  ['/business-information', 'Business Information', 'Business model, services and complete customer journey.', '◆'],
-  ['/payment-and-checkout', 'Payment & Checkout', 'PKR checkout use case and payment confirmation flow.', '₹'],
-  ['/profile/terms', 'Terms & Conditions', 'Rules and responsibilities for using CrickX.', '◈'],
-  ['/profile/privacy', 'Privacy Policy', 'How account and profile data is handled.', '●'],
-  ['/profile/refund', 'Refund Policy', 'Refund and payment issue handling for digital services.', '↩'],
-  ['/profile/shipping', 'Shipping Policy', 'Digital delivery information; no physical shipping.', '◇'],
-];
 
 export default function ProfilePage() {
   const { user, loading: authLoading, logout } = useAuth();
@@ -215,7 +204,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <div className="profile-grid" style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 16 }}>
         <div className="card">
           <div className="section-mini-row">
             <div>
@@ -243,23 +232,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="card">
-          <p className="eyebrow">HELP & INFORMATION</p>
-          {helpItems.map(([href, title, note, icon]) => (
-            <Link
-              key={href}
-              href={href}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 0', textDecoration: 'none', borderBottom: '1px solid rgba(255,255,255,.06)' }}
-            >
-              <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'rgba(155,255,71,.08)' }}>{icon}</span>
-              <span style={{ flex: 1 }}>
-                <strong style={{ display: 'block' }}>{title}</strong>
-                <small style={{ color: 'var(--muted)' }}>{note}</small>
-              </span>
-              <span style={{ color: 'var(--muted)', fontSize: 20 }}>›</span>
-            </Link>
-          ))}
-        </div>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
