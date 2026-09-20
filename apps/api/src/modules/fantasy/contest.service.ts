@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { verifyMessage, getAddress } from 'viem';
+import { verifyMessage, getAddress, type Address } from 'viem';
 import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { OnchainContestService } from '../onchain/onchain-contest.service';
@@ -225,7 +225,7 @@ export class ContestService {
       throw new ForbiddenException('The wallet confirmation expired. Please prepare the contest join again.');
     }
 
-    let wallet: string;
+    let wallet: Address;
     try { wallet = getAddress(dto.walletAddress); } catch { throw new BadRequestException('Invalid wallet address.'); }
 
     const message = this.joinMessage(userId, contest.id, team.id, Number(dto.walletMessageTimestamp));
@@ -269,7 +269,7 @@ export class ContestService {
       });
 
       return { entry, participantCount: currentCount + 1 };
-    });
+    }) as { entry: any; participantCount: number };
 
     return {
       ...result.entry,
