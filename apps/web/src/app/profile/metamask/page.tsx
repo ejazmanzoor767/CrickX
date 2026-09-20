@@ -5,7 +5,36 @@ import { CRX_TOKEN_ADDRESS } from '../../../lib/web3';
 
 export default function MetaMaskPage() {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const tokenAddress = CRX_TOKEN_ADDRESS || 'CRX token address is not configured yet';
+
+  async function copyTokenAddress() {
+    setCopyFailed(false);
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(tokenAddress);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = tokenAddress;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const copiedWithFallback = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (!copiedWithFallback) throw new Error('Clipboard copy failed.');
+      }
+
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopyFailed(true);
+      window.setTimeout(() => setCopyFailed(false), 2200);
+    }
+  }
 
   return (
     <section className="app-page" style={{ maxWidth: 900 }}>
@@ -33,20 +62,10 @@ export default function MetaMaskPage() {
             <button
               className="secondary-button"
               type="button"
-              onClick={async () => {
-                if (!navigator.clipboard) return;
-                try {
-                  await navigator.clipboard.writeText(tokenAddress);
-                  setCopied(true);
-                  window.setTimeout(() => setCopied(false), 1800);
-                } catch {
-                  setCopied(false);
-                }
-              }}
-              disabled={!navigator.clipboard}
+              onClick={copyTokenAddress}
               style={{ whiteSpace: 'nowrap' }}
             >
-              {copied ? 'Copied ✓' : 'Copy address'}
+              {copied ? 'Copied ✓' : copyFailed ? 'Copy failed' : 'Copy address'}
             </button>
           </div>
         </div>
