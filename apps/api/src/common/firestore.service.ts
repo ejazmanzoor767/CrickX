@@ -14,7 +14,7 @@ export class FirestoreDecimal {
 
 const DECIMAL_FIELDS: Record<string, Set<string>> = {
   wallet: new Set(['depositBalance', 'winningsBalance', 'bonusBalance']), transaction: new Set(['amount', 'balanceAfter']), deposit: new Set(['amount']), withdrawal: new Set(['amount']), subscription: new Set(['amount']), subscriptionPayment: new Set(['amount']),
-  contest: new Set(['entryFee', 'prizePoolTotal']), contestEntry: new Set(['entryFeePaid', 'totalPoints', 'prizeWon']), fantasyTeamPlayer: new Set(['creditsAtSelection']), playerFixtureCredit: new Set(['credits']),
+  contest: new Set(['entryFee', 'prizePoolTotal']), contestEntry: new Set(['entryFeePaid', 'totalPoints', 'prizeWon']), fantasyTeamPlayer: new Set(['creditsAtSelection', 'battingPoints', 'bowlingPoints', 'fieldingPoints', 'bonusPoints', 'powerupPoints', 'totalPoints']), playerFixtureCredit: new Set(['credits']),
 };
 function isPlainObject(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date) && !(v instanceof FirestoreDecimal); }
 function unwrap(value: unknown): unknown { if (value instanceof FirestoreDecimal) return value.toNumber(); if (value instanceof Date) return value; if (Array.isArray(value)) return value.map(unwrap); if (isPlainObject(value)) { const out: Record<string, unknown> = {}; for (const [k, v] of Object.entries(value)) if (v !== undefined) out[k] = unwrap(v); return out; } return value; }

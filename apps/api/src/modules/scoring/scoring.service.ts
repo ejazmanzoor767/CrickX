@@ -4,7 +4,7 @@ import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { OnchainContestService } from '../onchain/onchain-contest.service';
 import { LeaderboardService } from './leaderboard.service';
-import { ScoringRules, applyCaptaincy, computePlayerPoints, rulesForFormat } from './scoring.rules';
+import { ScoringRules, computePlayerScoreBreakdown, rulesForFormat } from './scoring.rules';
 
 function isFinished(status: string | null | undefined, live: 0 | 1) {
   // Sportmonks can briefly keep the live flag set while publishing a terminal
@@ -117,7 +117,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private calculateTeamPoints(
+  private calculateTeamScore(
     team: any,
     battingByPlayer: Map<number, any>,
     bowlingByPlayer: Map<number, any>,
@@ -128,22 +128,109 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     playerOfMatchId: number | null,
   ) {
     let total = 0;
+    const playerScores: Array<{
+      playerId: number;
+      battingPoints: number;
+      bowlingPoints: number;
+      fieldingPoints: number;
+      bonusPoints: number;
+      powerupPoints: number;
+      totalPoints: number;
+    }> = [];
+
     for (const player of team.players ?? []) {
       const playerId = Number(player.sportmonksPlayerId);
       const batting = battingByPlayer.get(playerId);
       const bowling = bowlingByPlayer.get(playerId);
-      const rawPoints = computePlayerPoints(
+      const breakdown = computePlayerScoreBreakdown(
         rules,
         batting,
         bowling,
         fieldingByPlayer.get(playerId),
         dotBallsByPlayer.get(playerId) ?? 0,
         playerId === Number(playerOfMatchId),
-        winnerTeamId !== null && (Number(player.sportmonksTeamId) === Number(winnerTeamId) || Number(batting?.team_id) === Number(winnerTeamId) || Number(bowling?.team_id) === Number(winnerTeamId)),
+        winnerTeamId !== null && (
+          Number(player.sportmonksTeamId) === Number(winnerTeamId) ||
+          Number(batting?.team_id) === Number(winnerTeamId) ||
+          Number(bowling?.team_id) === Number(winnerTeamId)
+        ),
       );
-      total += applyCaptaincy(rawPoints, playerId, Number(team.captainSportmonksPlayerId), Number(team.viceCaptainSportmonksPlayerId), rules);
+
+      const multiplier =
+        playerId === Number(team.captainSportmonksPlayerId)
+          ? rules.captain_multiplier
+          : playerId === Number(team.viceCaptainSportmonksPlayerId)
+            ? rules.vice_captain_multiplier
+            : 1;
+
+      const powerupPoints = Math.round(
+        breakdown.baseTotal * (multiplier - 1) * 10,
+      ) / 10;
+      const totalPoints = Math.round(
+        (breakdown.battingPoints +
+          breakdown.bowlingPoints +
+          breakdown.fieldingPoints +
+          breakdown.bonusPoints +
+          powerupPoints) *
+          10,
+      ) / 10;
+
+      playerScores.push({
+        playerId,
+        battingPoints: breakdown.battingPoints,
+        bowlingPoints: breakdown.bowlingPoints,
+        fieldingPoints: breakdown.fieldingPoints,
+        bonusPoints: breakdown.bonusPoints,
+        powerupPoints,
+        totalPoints,
+      });
+      total += totalPoints;
     }
-    return Math.round(total * 10) / 10;
+
+    return {
+      total: Math.round(total * 10) / 10,
+      playerScores,
+    };
+  }
+
+  private async persistTeamPlayerScores(team: any, playerScores: Array<{
+    playerId: number;
+    battingPoints: number;
+    bowlingPoints: number;
+    fieldingPoints: number;
+    bonusPoints: number;
+    powerupPoints: number;
+    totalPoints: number;
+  }>) {
+    const byPlayerId = new Map(playerScores.map((score) => [score.playerId, score]));
+    await Promise.all(
+      (team.players ?? []).map(async (player: any) => {
+        const score = byPlayerId.get(Number(player.sportmonksPlayerId));
+        if (!score) return;
+
+        const unchanged =
+          Number(player.battingPoints ?? 0) === score.battingPoints &&
+          Number(player.bowlingPoints ?? 0) === score.bowlingPoints &&
+          Number(player.fieldingPoints ?? 0) === score.fieldingPoints &&
+          Number(player.bonusPoints ?? 0) === score.bonusPoints &&
+          Number(player.powerupPoints ?? 0) === score.powerupPoints &&
+          Number(player.totalPoints ?? 0) === score.totalPoints;
+
+        if (unchanged) return;
+
+        await this.prisma.fantasyTeamPlayer.update({
+          where: { id: player.id },
+          data: {
+            battingPoints: score.battingPoints,
+            bowlingPoints: score.bowlingPoints,
+            fieldingPoints: score.fieldingPoints,
+            bonusPoints: score.bonusPoints,
+            powerupPoints: score.powerupPoints,
+            totalPoints: score.totalPoints,
+          },
+        });
+      }),
+    );
   }
 
   async scoreFixture(fixtureId: number) {
@@ -222,11 +309,23 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     // the first player-stat payload arrives. A zero score is a real placeholder
     // until Sportmonks provides player statistics, rather than omitting the user.
     for (const team of fantasyTeams) {
-      const total = (batting.length || bowling.length || balls.length)
-        ? this.calculateTeamPoints(team, battingByPlayer, bowlingByPlayer, fieldingByPlayer, dotBallsByPlayer, formatRules, fixture.winner_team_id, fixture.man_of_match_id)
-        : 0;
+      const scored = (batting.length || bowling.length || balls.length)
+        ? this.calculateTeamScore(team, battingByPlayer, bowlingByPlayer, fieldingByPlayer, dotBallsByPlayer, formatRules, fixture.winner_team_id, fixture.man_of_match_id)
+        : {
+            total: 0,
+            playerScores: (team.players ?? []).map((player: any) => ({
+              playerId: Number(player.sportmonksPlayerId),
+              battingPoints: 0,
+              bowlingPoints: 0,
+              fieldingPoints: 0,
+              bonusPoints: 0,
+              powerupPoints: 0,
+              totalPoints: 0,
+            })),
+          };
+      await this.persistTeamPlayerScores(team, scored.playerScores);
       const previous = userFixtureScores.get(team.userId) ?? -Infinity;
-      if (total > previous) userFixtureScores.set(team.userId, total);
+      if (scored.total > previous) userFixtureScores.set(team.userId, scored.total);
     }
 
     const contests = await this.prisma.contest.findMany({
@@ -239,10 +338,10 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       const rules: ScoringRules = { ...formatRules, ...(configuredRules ?? {}) };
 
       for (const entry of contest.entries) {
-        const total = this.calculateTeamPoints(entry.fantasyTeam, battingByPlayer, bowlingByPlayer, fieldingByPlayer, dotBallsByPlayer, rules, fixture.winner_team_id, fixture.man_of_match_id);
-        await this.prisma.contestEntry.update({ where: { id: entry.id }, data: { totalPoints: total } });
+        const scored = this.calculateTeamScore(entry.fantasyTeam, battingByPlayer, bowlingByPlayer, fieldingByPlayer, dotBallsByPlayer, rules, fixture.winner_team_id, fixture.man_of_match_id);
+        await this.prisma.contestEntry.update({ where: { id: entry.id }, data: { totalPoints: scored.total } });
         const previous = userFixtureScores.get(entry.userId) ?? -Infinity;
-        if (total > previous) userFixtureScores.set(entry.userId, total);
+        if (scored.total > previous) userFixtureScores.set(entry.userId, scored.total);
       }
 
       const ranked = await this.prisma.contestEntry.findMany({ where: { contestId: contest.id }, orderBy: { totalPoints: 'desc' } });
@@ -367,7 +466,19 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         });
       }
 
-      const total = this.calculateTeamPoints(
+      const storedScore = this.calculateTeamScore(
+        fantasyTeam,
+        battingByPlayer,
+        bowlingByPlayer,
+        fieldingByPlayer,
+        dotBallsByPlayer,
+        formatRules,
+        fixture.winner_team_id,
+        fixture.man_of_match_id,
+      );
+      await this.persistTeamPlayerScores(fantasyTeam, storedScore.playerScores);
+
+      const scored = this.calculateTeamScore(
         fantasyTeam,
         battingByPlayer,
         bowlingByPlayer,
@@ -380,7 +491,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
       await this.prisma.contestEntry.update({
         where: { id: entry.id },
-        data: { totalPoints: total },
+        data: { totalPoints: scored.total },
       });
     }
 

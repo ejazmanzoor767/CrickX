@@ -1,8 +1,25 @@
-import { T20_RULES, T10_RULES, ODI_RULES, computePlayerPoints, applyCaptaincy } from './scoring.rules';
+import { T20_RULES, T10_RULES, ODI_RULES, computePlayerPoints, computePlayerScoreBreakdown, applyCaptaincy } from './scoring.rules';
 
 describe('fantasy scoring rules', () => {
   it('applies the T20 batting rules', () => {
     expect(computePlayerPoints(T20_RULES, { score: 50, ball: 40, four_x: 2, six_x: 1, rate: 125 })).toBe(50 + 10 + 10 + 20 + 20 + 10);
+  });
+
+  it('returns separate batting, bowling, fielding and bonus components whose sum is the base total', () => {
+    const breakdown = computePlayerScoreBreakdown(
+      T20_RULES,
+      { score: 50, ball: 40, four_x: 2, six_x: 1, rate: 125 },
+      { wickets: 1, medians: 0, runs: 8, overs: 2 },
+      { catches: 1, stumpings: 0, runOuts: 0 },
+      2,
+      true,
+      true,
+    );
+    expect(breakdown.battingPoints + breakdown.bowlingPoints + breakdown.fieldingPoints + breakdown.bonusPoints).toBe(breakdown.baseTotal);
+    expect(breakdown.battingPoints).toBe(50 + 10 + 10 + 20 + 10);
+    expect(breakdown.bowlingPoints).toBe(30 + 6 + 30);
+    expect(breakdown.fieldingPoints).toBe(10);
+    expect(breakdown.bonusPoints).toBe(25 + 5);
   });
 
   it('applies the T20 bowling rules', () => {

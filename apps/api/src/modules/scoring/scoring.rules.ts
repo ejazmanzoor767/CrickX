@@ -84,6 +84,68 @@ function economyFromOvers(runs: number, oversValue: number) {
   return legalBalls > 0 ? (runs / legalBalls) * 6 : 0;
 }
 
+export interface PlayerScoreBreakdown {
+  battingPoints: number;
+  bowlingPoints: number;
+  fieldingPoints: number;
+  bonusPoints: number;
+  baseTotal: number;
+}
+
+export function computePlayerScoreBreakdown(
+  rules: ScoringRules,
+  batting?: Pick<SportmonksBatting, 'score' | 'ball' | 'four_x' | 'six_x' | 'rate'>,
+  bowling?: Pick<SportmonksBowling, 'wickets' | 'medians' | 'runs' | 'overs'>,
+  fielding?: { catches: number; stumpings: number; runOuts: number },
+  dotBalls = 0,
+  playerOfMatch = false,
+  winningTeam = false,
+): PlayerScoreBreakdown {
+  let battingPoints = 0;
+  let bowlingPoints = 0;
+  let fieldingPoints = 0;
+  let bonusPoints = 0;
+
+  if (batting) {
+    battingPoints += batting.score * rules.run;
+    battingPoints += batting.four_x * rules.four_bonus;
+    battingPoints += batting.six_x * rules.six_bonus;
+    if (batting.score === 0 && batting.ball > 0) battingPoints += rules.duck_penalty;
+    if (batting.ball >= rules.minimum_balls_for_strike_rate) battingPoints += bandPoints(batting.rate, rules.strike_rate_bands);
+    if (rules.milestone_runs > 0) battingPoints += Math.floor(batting.score / rules.milestone_runs) * rules.milestone_points;
+  }
+
+  if (bowling) {
+    bowlingPoints += bowling.wickets * rules.wicket;
+    bowlingPoints += bowling.medians * rules.maiden_over;
+    bowlingPoints += dotBalls * rules.dot_ball_bonus;
+    if (bowling.overs >= rules.minimum_overs_for_economy) {
+      bowlingPoints += bandPoints(
+        economyFromOvers(bowling.runs, bowling.overs),
+        rules.bowling_economy_bands,
+      );
+    }
+  }
+
+  if (fielding) {
+    fieldingPoints += fielding.catches * rules.catch;
+    fieldingPoints += fielding.stumpings * rules.stumping;
+    fieldingPoints += fielding.runOuts * rules.run_out;
+  }
+
+  if (playerOfMatch) bonusPoints += rules.player_of_match_bonus;
+  if (winningTeam) bonusPoints += rules.winning_team_bonus;
+
+  const baseTotal = battingPoints + bowlingPoints + fieldingPoints + bonusPoints;
+  return {
+    battingPoints: Math.round(battingPoints * 10) / 10,
+    bowlingPoints: Math.round(bowlingPoints * 10) / 10,
+    fieldingPoints: Math.round(fieldingPoints * 10) / 10,
+    bonusPoints: Math.round(bonusPoints * 10) / 10,
+    baseTotal: Math.round(baseTotal * 10) / 10,
+  };
+}
+
 export function computePlayerPoints(
   rules: ScoringRules,
   batting?: Pick<SportmonksBatting, 'score' | 'ball' | 'four_x' | 'six_x' | 'rate'>,
@@ -93,29 +155,15 @@ export function computePlayerPoints(
   playerOfMatch = false,
   winningTeam = false,
 ): number {
-  let points = 0;
-  if (batting) {
-    points += batting.score * rules.run;
-    points += batting.four_x * rules.four_bonus;
-    points += batting.six_x * rules.six_bonus;
-    if (batting.score === 0 && batting.ball > 0) points += rules.duck_penalty;
-    if (batting.ball >= rules.minimum_balls_for_strike_rate) points += bandPoints(batting.rate, rules.strike_rate_bands);
-    if (rules.milestone_runs > 0) points += Math.floor(batting.score / rules.milestone_runs) * rules.milestone_points;
-  }
-  if (bowling) {
-    points += bowling.wickets * rules.wicket;
-    points += bowling.medians * rules.maiden_over;
-    points += dotBalls * rules.dot_ball_bonus;
-    if (bowling.overs >= rules.minimum_overs_for_economy) points += bandPoints(economyFromOvers(bowling.runs, bowling.overs), rules.bowling_economy_bands);
-  }
-  if (fielding) {
-    points += fielding.catches * rules.catch;
-    points += fielding.stumpings * rules.stumping;
-    points += fielding.runOuts * rules.run_out;
-  }
-  if (playerOfMatch) points += rules.player_of_match_bonus;
-  if (winningTeam) points += rules.winning_team_bonus;
-  return Math.round(points * 10) / 10;
+  return computePlayerScoreBreakdown(
+    rules,
+    batting,
+    bowling,
+    fielding,
+    dotBalls,
+    playerOfMatch,
+    winningTeam,
+  ).baseTotal;
 }
 
 export function applyCaptaincy(points: number, playerId: number, captainId: number, viceCaptainId: number, rules: ScoringRules): number {

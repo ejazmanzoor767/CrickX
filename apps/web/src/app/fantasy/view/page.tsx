@@ -210,15 +210,44 @@ function SavedTeamView() {
   const breakdowns = useMemo(() => {
     return players.map((player: any) => {
       const id = Number(player?.sportmonksPlayerId);
-      const info = playerInfo[id] ?? {};
       const isCaptain = Number(team?.captainSportmonksPlayerId) === id;
       const isViceCaptain = Number(team?.viceCaptainSportmonksPlayerId) === id;
       const multiplier = isCaptain ? 2 : isViceCaptain ? 1.5 : 1;
-      return scoringForPlayer({ ...(fixture ?? {}), lineup: fixture?.lineup }, id, multiplier);
+      const hasStoredScore = [player?.battingPoints, player?.bowlingPoints, player?.fieldingPoints, player?.bonusPoints, player?.powerupPoints, player?.totalPoints]
+        .some((value) => value !== undefined && value !== null);
+      if (hasStoredScore) {
+        const batting = num(player?.battingPoints, 0) ?? 0;
+        const bowling = num(player?.bowlingPoints, 0) ?? 0;
+        const fielding = num(player?.fieldingPoints, 0) ?? 0;
+        const bonus = num(player?.bonusPoints, 0) ?? 0;
+        const powerup = num(player?.powerupPoints, 0) ?? 0;
+        return {
+          available: true,
+          batting,
+          bowling,
+          fielding,
+          bonus,
+          powerup,
+          total: batting + bowling + fielding + bonus + powerup,
+          multiplier,
+        };
+      }
+      const legacy = scoringForPlayer({ ...(fixture ?? {}), lineup: fixture?.lineup }, id, multiplier);
+      const legacyTotal = num(legacy.total);
+      const legacyPowerup = legacyTotal === null || multiplier <= 1
+        ? 0
+        : Math.round((legacyTotal - legacyTotal / multiplier) * 10) / 10;
+      return {
+        ...legacy,
+        powerup: legacyPowerup,
+        total: legacyTotal,
+      };
     });
-  }, [players, fixture, playerInfo, team]);
+  }, [players, fixture, team]);
   const totalPoints = useMemo(() => {
-    const computed = breakdowns.every((item) => item.total !== null) ? breakdowns.reduce((sum, item) => sum + Number(item.total), 0) : null;
+    const computed = breakdowns.length > 0 && breakdowns.every((item) => item.total !== null)
+      ? breakdowns.reduce((sum, item) => sum + Number(item.total), 0)
+      : null;
     if (computed !== null) return computed;
     const saved = Number(team?.points ?? team?.totalPoints ?? team?.fantasyPoints);
     return Number.isFinite(saved) ? saved : null;
@@ -247,8 +276,8 @@ function SavedTeamView() {
             <div style={{ minWidth: 56, textAlign: 'right' }}><strong style={{ display: 'block', fontSize: 17 }}>{breakdown?.total ?? '—'}</strong><span style={{ fontSize: 17, color: '#98a0b3', display: 'block', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>⌄</span></div>
           </div></button>
           {expanded && <div style={{ padding: '0 15px 14px 68px' }}><div style={{ borderRadius: 12, overflow: 'hidden', background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)' }}>
-            {multiplier > 1 && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 13px', borderBottom: '1px solid rgba(255,255,255,.06)' }}><span>Powerup Points</span><strong>{multiplier}×</strong></div>}
-            {[['Batting Points', breakdown?.batting], ['Bowling Points', breakdown?.bowling], ['Fielding Points', breakdown?.fielding], ['Bonus Points', breakdown?.bonus]].map(([label, value]) => <div key={String(label)} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 13px', borderBottom: '1px solid rgba(255,255,255,.045)' }}><span>{label}</span><strong>{value ?? '—'}</strong></div>)}
+            {multiplier > 1 && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 13px', borderBottom: '1px solid rgba(255,255,255,.06)' }}><span>Powerup Points</span><strong>{breakdown?.powerup ?? 0} ({multiplier}×)</strong></div>}
+            {[['Batting Points', breakdown?.batting], ['Bowling Points', breakdown?.bowling], ['Fielding Points', breakdown?.fielding], ['Bonus Points', breakdown?.bonus], ['Total Points', breakdown?.total]].map(([label, value], index, items) => <div key={String(label)} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 13px', borderBottom: index === items.length - 1 ? '0' : '1px solid rgba(255,255,255,.045)', fontWeight: label === 'Total Points' ? 900 : 400 }}><span>{label}</span><strong>{value ?? '—'}</strong></div>)}
           </div></div>}
         </div>;
       })}</div>

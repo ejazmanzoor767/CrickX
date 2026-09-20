@@ -195,14 +195,31 @@ function LeaderboardPageInner() {
       const captain = Number(team?.captainSportmonksPlayerId) === id;
       const viceCaptain = Number(team?.viceCaptainSportmonksPlayerId) === id;
       const multiplier = captain ? 2 : viceCaptain ? 1.5 : 1;
-      const score = playerScore(fixture, id, multiplier);
+      const hasStoredScore = [player?.battingPoints, player?.bowlingPoints, player?.fieldingPoints, player?.bonusPoints, player?.powerupPoints, player?.totalPoints]
+        .some((value) => value !== undefined && value !== null);
+      const storedScore = hasStoredScore
+        ? {
+            batting: num(player?.battingPoints, 0) ?? 0,
+            bowling: num(player?.bowlingPoints, 0) ?? 0,
+            fielding: num(player?.fieldingPoints, 0) ?? 0,
+            bonus: num(player?.bonusPoints, 0) ?? 0,
+            powerupPoints: num(player?.powerupPoints, 0) ?? 0,
+            total: (num(player?.battingPoints, 0) ?? 0) +
+              (num(player?.bowlingPoints, 0) ?? 0) +
+              (num(player?.fieldingPoints, 0) ?? 0) +
+              (num(player?.bonusPoints, 0) ?? 0) +
+              (num(player?.powerupPoints, 0) ?? 0),
+          }
+        : null;
+      const score = storedScore ?? playerScore(fixture, id, multiplier);
       return { id, name: info?.fullname ?? info?.full_name ?? info?.name ?? `Player ${id}`, image: info?.image_path ?? info?.image ?? null, role: info?.position_name ?? info?.role ?? 'Fantasy player', captain, viceCaptain, multiplier, score, points: score?.total ?? null };
     });
   }, [fixture, squadMap, team]);
 
-  const storedTeamPoints = num(team?.points, team?.totalPoints, team?.fantasyPoints);
   const leaderboardTeamPoints = rows.find((row: any) => String(row?.userId ?? row?.id) === String(team?.userId ?? ''))?.points;
-  const totalPoints = storedTeamPoints ?? leaderboardTeamPoints ?? playerRows.reduce((sum, row) => sum + (row.points ?? 0), 0);
+  const totalPoints = playerRows.length
+    ? playerRows.reduce((sum, row) => sum + (row.points ?? 0), 0)
+    : leaderboardTeamPoints ?? 0;
   const fixtureTitle = scopedToFixture ? `${fixture?.localteam?.name ?? 'Home'} vs ${fixture?.visitorteam?.name ?? 'Away'}` : 'Overall CrickX fantasy standings';
   const topThree = rows.slice(0, 3);
   const rest = rows.slice(3);
