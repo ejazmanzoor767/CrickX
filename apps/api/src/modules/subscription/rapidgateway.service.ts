@@ -26,7 +26,7 @@ export class RapidGatewayService {
   private tokenExpiresAt = 0;
 
   constructor(private readonly config: ConfigService) {
-    this.baseUrl = (this.config.get<string>('RAPIDGATEWAY_BASE_URL') || 'https://secure.rapid-gateway.com').replace(/\\/$/, '');
+    this.baseUrl = (this.config.get<string>('RAPIDGATEWAY_BASE_URL') || 'https://secure.rapid-gateway.com').replace(/\/$/, '');
     this.merchantId = this.config.get<string>('RAPIDGATEWAY_MERCHANT_ID', '').trim();
     this.clientSecret = this.config.get<string>('RAPIDGATEWAY_CLIENT_SECRET', '').trim();
     this.merchantName = this.config.get<string>('RAPIDGATEWAY_MERCHANT_NAME', 'CrickX').trim() || 'CrickX';
