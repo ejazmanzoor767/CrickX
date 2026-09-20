@@ -7,7 +7,7 @@ export default function Footer() {
         <div>
           <div className="footer-brand">
             <img
-              src="/crickx-app-logo.webp?v=2"
+              src="/crx.svg"
               alt="CrickX"
               width="40"
               height="40"
