@@ -102,6 +102,14 @@ export async function connectWallet() {
   return address as Address;
 }
 
+export async function signContestJoinMessage(message: string) {
+  const ethereum = await getEthereumProvider(true);
+  const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
+  const [account] = await walletClient.requestAddresses();
+  const signature = await walletClient.signMessage({ account, message });
+  return { account, signature };
+}
+
 export async function getCurrentWallet() {
   if (typeof window === 'undefined') return null;
   try {
