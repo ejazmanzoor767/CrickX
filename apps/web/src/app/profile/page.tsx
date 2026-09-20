@@ -204,8 +204,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <div style={{ marginTop: 16 }}>
-        <div className="card">
+      <div className="card" style={{ marginTop: 16 }}>
           <div className="section-mini-row">
             <div>
               <p className="eyebrow">PLAYER IDENTITY</p>
@@ -230,8 +229,6 @@ export default function ProfilePage() {
               <strong className="break-text" style={{ display: 'block', marginTop: 5 }}>{user?.email}</strong>
             </div>
           </div>
-        </div>
-
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
