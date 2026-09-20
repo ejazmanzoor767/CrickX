@@ -3,14 +3,14 @@ import Link from 'next/link';
 export default function PaymentAndCheckoutPage() {
   return <section className="app-page"><div className="page-intro"><div><p className="eyebrow">CRICKX CHECKOUT</p><h1 className="section-title">Payment & Checkout</h1><p className="section-subtitle">How online PKR payments are intended to be used on CrickX.</p></div><Link className="secondary-button" href="/profile">← Profile</Link></div>
     <div className="card" style={{lineHeight:1.7}}>
-      <h2>Intended payment-gateway use case</h2>
-      <p>CrickX intends to use an online payment gateway to accept PKR payments for eligible digital CrickX services and purchases shown at checkout. The gateway is a payment-collection method; it does not replace the CrickX application, fantasy scoring system or customer account.</p>
+      <h2>Weekly subscription payment</h2>
+      <p>CrickX uses RapidGateway to collect the 50 PKR weekly subscription payment. One successful payment gives the customer 7 days of access to subscriber fantasy features. The payment gateway is separate from blockchain prize settlement.</p>
       <h2>What the customer sees</h2>
-      <p>The customer selects an eligible service, reviews the displayed PKR amount and proceeds to checkout. When Rapid Gateway is enabled for the account, the customer completes payment using the payment methods made available by the gateway.</p>
+      <p>The customer selects the Weekly Subscription, reviews the 50 PKR price, enters the required mobile number and proceeds to RapidGateway checkout to complete the PKR payment.</p>
       <h2>Payment confirmation</h2>
-      <p>After the gateway reports a successful payment, CrickX records the payment reference and makes the purchased digital service available according to the applicable service terms. Failed or cancelled payments do not create a successful order.</p>
-      <h2>Blockchain transactions are separate</h2>
-      <p>Where a CrickX feature requires a blockchain transaction, that transaction is handled separately by the customer's connected wallet and the applicable blockchain network. The payment gateway is not used to collect blockchain network gas fees.</p>
+      <p>CrickX activates the subscription only after receiving and verifying RapidGateway's signed <code>transaction.completed</code> webhook. A browser redirect by itself does not activate access.</p>
+      <h2>Blockchain prizes are separate</h2>
+      <p>Contest joining does not require a blockchain payment. After a contest closes, CrickX funds 10 CRX per joined participant into the CRX contest pool smart contract, which distributes the prize pool to the ranked participant wallets.</p>
       <h2>PKR pricing</h2>
       <p>Applicable customer-facing checkout amounts are displayed in PKR before payment. Customers can review the amount and service description before confirming the transaction.</p>
       <h2>Payment records</h2>
