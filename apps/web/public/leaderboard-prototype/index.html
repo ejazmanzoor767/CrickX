@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CrickX — Leaderboard Prototype</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap');
+    :root{--bg:#05070b;--panel:rgba(14,18,28,.88);--line:rgba(255,255,255,.09);--text:#f7f8fb;--muted:#98a0b3;--accent:#9bff47;--success:#7dff9a}
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at 8% 4%,rgba(155,255,71,.11),transparent 26%),radial-gradient(circle at 92% 8%,rgba(79,112,255,.11),transparent 28%),var(--bg);color:var(--text)}
+    body{padding:30px 16px 70px}
+    .shell{width:min(900px,100%);margin:0 auto}
+    .prototype-label{color:var(--accent);font-size:11px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;margin:0 0 12px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 12px 36px rgba(0,0,0,.18)}
+    .top{display:flex;align-items:center;gap:14px;padding:18px;border-bottom:1px solid rgba(255,255,255,.06)}
+    .back{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:rgba(255,255,255,.035);color:#e8edf5;font-size:28px}
+    .title-wrap{min-width:0;flex:1}
+    .eyebrow{color:var(--accent);text-transform:uppercase;letter-spacing:.18em;font-size:11px;font-weight:900;margin:0 0 4px}
+    h1,h2{font-family:'Barlow Condensed';text-transform:uppercase}
+    h1{font-size:28px;margin:0}
+    h2{margin:0;font-size:28px}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid rgba(255,255,255,.06)}
+    .tab{position:relative;border:0;background:transparent;color:#98a0b3;padding:18px 12px;font-size:16px;font-weight:900;cursor:pointer}
+    .tab.active{color:#edf2f8;background:rgba(255,255,255,.025)}
+    .tab.active:after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:#99f43e}
+    .panel{padding:18px}
+    .updating{padding:8px 18px;color:#98a0b3;font-size:12px}
+    .podium{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:end;gap:6px;padding:16px 0 18px}
+    .podium-item{text-align:center;min-width:0}
+    .avatar-wrap{position:relative;margin:0 auto 8px}
+    .avatar{border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#eaf0f6,#fff);color:#152033;font-weight:900;overflow:hidden}
+    .avatar img{width:100%;height:100%;object-fit:cover}
+    .rank{position:absolute;top:-3px;left:-3px;min-width:28px;height:28px;padding:0 7px;display:grid;place-items:center;border-radius:999px;background:#f0b36b;color:#172033;font-weight:1000;font-size:13px}
+    .rank.one{background:#ffd400}
+    .player-name{color:#eef2f7;font-weight:900;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .points-pill{display:inline-flex;margin-top:7px;padding:6px 14px;min-width:84px;justify-content:center;border-radius:999px;background:#7de928;color:#10210b;font-weight:1000}
+    .leader-row{display:grid;grid-template-columns:54px 1fr 84px;gap:8px;align-items:center;min-height:76px;padding:0;border-top:1px solid rgba(255,255,255,.05)}
+    .leader-rank{padding-left:0;font-size:18px}
+    .leader-user{display:flex;align-items:center;gap:10px;min-width:0}
+    .leader-points{text-align:right;font-weight:900}
+    .empty{margin:18px;padding:22px;border:1px solid var(--line);border-radius:16px;color:var(--muted);text-align:center}
+    .empty strong{display:block;color:var(--text);margin-bottom:6px}
+    .match-card{padding:14px;margin-bottom:10px}
+    .teams{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}
+    .team-name{font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .team-code{color:var(--muted);font-size:12px}
+    .team-away{text-align:right}
+    .vs{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);color:var(--accent);font-size:10px;font-weight:900}
+    .match-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);color:var(--muted);font-size:12px}
+    .pill{border:1px solid rgba(155,255,71,.2);background:rgba(155,255,71,.08);color:#caffaa;padding:7px 10px;border-radius:999px;font-size:11px;font-weight:900;white-space:nowrap}
+    .players-card{border:1px solid var(--line);border-radius:18px;overflow:hidden}
+    .players-head,.player-row-main{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+    .players-head{padding:13px 15px;background:rgba(255,255,255,.035);border-bottom:1px solid rgba(255,255,255,.07)}
+    .players-head strong{font-size:13px;letter-spacing:.04em}
+    .player-item{border-bottom:1px solid rgba(255,255,255,.055)}
+    .player-button{width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:14px 15px;cursor:pointer}
+    .player-row{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:11px;align-items:center}
+    .player-info{min-width:0}
+    .player-info strong{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .role-line{display:flex;gap:5px;margin-top:4px;align-items:center;color:#98a0b3;font-size:11px}
+    .badge{display:inline-flex;align-items:center;justify-content:center;min-width:31px;padding:4px 7px;border-radius:999px;font-size:10px;font-weight:900}
+    .badge.c{background:rgba(255,101,115,.15);color:#ff8f99;border:1px solid rgba(255,101,115,.2)}
+    .badge.vc{background:rgba(155,255,71,.08);color:#caffaa;border:1px solid rgba(155,255,71,.2)}
+    .player-score{text-align:right;min-width:55px}
+    .player-score strong{display:block;font-size:17px}
+    .chevron{display:block;color:#98a0b3;font-size:16px;transition:.15s}
+    .chevron.open{transform:rotate(180deg)}
+    .details{padding:0 15px 14px 68px}
+    .details-box{padding:10px 12px;border-radius:12px;background:rgba(155,255,71,.045);border:1px solid rgba(155,255,71,.1);color:#cfd6e2;font-size:12px}
+    .total{margin-top:10px;padding:14px 15px;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:18px}
+    .total strong:last-child{font-size:20px}
+    .note{margin-top:14px;color:var(--muted);font-size:12px;line-height:1.6;text-align:center}
+    @media(max-width:620px){
+      body{padding:18px 10px 50px}
+      .panel{padding:12px}
+      .podium{gap:3px}
+      .leader-row{grid-template-columns:42px 1fr 62px}
+      .teams{gap:7px}
+      .team-name{font-size:14px}
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <p class="prototype-label">CrickX • UI Prototype</p>
+    <div class="card">
+      <header class="top">
+        <div class="back">‹</div>
+        <div class="title-wrap">
+          <p class="eyebrow">CRICKX FANTASY</p>
+          <h1>Pakistan vs South Africa</h1>
+        </div>
+      </header>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="leaderboard">Leaderboard</button>
+        <button class="tab" data-tab="team">View Team</button>
+      </div>
+
+      <section id="leaderboard" class="panel">
+        <div class="podium">
+          <div class="podium-item">
+            <div class="avatar-wrap" style="width:72px">
+              <div class="avatar" style="width:72px;height:72px">AR</div>
+              <span class="rank">2</span>
+            </div>
+            <div class="player-name">Ahsan Raza</div>
+            <div class="points-pill">142</div>
+          </div>
+          <div class="podium-item">
+            <div class="avatar-wrap" style="width:82px">
+              <div class="avatar" style="width:82px;height:82px">UK</div>
+              <span class="rank one">1</span>
+            </div>
+            <div class="player-name">Usman Khan</div>
+            <div class="points-pill">158</div>
+          </div>
+          <div class="podium-item">
+            <div class="avatar-wrap" style="width:72px">
+              <div class="avatar" style="width:72px;height:72px">HZ</div>
+              <span class="rank">3</span>
+            </div>
+            <div class="player-name">Hassan Zia</div>
+            <div class="points-pill">136</div>
+          </div>
+        </div>
+
+        <div class="leader-row">
+          <strong class="leader-rank">4</strong>
+          <div class="leader-user"><div class="avatar" style="width:46px;height:46px">MA</div><span class="player-name" style="font-size:15px">Muhammad Ali</span></div>
+          <strong class="leader-points">129</strong>
+        </div>
+        <div class="leader-row">
+          <strong class="leader-rank">5</strong>
+          <div class="leader-user"><div class="avatar" style="width:46px;height:46px">SO</div><span class="player-name" style="font-size:15px">Samiullah Omar</span></div>
+          <strong class="leader-points">121</strong>
+        </div>
+        <div class="leader-row">
+          <strong class="leader-rank">6</strong>
+          <div class="leader-user"><div class="avatar" style="width:46px;height:46px">FK</div><span class="player-name" style="font-size:15px">Fahad Khan</span></div>
+          <strong class="leader-points">115</strong>
+        </div>
+        <div class="leader-row">
+          <strong class="leader-rank">7</strong>
+          <div class="leader-user"><div class="avatar" style="width:46px;height:46px">NA</div><span class="player-name" style="font-size:15px">Naveed Ahmad</span></div>
+          <strong class="leader-points">109</strong>
+        </div>
+      </section>
+
+      <section id="team" class="panel" hidden>
+        <div class="match-card card">
+          <div class="teams">
+            <div>
+              <div class="team-name">Pakistan</div>
+              <div class="team-code">PAK</div>
+            </div>
+            <div class="vs">VS</div>
+            <div class="team-away">
+              <div class="team-name">South Africa</div>
+              <div class="team-code">SA</div>
+            </div>
+          </div>
+          <div class="match-meta">
+            <span>My CrickX XI</span>
+            <span class="pill">11/11 PLAYERS</span>
+          </div>
+        </div>
+
+        <div class="players-card">
+          <div class="players-head">
+            <strong>PLAYERS</strong>
+            <strong>POINTS</strong>
+          </div>
+
+          <div class="player-item">
+            <button class="player-button" data-player="1">
+              <div class="player-row">
+                <div class="avatar" style="width:42px;height:42px">BK</div>
+                <div class="player-info">
+                  <strong>Babar Khan</strong>
+                  <div class="role-line">Batter <span class="badge c">C</span></div>
+                </div>
+                <div class="player-score"><strong>54</strong><span class="chevron">⌄</span></div>
+              </div>
+            </button>
+            <div class="details" data-details="1" hidden><div class="details-box">Captain · 2× multiplier · 54 points</div></div>
+          </div>
+
+          <div class="player-item">
+            <button class="player-button" data-player="2">
+              <div class="player-row">
+                <div class="avatar" style="width:42px;height:42px">MR</div>
+                <div class="player-info">
+                  <strong>Mohammad Rizwan</strong>
+                  <div class="role-line">Wicketkeeper <span class="badge vc">VC</span></div>
+                </div>
+                <div class="player-score"><strong>41</strong><span class="chevron">⌄</span></div>
+              </div>
+            </button>
+            <div class="details" data-details="2" hidden><div class="details-box">Vice-captain · 1.5× multiplier · 41 points</div></div>
+          </div>
+
+          <div class="player-item">
+            <button class="player-button" data-player="3">
+              <div class="player-row">
+                <div class="avatar" style="width:42px;height:42px">IH</div>
+                <div class="player-info">
+                  <strong>Imran Haris</strong>
+                  <div class="role-line">All-rounder</div>
+                </div>
+                <div class="player-score"><strong>36</strong><span class="chevron">⌄</span></div>
+              </div>
+            </button>
+            <div class="details" data-details="3" hidden><div class="details-box">Fantasy player · 36 points</div></div>
+          </div>
+
+          <div class="player-item">
+            <button class="player-button" data-player="4">
+              <div class="player-row">
+                <div class="avatar" style="width:42px;height:42px">SN</div>
+                <div class="player-info">
+                  <strong>Shaheen Nawaz</strong>
+                  <div class="role-line">Bowler</div>
+                </div>
+                <div class="player-score"><strong>28</strong><span class="chevron">⌄</span></div>
+              </div>
+            </button>
+            <div class="details" data-details="4" hidden><div class="details-box">Fantasy player · 28 points</div></div>
+          </div>
+
+          <div class="player-item">
+            <button class="player-button" data-player="5">
+              <div class="player-row">
+                <div class="avatar" style="width:42px;height:42px">FA</div>
+                <div class="player-info">
+                  <strong>Fakhar Ahmed</strong>
+                  <div class="role-line">Batter</div>
+                </div>
+                <div class="player-score"><strong>23</strong><span class="chevron">⌄</span></div>
+              </div>
+            </button>
+            <div class="details" data-details="5" hidden><div class="details-box">Fantasy player · 23 points</div></div>
+          </div>
+
+          <div class="player-item">
+            <button class="player-button" data-player="6">
+              <div class="player-row">
+                <div class="avatar" style="width:42px;height:42px">AM</div>
+                <div class="player-info">
+                  <strong>Asif Malik</strong>
+                  <div class="role-line">All-rounder</div>
+                </div>
+                <div class="player-score"><strong>19</strong><span class="chevron">⌄</span></div>
+              </div>
+            </button>
+            <div class="details" data-details="6" hidden><div class="details-box">Fantasy player · 19 points</div></div>
+          </div>
+        </div>
+
+        <div class="total"><strong>Total Points</strong><strong>201</strong></div>
+      </section>
+    </div>
+    <p class="note">Prototype only — uses sample names and points. It does not connect to live CrickX data.</p>
+  </main>
+
+  <script>
+    const tabs = document.querySelectorAll('.tab');
+    const leaderboard = document.getElementById('leaderboard');
+    const team = document.getElementById('team');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.toggle('active', t === tab));
+        const showTeam = tab.dataset.tab === 'team';
+        leaderboard.hidden = showTeam;
+        team.hidden = !showTeam;
+      });
+    });
+
+    document.querySelectorAll('.player-button').forEach(button => {
+      button.addEventListener('click', () => {
+        const id = button.dataset.player;
+        const details = document.querySelector('[data-details="' + id + '"]');
+        const chevron = button.querySelector('.chevron');
+        details.hidden = !details.hidden;
+        chevron.classList.toggle('open', !details.hidden);
+      });
+    });
+  </script>
+</body>
+</html>
