@@ -10,6 +10,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { ScoringModule } from './modules/scoring/scoring.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { FirestoreService } from './common/firestore.service';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { HealthController } from './health.controller';
@@ -24,6 +25,7 @@ import { HealthController } from './health.controller';
     MatchesModule,
     FantasyModule,
     WalletModule,
+    SubscriptionModule,
     ProfileModule,
     ScoringModule,
     AdminModule,

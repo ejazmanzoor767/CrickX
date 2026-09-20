@@ -4,7 +4,7 @@ import { createPublicClient, createWalletClient, custom, formatUnits, http, isAd
 import { createEVMClient } from '@metamask/connect-evm';
 import { polygon } from 'viem/chains';
 
-export const CRX_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_CRX_TOKEN_ADDRESS || '0x0706508638A6cBaaC482f971326299eCdd2D0731') as Address;
+export const CRX_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_CRX_TOKEN_ADDRESS || '') as Address;
 export const CRX_CONTEST_POOL_ADDRESS = (process.env.NEXT_PUBLIC_CRX_CONTEST_POOL_ADDRESS || '') as Address;
 export const POLYGON_CHAIN_ID = 137;
 export const DEFAULT_RPC_URL = process.env.NEXT_PUBLIC_POLYGON_RPC_URL || 'https://polygon-rpc.com';
@@ -18,11 +18,10 @@ const CRX_ABI = [
 ] as const;
 
 const POOL_ABI = [
-  { type: 'function', name: 'entryFee', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'stage', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [{ type: 'uint8' }] },
   { type: 'function', name: 'participantCount', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'totalPool', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'hasEntered', stateMutability: 'view', inputs: [{ name: 'contestId', type: 'uint256' }, { name: 'account', type: 'address' }], outputs: [{ type: 'bool' }] },
-  { type: 'function', name: 'joinContest', stateMutability: 'nonpayable', inputs: [{ name: 'contestId', type: 'uint256' }], outputs: [] },
 ] as const;
 
 const publicClient = createPublicClient({ chain: polygon, transport: http(DEFAULT_RPC_URL) });
@@ -102,6 +101,14 @@ export async function connectWallet() {
   return address as Address;
 }
 
+export async function signContestJoinMessage(message: string) {
+  const ethereum = await getEthereumProvider(true);
+  const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
+  const [account] = await walletClient.requestAddresses();
+  const signature = await walletClient.signMessage({ account, message });
+  return { account, signature };
+}
+
 export async function getCurrentWallet() {
   if (typeof window === 'undefined') return null;
   try {
@@ -113,33 +120,19 @@ export async function getCurrentWallet() {
 }
 
 export async function readCrxWallet(address: Address) {
+  if (!CRX_TOKEN_ADDRESS) throw new Error('CRX token address is not configured.');
   const decimals = Number(await readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'decimals' }));
   const balanceRaw = await readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'balanceOf', args: [address] });
   const allowanceRaw = CRX_CONTEST_POOL_ADDRESS ? await readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'allowance', args: [address, CRX_CONTEST_POOL_ADDRESS] }) : 0n;
   return { address, decimals, balanceRaw, allowanceRaw, balance: Number(formatUnits(balanceRaw, decimals)), allowance: Number(formatUnits(allowanceRaw, decimals)) };
 }
 
-export async function approveContestPool(amount: string | number, decimals = 18) {
-  if (!CRX_CONTEST_POOL_ADDRESS) throw new Error('CRX contest pool address is not configured.');
-  const ethereum = await getEthereumProvider(true);
-  const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
-  const [account] = await walletClient.requestAddresses();
-  const hash = await walletClient.writeContract({ account, chain: polygon, address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'approve', args: [CRX_CONTEST_POOL_ADDRESS, parseUnits(String(amount), decimals)] });
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
-}
+export async function approveContestPool(_amount: string | number, _decimals = 18) { throw new Error('Contest entry is free. User CRX approval is not required.'); }
 
-export async function joinOnchainContest(contestId: number) {
-  if (!CRX_CONTEST_POOL_ADDRESS) throw new Error('CRX contest pool address is not configured.');
-  const ethereum = await getEthereumProvider(true);
-  const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
-  const [account] = await walletClient.requestAddresses();
-  const hash = await walletClient.writeContract({ account, chain: polygon, address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'joinContest', args: [BigInt(contestId)] });
-  await publicClient.waitForTransactionReceipt({ hash });
-  return { hash, account };
-}
+export async function joinOnchainContest(_contestId: number) { throw new Error('Contest entry is free. No CRX blockchain payment is required.'); }
 
 export async function sendCrx(to: string, amount: string, decimals = 18) {
+  if (!CRX_TOKEN_ADDRESS) throw new Error('CRX token address is not configured.');
   if (!isAddress(to)) throw new Error('Enter a valid wallet address.');
   const ethereum = await getEthereumProvider(true);
   const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
@@ -151,11 +144,18 @@ export async function sendCrx(to: string, amount: string, decimals = 18) {
 
 export async function readOnchainContest(contestId: number) {
   if (!CRX_CONTEST_POOL_ADDRESS) throw new Error('CRX contest pool address is not configured.');
-  const [entryFeeRaw, stage, participantCount] = await Promise.all([
-    readContract({ address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'entryFee', args: [BigInt(contestId)] }),
+  if (!CRX_TOKEN_ADDRESS) throw new Error('CRX token address is not configured.');
+  const [stage, participantCount, totalPoolRaw, decimals] = await Promise.all([
     readContract({ address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'stage', args: [BigInt(contestId)] }),
     readContract({ address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'participantCount', args: [BigInt(contestId)] }),
+    readContract({ address: CRX_CONTEST_POOL_ADDRESS, abi: POOL_ABI, functionName: 'totalPool', args: [BigInt(contestId)] }),
+    readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'decimals' }),
   ]);
-  const decimals = Number(await readContract({ address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'decimals' }));
-  return { entryFee: Number(formatUnits(entryFeeRaw, decimals)), stage: Number(stage), participantCount: Number(participantCount), decimals };
+  return {
+    entryFee: 0,
+    stage: Number(stage),
+    participantCount: Number(participantCount),
+    totalPool: Number(formatUnits(totalPoolRaw, Number(decimals))),
+    decimals: Number(decimals),
+  };
 }

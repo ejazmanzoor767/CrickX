@@ -65,6 +65,8 @@ model User {
   deposits          Deposit[]
   withdrawals       Withdrawal[]
   kycRecords        KycRecord[]
+  subscriptions     Subscription[]
+  subscriptionPayments SubscriptionPayment[]
 
   @@index([email])
   @@index([status])
@@ -253,6 +255,69 @@ model Withdrawal {
   @@index([status])
 }
 
+
+// ---------------------------------------------------------------------------
+// Weekly subscriptions and RapidGateway PKR payments
+// ---------------------------------------------------------------------------
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  PAYMENT_FAILED
+}
+
+enum SubscriptionPaymentStatus {
+  INITIATED
+  SUCCEEDED
+  FAILED
+}
+
+model Subscription {
+  id          String             @id @default(uuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan        String             // WEEKLY
+  amount      Decimal            @db.Decimal(10, 2)
+  currency    String             @default("PKR")
+  status      SubscriptionStatus @default(PENDING)
+  basketId    String             @unique
+  startedAt   DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  payments    SubscriptionPayment[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model SubscriptionPayment {
+  id              String                    @id @default(uuid())
+  userId          String
+  user            User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId  String
+  subscription    Subscription               @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  basketId        String                    @unique
+  amount          Decimal                   @db.Decimal(10, 2)
+  currency        String                    @default("PKR")
+  status          SubscriptionPaymentStatus @default(INITIATED)
+  gatewayTxnRef   String?
+  eventId         String?
+  environment     String?
+  checkoutUrl     String?
+  failureReason   String?
+  createdAt       DateTime                  @default(now())
+  completedAt     DateTime?
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([eventId])
+}
+
 // ---------------------------------------------------------------------------
 // Fantasy Scoring Configuration (application-owned; applied to Sportmonks
 // ball-by-ball / stats data, never stored as duplicated cricket data)
@@ -289,10 +354,10 @@ model Contest {
   sportmonksFixtureId Int
 
   name                String
-  entryFee            Decimal        @db.Decimal(10, 2)
+  entryFee            Decimal        @db.Decimal(10, 2) // always 0 for the new subscription-gated free-entry model
   totalSpots          Int?
   filledSpots         Int            @default(0)
-  prizePoolTotal      Decimal        @db.Decimal(14, 2)
+  prizePoolTotal      Decimal        @db.Decimal(14, 2) // CRX pool = 10 CRX × joined participants
   prizeDistribution   Json           // [{ rankFrom: 1, rankTo: 1, amount: 5000 }, ...]
   maxTeamsPerUser      Int           @default(1)
 
@@ -320,7 +385,7 @@ model ContestEntry {
   fantasyTeamId   String
   fantasyTeam     FantasyTeam  @relation(fields: [fantasyTeamId], references: [id])
 
-  entryFeePaid    Decimal      @db.Decimal(10, 2)
+  entryFeePaid    Decimal      @db.Decimal(10, 2) // always 0; subscription is the access payment
   paymentStatus   String       @default("VERIFIED")
   transactionHash String?      @unique
   walletAddress   String?

@@ -8,7 +8,7 @@ export default function RefundPage() {
       <h2>When a refund may be considered</h2>
       <p>If a PKR payment is successfully charged but the purchased CrickX service is not delivered because of a confirmed technical failure on our side, the customer may contact support with the order or transaction reference for review.</p>
       <h2>Completed digital services</h2>
-      <p>Payments for digital services that have already been delivered or consumed are generally not refundable, subject to applicable law and the payment provider's rules.</p>
+      <p>The weekly subscription is a digital service. Payments for an access period that has already been delivered or consumed are generally not refundable, subject to applicable law and the payment provider's rules.</p>
       <h2>Blockchain transactions</h2>
       <p>Blockchain transactions, including external-wallet CRX transfers, are processed on-chain and cannot be reversed by CrickX. Customers should verify the amount, wallet and network before confirming a blockchain transaction.</p>
       <h2>How to request help</h2>
