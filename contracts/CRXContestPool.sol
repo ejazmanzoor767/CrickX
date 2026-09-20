@@ -195,5 +195,7 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
     function stage(uint256 contestId) external view returns (Stage) { return contests[contestId].stage; }
     function participantCount(uint256 contestId) external view returns (uint256) { return contests[contestId].participantCount; }
     function totalPool(uint256 contestId) external view returns (uint256) { return contests[contestId].totalPool; }
+    function distributedAmount(uint256 contestId) external view returns (uint256) { return contests[contestId].distributedAmount; }
+    function distributedCount(uint256 contestId) external view returns (uint256) { return contests[contestId].distributedCount; }
     function joinDeadline(uint256 contestId) external view returns (uint256) { return contests[contestId].joinDeadline; }
 }
