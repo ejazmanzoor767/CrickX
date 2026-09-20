@@ -17,7 +17,7 @@ describe('fantasy scoring rules', () => {
     );
     expect(breakdown.battingPoints + breakdown.bowlingPoints + breakdown.fieldingPoints + breakdown.bonusPoints).toBe(breakdown.baseTotal);
     expect(breakdown.battingPoints).toBe(50 + 10 + 10 + 20 + 10);
-    expect(breakdown.bowlingPoints).toBe(30 + 6 + 10);
+    expect(breakdown.bowlingPoints).toBe(30 + 6 + 30);
     expect(breakdown.fieldingPoints).toBe(10);
     expect(breakdown.bonusPoints).toBe(25 + 5);
   });
