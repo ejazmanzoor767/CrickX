@@ -59,7 +59,14 @@ export class ContestService {
     let contest = await this.prisma.contest.findUnique({ where: { id: contestId } });
     let fixtureForClock: any = null;
 
+    try {
+      fixtureForClock = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+    } catch {
+      fixtureForClock = null;
+    }
+
     if (!contest) {
+      if (!fixtureForClock) fixtureForClock = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
       fixtureForClock = await this.sportmonks.getFixture(fixtureId);
       const providerStatus = String(fixtureForClock.status ?? '').toLowerCase();
       const providerFinished = providerStatus.includes('finish') || providerStatus.includes('abandon') || providerStatus.includes('cancel');
@@ -88,8 +95,14 @@ export class ContestService {
     }
 
     const startingAtMs = new Date((contest as any).lineupLockAt ?? fixtureForClock?.starting_at).getTime();
-    if (Number.isFinite(startingAtMs) && Date.now() < startingAtMs && contest.status !== 'UPCOMING' && contest.status !== 'CANCELLED') {
-      contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING', entryFee: 0 } });
+    const providerStatus = String(fixtureForClock?.status ?? '').toLowerCase();
+    const providerFinished = providerStatus.includes('finish') || providerStatus.includes('abandon') || providerStatus.includes('cancel');
+    const started = Number.isFinite(startingAtMs) && Date.now() >= startingAtMs;
+    const isOpen = !providerFinished && !started && contest.status !== 'COMPLETED' && contest.status !== 'CANCELLED';
+    if (contest.status !== (isOpen ? 'UPCOMING' : contest.status)) {
+      if (isOpen) {
+        contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING', entryFee: 0 } });
+      }
     }
 
     return {
@@ -97,7 +110,10 @@ export class ContestService {
       entryFee: 0,
       totalSpots: null,
       unlimited: true,
+      entriesOpen: isOpen,
+      matchStarted: started,
       prizePoolPerParticipant: CRX_PRIZE_PER_PARTICIPANT,
+      projectedPrizePool: Number(contest.filledSpots || 0) * CRX_PRIZE_PER_PARTICIPANT,
       chain: null,
     };
   }
@@ -190,8 +206,14 @@ export class ContestService {
     if (!contest) throw new NotFoundException('Contest not found.');
     if (contest.status === 'COMPLETED' || contest.status === 'CANCELLED') throw new ForbiddenException('Contest is already closed.');
 
+    const lockMs = new Date((contest as any).lineupLockAt).getTime();
+    if (Number.isFinite(lockMs) && Date.now() >= lockMs) {
+      throw new ForbiddenException('Entries are closed because the match has started.');
+    }
+
     const team = await this.prisma.fantasyTeam.findUnique({ where: { id: dto.fantasyTeamId } });
     if (!team || team.userId !== userId) throw new NotFoundException('Fantasy team not found.');
+    if (team.isLocked) throw new ForbiddenException('Fantasy team is already locked.');
     if (team.sportmonksFixtureId !== contest.sportmonksFixtureId) throw new BadRequestException('This fantasy team was not built for this match.');
 
     const now = Math.floor(Date.now() / 1000);
@@ -207,39 +229,49 @@ export class ContestService {
     try { valid = await verifyMessage({ address: wallet, message, signature: dto.walletSignature as `0x${string}` }); } catch { valid = false; }
     if (!valid) throw new ForbiddenException('Wallet signature could not be verified.');
 
-    const existingUser = await this.prisma.contestEntry.findFirst({ where: { contestId: contest.id, userId } });
-    if (existingUser) return existingUser;
     const existingWallet = await this.prisma.contestEntry.findFirst({ where: { contestId: contest.id, walletAddress: wallet } });
-    if (existingWallet) throw new ForbiddenException('This wallet has already joined the contest.');
+    if (existingWallet && existingWallet.userId !== userId) throw new ForbiddenException('This wallet has already joined the contest.');
 
-    const entry = await this.prisma.contestEntry.create({
-      data: {
-        id: `entry_${contest.id}_${team.id}`,
-        contestId: contest.id,
-        userId,
-        fantasyTeamId: team.id,
-        entryFeePaid: 0,
-        transactionHash: null,
-        walletAddress: wallet,
-        paymentStatus: 'SUBSCRIPTION_ACTIVE',
-      },
+    const entryId = `entry_${contest.id}_${userId}`;
+    const result = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.contestEntry.findUnique({ where: { id: entryId } });
+      if (existing) return { entry: existing, participantCount: Number(contest.filledSpots || 0) };
+
+      const currentContest = await tx.contest.findUnique({ where: { id: contest.id } });
+      if (!currentContest) throw new NotFoundException('Contest not found.');
+      if (currentContest.status === 'COMPLETED' || currentContest.status === 'CANCELLED') throw new ForbiddenException('Contest is already closed.');
+
+      const currentCount = Number(currentContest.filledSpots || 0);
+      const entry = await tx.contestEntry.create({
+        data: {
+          id: entryId,
+          contestId: contest.id,
+          userId,
+          fantasyTeamId: team.id,
+          entryFeePaid: 0,
+          transactionHash: null,
+          walletAddress: wallet,
+          paymentStatus: 'SUBSCRIPTION_ACTIVE',
+        },
+      });
+
+      await tx.contest.update({
+        where: { id: contest.id },
+        data: {
+          filledSpots: { increment: 1 },
+          prizePoolTotal: { increment: CRX_PRIZE_PER_PARTICIPANT },
+          entryFee: 0,
+        },
+      });
+
+      return { entry, participantCount: currentCount + 1 };
     });
 
-    await this.prisma.contest.update({
-      where: { id: contest.id },
-      data: {
-        filledSpots: { increment: 1 },
-        prizePoolTotal: { increment: CRX_PRIZE_PER_PARTICIPANT },
-        entryFee: 0,
-      },
-    });
-
-    const participantCount = Number(contest.filledSpots || 0) + 1;
     return {
-      ...entry,
+      ...result.entry,
       freeEntry: true,
-      participantCount,
-      prizePoolTotal: participantCount * CRX_PRIZE_PER_PARTICIPANT,
+      participantCount: result.participantCount,
+      prizePoolTotal: result.participantCount * CRX_PRIZE_PER_PARTICIPANT,
       prizePoolPerParticipant: CRX_PRIZE_PER_PARTICIPANT,
     };
   }
