@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
@@ -10,7 +10,6 @@ export default function SubscriptionPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [status, setStatus] = useState<any>(null);
-  const [mobile, setMobile] = useState('');
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
@@ -35,12 +34,11 @@ export default function SubscriptionPage() {
     void load();
   }, [authLoading, user, router]);
 
-  async function subscribe(event: FormEvent) {
-    event.preventDefault();
+  async function subscribe() {
     setPaying(true);
     setError('');
     try {
-      const result: any = await api.createSubscriptionCheckout(mobile.trim() || undefined);
+      const result: any = await api.createSubscriptionCheckout();
       window.location.assign(result.checkoutUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to start RapidGateway checkout.');
@@ -86,22 +84,14 @@ export default function SubscriptionPage() {
           <Link className="primary-button" href="/fantasy-home" style={{ marginTop: 14 }}>Open Fantasy</Link>
         </div>
       ) : (
-        <form onSubmit={subscribe} style={{ marginTop: 20 }}>
-          <label className="form-label" htmlFor="mobile">Pakistani mobile number</label>
-          <input
-            id="mobile"
-            value={mobile}
-            onChange={(event) => setMobile(event.target.value)}
-            placeholder="03XXXXXXXXX"
-            inputMode="numeric"
-            autoComplete="tel"
-            pattern="03[0-9]{9}"
-          />
-          <small className="section-subtitle" style={{ display: 'block', marginTop: 8 }}>RapidGateway requires a customer mobile number for the PKR checkout.</small>
-          <button className="primary-button full" type="submit" disabled={paying} style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 20 }}>
+          <p className="section-subtitle" style={{ maxWidth: 650 }}>
+            You will be redirected to RapidGateway's secure branded checkout, where the payment methods enabled for CrickX are shown.
+          </p>
+          <button className="primary-button full" type="button" disabled={paying} onClick={subscribe} style={{ marginTop: 16 }}>
             {paying ? 'Opening secure checkout…' : 'Subscribe for 50 PKR'}
           </button>
-        </form>
+        </div>
       )}
     </div>
 
