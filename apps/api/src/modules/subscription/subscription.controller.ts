@@ -39,11 +39,15 @@ export class SubscriptionController {
   async webhook(
     @Req() req: Request,
     @Headers('x-rapidgateway-signature') signature: string,
+    @Headers('x-rg-signature') legacySignature: string,
     @Headers('x-rapidgateway-timestamp') timestamp: string,
+    @Headers('x-rg-timestamp') legacyTimestamp: string,
   ) {
     const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody ?? (req.body as Buffer);
     const rawBodyString = Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : JSON.stringify(rawBody);
-    if (!this.rapid.verifyWebhook(rawBodyString, signature, timestamp)) throw new BadRequestException('Invalid RapidGateway webhook signature.');
+    const finalSignature = signature || legacySignature;
+    const finalTimestamp = timestamp || legacyTimestamp;
+    if (!this.rapid.verifyWebhook(rawBodyString, finalSignature, finalTimestamp)) throw new BadRequestException('Invalid RapidGateway webhook signature.');
 
     let payload: any;
     try {
