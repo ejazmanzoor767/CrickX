@@ -4,7 +4,7 @@ export default function BusinessInformationPage() {
   return <section className="app-page"><div className="page-intro"><div><p className="eyebrow">CRICKX BUSINESS</p><h1 className="section-title">Business Information</h1><p className="section-subtitle">How CrickX operates, what customers receive and how the online customer journey works.</p></div><Link className="secondary-button" href="/profile">← Profile</Link></div>
     <div className="card" style={{lineHeight:1.7}}>
       <h2>Business model</h2>
-      <p>CrickX is an online fantasy-cricket service. Customers create an account, browse available cricket matches, select players, build a fantasy XI and use the available CrickX participation services through the website.</p>
+      <p>CrickX is an online fantasy-cricket service. Customers create an account, purchase a 50 PKR weekly subscription, browse available cricket matches, select players, build a fantasy XI and access subscriber contest features through the website.</p>
       <h2>How CrickX operates</h2>
       <p>CrickX combines live match information, fantasy team selection, scoring, rankings and account records in one online platform. Match and player information is used to calculate fantasy performance and display results to participating users.</p>
       <h2>Services offered</h2>
@@ -13,18 +13,19 @@ export default function BusinessInformationPage() {
         <li>Match browsing and match-detail information.</li>
         <li>Fantasy scoring, rankings and leaderboard services.</li>
         <li>Digital account and wallet-related services available within CrickX.</li>
-        <li>Eligible digital contest participation where shown in the user's account.</li>
+        <li>Eligible digital contest participation for users with an active weekly subscription.</li>
+        <li>CRX prize distribution through the CrickX contest smart contract.</li>
       </ul>
       <h2>Customer journey</h2>
       <ol>
         <li><strong>Register:</strong> Customer creates or signs into a CrickX account.</li>
         <li><strong>Browse:</strong> Customer reviews available matches and service information.</li>
         <li><strong>Select:</strong> Customer chooses a match and creates a fantasy XI, including captain and vice-captain where required.</li>
-        <li><strong>Review:</strong> Customer reviews the applicable service, price and payment instructions before confirming.</li>
+        <li><strong>Review:</strong> Customer reviews the 50 PKR weekly subscription price and payment instructions before confirming.</li>
         <li><strong>Checkout:</strong> For eligible PKR purchases, the customer proceeds to the CrickX checkout and selects an available payment method.</li>
-        <li><strong>Payment:</strong> When Rapid Gateway is enabled, the customer is redirected to or presented with the secure gateway checkout to complete the PKR payment.</li>
-        <li><strong>Confirmation:</strong> CrickX receives the payment result and records the transaction before providing the purchased digital service.</li>
-        <li><strong>Delivery:</strong> The purchased digital service or account entitlement is delivered online; there is no physical shipment.</li>
+        <li><strong>Payment:</strong> The customer completes the 50 PKR subscription payment through RapidGateway's secure checkout.</li>
+        <li><strong>Confirmation:</strong> CrickX verifies the signed RapidGateway webhook before activating the 7-day subscription.</li>
+        <li><strong>Contest access:</strong> Active subscribers can create/manage fantasy teams and join eligible contests for 0 CRX. CrickX funds 10 CRX per joined participant for on-chain prize settlement.</li>
       </ol>
       <h2>International and Pakistan customers</h2>
       <p>CrickX is an online service intended for customers inside and outside Pakistan. Prices for PKR checkout are displayed in Pakistani Rupees where applicable.</p>
