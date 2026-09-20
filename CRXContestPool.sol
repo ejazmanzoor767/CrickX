@@ -79,17 +79,21 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
         emit RankingFinalized(contestId, c.participantCount);
     }
 
-    function distributePrizes(uint256 contestId) external onlyOwner nonReentrant {
+    function distributePrizes(uint256 contestId, uint256 maxRecipients) external onlyOwner nonReentrant {
         Contest storage c = contests[contestId];
         require(contestExists[contestId], "contest not found");
         require(c.stage == Stage.Ranked, "ranking not finalized");
         require(c.fundingComplete, "pool not funded");
+        require(maxRecipients > 0, "invalid batch size");
         uint256 n = c.ranking.length;
+        uint256 start = c.distributedCount;
+        uint256 end = start + maxRecipients;
+        if (end > n) end = n;
         uint256 denominator = (n * (n + 1)) / 2;
         uint256 distributed;
-        for (uint256 i = 0; i < n; i++) {
+        for (uint256 i = start; i < end; i++) {
             require(!c.prizePaid[i], "prize already paid");
-            uint256 amount = i == n - 1 ? c.totalPool - distributed : (c.totalPool * (n - i)) / denominator;
+            uint256 amount = i == n - 1 ? c.totalPool - c.distributedAmount : (c.totalPool * (n - i)) / denominator;
             c.prizePaid[i] = true;
             distributed += amount;
             c.distributedAmount += amount;
@@ -97,8 +101,10 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
             if (amount > 0) crxToken.safeTransfer(c.ranking[i], amount);
             emit PrizePaid(contestId, i + 1, c.ranking[i], amount);
         }
-        require(distributed == c.totalPool, "pool not fully distributed");
-        c.stage = Stage.Distributed;
+        if (c.distributedCount == n) {
+            require(c.distributedAmount == c.totalPool, "pool not fully distributed");
+            c.stage = Stage.Distributed;
+        }
         emit ContestDistributed(contestId, c.totalPool);
     }
 
