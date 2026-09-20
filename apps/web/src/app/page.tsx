@@ -88,10 +88,7 @@ export default function Home() {
             <h2 style={{ margin: 0, fontFamily: 'Barlow Condensed', fontSize: 34, textTransform: 'uppercase' }}>Ready for the next match?</h2>
             <p className="section-subtitle" style={{ marginTop: 8, marginBottom: 0 }}>Create an account, activate your weekly subscription and start building your fantasy XI.</p>
           </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <Link className="secondary-button" href="/register">Create account</Link>
-            <Link className="primary-button" href="/profile/metamask">CRX in MetaMask</Link>
-          </div>
+          <Link className="primary-button" href="/register">Create account</Link>
         </div>
       </div>
     </section>
