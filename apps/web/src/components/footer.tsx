@@ -5,7 +5,16 @@ export default function Footer() {
     <footer className="site-footer">
       <div className="footer-shell">
         <div>
-          <div className="footer-brand"><span className="brand-mark">CX</span><strong>CrickX</strong></div>
+          <div className="footer-brand">
+            <img
+              src="/crickx-app-logo.webp?v=2"
+              alt="CrickX"
+              width="40"
+              height="40"
+              style={{ width: 40, height: 40, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }}
+            />
+            <strong>CrickX</strong>
+          </div>
           <p className="footer-copy">Fantasy cricket and digital services delivered online through the CrickX platform.</p>
           <p className="footer-copy" style={{ marginTop: 10 }}>
             <strong>Email:</strong> <a href="mailto:ejazchouhan27@gmail.com">ejazchouhan27@gmail.com</a><br />
