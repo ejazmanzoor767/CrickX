@@ -79,6 +79,10 @@ export class OnchainContestService {
     }
   }
 
+  getAddresses() {
+    return { poolAddress: this.poolAddress, tokenAddress: this.tokenAddress };
+  }
+
   async createContest(joinDeadlineUnix: number) {
     this.requireConfigured();
     this.requireOwner();
