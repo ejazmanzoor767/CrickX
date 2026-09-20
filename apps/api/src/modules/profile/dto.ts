@@ -4,5 +4,6 @@ export class UpdateProfileDto {
   @IsOptional() @IsString() displayName?: string;
   @IsOptional() @IsString() avatarUrl?: string;
   @IsOptional() @IsString() state?: string;
+  @IsOptional() @IsString() country?: string;
   @IsOptional() @IsInt() favoriteTeamSportmonksId?: number;
 }
