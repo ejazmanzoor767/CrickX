@@ -110,7 +110,7 @@ export class RapidGatewayService {
         typeof response.data === 'string' ? response.data : null,
       ].filter(Boolean).map(String);
 
-      const redirectUrl = candidates.find((value) => /^https?:\\/\\//i.test(value));
+      const redirectUrl = candidates.find((value) => /^https?:\/\//i.test(value));
       if (!redirectUrl) throw new Error('RapidGateway did not return a checkout redirect URL.');
       return redirectUrl;
     } catch (error) {
