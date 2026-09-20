@@ -6,8 +6,6 @@ import {
   http,
   parseAbi,
   formatUnits,
-  decodeFunctionData,
-  decodeEventLog,
   type Address,
   type Hex,
   getAddress,
@@ -24,18 +22,19 @@ const CRX_ABI = parseAbi([
 
 const POOL_ABI = parseAbi([
   'function nextContestId() view returns (uint256)',
-  'function createContest(uint256 entryFee) returns (uint256 contestId)',
-  'function entryFee(uint256 contestId) view returns (uint256)',
-  'function getContestSummary(uint256 contestId) view returns (uint256 entryFee, uint8 stage, uint256 participantCount, uint256 winnerCount, uint256 totalPool, uint256 companyPaid, bool companyPayoutSent)',
+  'function contestExists(uint256 contestId) view returns (bool)',
+  'function createContest(uint256 joinDeadline) returns (uint256 contestId)',
+  'function fundingWallet() view returns (address)',
+  'function POOL_PER_PARTICIPANT() view returns (uint256)',
+  'function getContestSummary(uint256 contestId) view returns (uint256 joinDeadline, uint8 contestStage, uint256 participantCount, uint256 totalPool, uint256 distributedAmount, uint256 distributedCount, bool fundingComplete)',
   'function hasEntered(uint256 contestId, address participant) view returns (bool)',
-  'function joinContest(uint256 contestId)',
-  'function lockContest(uint256 contestId)',
-  'function setPrizeTable(uint256 contestId, uint16[] prizeBps)',
-  'function finalizeRanking(uint256 contestId, address[] ranking)',
-  'function distributePrizes(uint256 contestId)',
+  'function finalizeRankingAndFund(uint256 contestId, address[] ranking)',
+  'function distributePrizes(uint256 contestId, uint256 maxRecipients)',
+  'function stage(uint256 contestId) view returns (uint8)',
+  'function participantCount(uint256 contestId) view returns (uint256)',
+  'function totalPool(uint256 contestId) view returns (uint256)',
+  'function joinDeadline(uint256 contestId) view returns (uint256)',
 ]);
-
-const TRANSFER_ABI = parseAbi(['event Transfer(address indexed from, address indexed to, uint256 value)']);
 
 @Injectable()
 export class OnchainContestService {
@@ -45,6 +44,7 @@ export class OnchainContestService {
   private readonly publicClient;
   private readonly walletClient;
   private readonly ownerAccount;
+  private readonly prizeBatchSize: number;
 
   constructor(private readonly config: ConfigService) {
     this.rpcUrl = this.config.get<string>('POLYGON_RPC_URL') || 'https://polygon-rpc.com';
@@ -52,6 +52,7 @@ export class OnchainContestService {
     const token = this.config.get<string>('CRX_TOKEN_ADDRESS') || '0x0706508638A6cBaaC482f971326299eCdd2D0731';
     this.poolAddress = pool ? getAddress(pool) : null;
     this.tokenAddress = token ? getAddress(token) : null;
+    this.prizeBatchSize = Math.max(1, Number(this.config.get<string>('CRX_PRIZE_DISTRIBUTION_BATCH_SIZE', '50')) || 50);
     this.publicClient = createPublicClient({ chain: polygon, transport: http(this.rpcUrl) });
 
     const rawPrivateKey = this.config.get<string>('CRX_CONTEST_OWNER_PRIVATE_KEY');
@@ -74,25 +75,18 @@ export class OnchainContestService {
 
   private requireOwner() {
     if (!this.walletClient || !this.ownerAccount) {
-      throw new ServiceUnavailableException('CRX_CONTEST_OWNER_PRIVATE_KEY is required for contest creation/settlement.');
+      throw new ServiceUnavailableException('CRX_CONTEST_OWNER_PRIVATE_KEY is required for contest creation and settlement.');
     }
   }
 
-  async createContest(entryFeeCrx = 4) {
+  async createContest(joinDeadlineUnix: number) {
     this.requireConfigured();
     this.requireOwner();
+    if (!Number.isFinite(joinDeadlineUnix) || joinDeadlineUnix <= Math.floor(Date.now() / 1000)) {
+      throw new BadRequestException('The contest join deadline must be in the future.');
+    }
 
-    const decimals = Number(await this.publicClient.readContract({
-      address: this.tokenAddress!,
-      abi: CRX_ABI,
-      functionName: 'decimals',
-    }));
-    const fee = BigInt(Math.round(entryFeeCrx * 10 ** decimals));
-
-    // The supplied CRXContestPool generates its own sequential contest ID.
-    // Read it immediately before creation, then verify the emitted on-chain state
-    // after the transaction confirms.
-    const chainContestId = BigInt(await this.publicClient.readContract({
+    const expectedId = BigInt(await this.publicClient.readContract({
       address: this.poolAddress!,
       abi: POOL_ABI,
       functionName: 'nextContestId',
@@ -102,139 +96,169 @@ export class OnchainContestService {
       address: this.poolAddress!,
       abi: POOL_ABI,
       functionName: 'createContest',
-      args: [fee],
+      args: [BigInt(Math.floor(joinDeadlineUnix))],
     });
     await this.publicClient.waitForTransactionReceipt({ hash });
 
-    const summary = await this.summary(Number(chainContestId));
-    return { ...summary, chainContestId: Number(chainContestId), createTxHash: String(hash) };
+    const summary = await this.summary(Number(expectedId));
+    return { ...summary, chainContestId: Number(expectedId), createTxHash: String(hash) };
   }
 
   async summary(chainContestId: number) {
     this.requireConfigured();
     const id = BigInt(chainContestId);
-
-    const [summaryRaw, decimals] = await Promise.all([
-      this.publicClient.readContract({
-        address: this.poolAddress!,
-        abi: POOL_ABI,
-        functionName: 'getContestSummary',
-        args: [id],
-      }),
-      this.publicClient.readContract({
-        address: this.tokenAddress!,
-        abi: CRX_ABI,
-        functionName: 'decimals',
-      }),
+    const [exists, summaryRaw, decimals] = await Promise.all([
+      this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'contestExists', args: [id] }),
+      this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'getContestSummary', args: [id] }),
+      this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'decimals' }),
     ]);
 
-    const [entryFee, stage, participantCount, winnerCount, totalPool, companyPaid, companyPayoutSent] =
-      summaryRaw as readonly [bigint, number, bigint, bigint, bigint, bigint, boolean];
+    const [
+      joinDeadline,
+      stage,
+      participantCount,
+      totalPool,
+      distributedAmount,
+      distributedCount,
+      fundingComplete,
+    ] = summaryRaw as readonly [bigint, number, bigint, bigint, bigint, bigint, boolean];
 
     return {
       contestId: chainContestId.toString(),
-      exists: true,
+      exists: Boolean(exists),
       chainContestId,
       poolAddress: this.poolAddress,
       tokenAddress: this.tokenAddress,
-      entryFee: Number(formatUnits(entryFee, Number(decimals))),
-      entryFeeBaseUnits: String(entryFee),
+      entryFee: 0,
+      entryFeeBaseUnits: '0',
+      joinDeadline: Number(joinDeadline),
       stage: Number(stage),
       participantCount: Number(participantCount),
-      winnerCount: Number(winnerCount),
+      winnerCount: Number(participantCount),
       totalPool: Number(formatUnits(totalPool, Number(decimals))),
-      companyPaid: Number(formatUnits(companyPaid, Number(decimals))),
-      companyPayoutSent: Boolean(companyPayoutSent),
+      distributedAmount: Number(formatUnits(distributedAmount, Number(decimals))),
+      distributedCount: Number(distributedCount),
+      fundingComplete: Boolean(fundingComplete),
       tokenDecimals: Number(decimals),
     };
   }
-
 
   async walletInfo(contestId: number, address: string) {
     this.requireConfigured();
     const account = getAddress(address);
     const id = BigInt(contestId);
     const decimals = Number(await this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'decimals' }));
-    const [balance, allowance, entered] = await Promise.all([
+    const [balance, entered] = await Promise.all([
       this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'balanceOf', args: [account] }),
-      this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'allowance', args: [account, this.poolAddress!] }),
       this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'hasEntered', args: [id, account] }),
     ]);
     return {
-      address: account, balance: Number(formatUnits(balance as bigint, decimals)), allowance: Number(formatUnits(allowance as bigint, decimals)),
-      hasEntered: Boolean(entered), decimals, tokenAddress: this.tokenAddress, poolAddress: this.poolAddress,
+      address: account,
+      balance: Number(formatUnits(balance as bigint, decimals)),
+      allowance: 0,
+      hasEntered: Boolean(entered),
+      decimals,
+      tokenAddress: this.tokenAddress,
+      poolAddress: this.poolAddress,
     };
   }
 
-  async verifyJoinTransaction(input: { contestId: number; txHash: string; userWallet: string }) {
+  private async ensureFundingAllowance(requiredAmount: bigint) {
     this.requireConfigured();
-    const hash = input.txHash as Hex;
-    const expectedUser = getAddress(input.userWallet);
-    const [tx, receipt, summary] = await Promise.all([
-      this.publicClient.getTransaction({ hash }),
-      this.publicClient.getTransactionReceipt({ hash }),
-      this.summary(input.contestId),
+    this.requireOwner();
+    const fundingWallet = getAddress(await this.publicClient.readContract({
+      address: this.poolAddress!,
+      abi: POOL_ABI,
+      functionName: 'fundingWallet',
+    }));
+
+    const [balance, allowance, decimals] = await Promise.all([
+      this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'balanceOf', args: [fundingWallet] }),
+      this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'allowance', args: [fundingWallet, this.poolAddress!] }),
+      this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'decimals' }),
     ]);
-    if (!summary.exists) throw new BadRequestException('The on-chain contest does not exist.');
-    if (!tx.to || getAddress(tx.to) !== this.poolAddress) throw new BadRequestException('Transaction is not for the CRX contest pool.');
-    if (getAddress(tx.from) !== expectedUser) throw new BadRequestException('Transaction wallet does not match your connected wallet.');
-    if (receipt.status !== 'success') throw new BadRequestException('The blockchain transaction failed.');
-    const decoded = decodeFunctionData({ abi: POOL_ABI, data: tx.input });
-    if (decoded.functionName !== 'joinContest') throw new BadRequestException('Transaction is not a contest-entry transaction.');
-    const decodedContestId = BigInt((decoded.args as readonly [bigint])[0]);
-    if (decodedContestId !== BigInt(input.contestId)) throw new BadRequestException('Transaction contest does not match this match.');
 
-    const logs = receipt.logs.filter((log) => getAddress(log.address) === this.tokenAddress);
-    const transfer = logs.map((log) => {
-      try { return decodeEventLog({ abi: TRANSFER_ABI, data: log.data, topics: log.topics }); } catch { return null; }
-    }).find((item: any) => item?.eventName === 'Transfer' && getAddress(item.args.from) === expectedUser && getAddress(item.args.to) === this.poolAddress);
-    if (!transfer) throw new BadRequestException('No CRX transfer to the contest pool was found in the transaction.');
-    const transferred = BigInt((transfer as any).args.value);
-    const expected = BigInt(summary.entryFeeBaseUnits);
-    if (transferred !== expected) throw new BadRequestException(`Incorrect contest entry payment. Expected ${summary.entryFee} CRX.`);
+    if ((balance as bigint) < requiredAmount) {
+      throw new ServiceUnavailableException(
+        `Funding wallet ${fundingWallet} has insufficient CRX. Required ${formatUnits(requiredAmount, Number(decimals))} CRX.`,
+      );
+    }
 
-    const already = Boolean(await this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'hasEntered', args: [BigInt(input.contestId), expectedUser] }));
-    if (!already) throw new BadRequestException('The contest contract did not record your entry.');
-    return { txHash: input.txHash, walletAddress: expectedUser, entryFee: summary.entryFee, participantCount: summary.participantCount, contestId: input.contestId, chainContestId: input.contestId };
+    if ((allowance as bigint) >= requiredAmount) return;
+
+    if (getAddress(this.ownerAccount!.address) !== fundingWallet) {
+      throw new ServiceUnavailableException(
+        `Funding wallet ${fundingWallet} must approve the CRX pool before prize funding. The contest owner key cannot approve on its behalf.`,
+      );
+    }
+
+    const maxUint256 = (2n ** 256n) - 1n;
+    const hash = await this.walletClient!.writeContract({
+      address: this.tokenAddress!,
+      abi: CRX_ABI,
+      functionName: 'approve',
+      args: [this.poolAddress!, maxUint256],
+    });
+    await this.publicClient.waitForTransactionReceipt({ hash });
   }
 
   async settleFinal(contestId: number, rankingWallets: string[]) {
-    this.requireConfigured(); this.requireOwner();
+    this.requireConfigured();
+    this.requireOwner();
     if (rankingWallets.length === 0) throw new BadRequestException('Cannot settle an empty contest.');
+
     const id = BigInt(contestId);
-    let currentStage = Number((await this.summary(contestId)).stage);
-    let lockHash: string | null = null, prizeHash: string | null = null, rankHash: string | null = null, payoutHash: string | null = null;
+    const ranking = rankingWallets.map(getAddress) as Address[];
+    const unique = new Set(ranking.map((wallet) => wallet.toLowerCase()));
+    if (unique.size !== ranking.length) throw new BadRequestException('Final ranking contains duplicate wallet addresses.');
 
-    if (currentStage === 0) {
-      const txHash = await this.walletClient!.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'lockContest', args: [id] });
-      lockHash = String(txHash); await this.publicClient.waitForTransactionReceipt({ hash: txHash }); currentStage = 1;
-    }
-    if (currentStage === 1) {
-      const winnerCount = Number((await this.summary(contestId)).winnerCount);
-      if (rankingWallets.length !== winnerCount) throw new BadRequestException(`Ranking must contain exactly ${winnerCount} winners.`);
-      const bps = this.equalPrizeBps(winnerCount);
-      const txHash = await this.walletClient!.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'setPrizeTable', args: [id, bps] });
-      prizeHash = String(txHash); await this.publicClient.waitForTransactionReceipt({ hash: txHash }); currentStage = 2;
-    }
-    const winnerCount = Number((await this.summary(contestId)).winnerCount);
-    if (rankingWallets.length !== winnerCount) throw new BadRequestException(`Ranking must contain exactly ${winnerCount} winners.`);
-    if (currentStage === 2) {
-      const ranking = rankingWallets.map(getAddress) as Address[];
-      const txHash = await this.walletClient!.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'finalizeRanking', args: [id, ranking] });
-      rankHash = String(txHash); await this.publicClient.waitForTransactionReceipt({ hash: txHash }); currentStage = 3;
-    }
-    if (currentStage === 3) {
-      const txHash = await this.walletClient!.writeContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'distributePrizes', args: [id] });
-      payoutHash = String(txHash); await this.publicClient.waitForTransactionReceipt({ hash: txHash }); currentStage = 4;
-    }
-    if (currentStage !== 4) throw new BadRequestException('Contest could not reach the distributed stage.');
-    return { lockHash, prizeHash, rankHash, payoutHash, winnerCount };
-  }
+    let current = await this.summary(contestId);
+    const hashes: string[] = [];
 
-  private equalPrizeBps(winnerCount: number): number[] {
-    if (!Number.isInteger(winnerCount) || winnerCount <= 0) throw new BadRequestException('Invalid winner count.');
-    const base = Math.floor(10000 / winnerCount), remainder = 10000 - base * winnerCount;
-    return Array.from({ length: winnerCount }, (_, index) => base + (index < remainder ? 1 : 0));
+    if (!current.exists) throw new BadRequestException('The on-chain contest does not exist.');
+    if (current.stage === 0) {
+      const [perParticipant, decimals] = await Promise.all([
+        this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'POOL_PER_PARTICIPANT' }),
+        this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'decimals' }),
+      ]);
+      const required = BigInt(ranking.length) * (perParticipant as bigint);
+      // The deployed CRX token uses 18 decimals; this calculation still reads
+      // the contract constant rather than hard-coding the funding amount.
+      void decimals;
+      await this.ensureFundingAllowance(required);
+
+      const hash = await this.walletClient!.writeContract({
+        address: this.poolAddress!,
+        abi: POOL_ABI,
+        functionName: 'finalizeRankingAndFund',
+        args: [id, ranking],
+      });
+      hashes.push(String(hash));
+      await this.publicClient.waitForTransactionReceipt({ hash });
+      current = await this.summary(contestId);
+    }
+
+    if (current.stage === 1) {
+      while (true) {
+        const hash = await this.walletClient!.writeContract({
+          address: this.poolAddress!,
+          abi: POOL_ABI,
+          functionName: 'distributePrizes',
+          args: [id, BigInt(this.prizeBatchSize)],
+        });
+        hashes.push(String(hash));
+        await this.publicClient.waitForTransactionReceipt({ hash });
+        current = await this.summary(contestId);
+        if (current.stage === 2) break;
+      }
+    }
+
+    if (current.stage !== 2) throw new BadRequestException(`Contest could not reach the distributed stage. Current stage=${current.stage}.`);
+    return {
+      txHashes: hashes,
+      finalPrizeTxHash: hashes[hashes.length - 1] ?? null,
+      participantCount: current.participantCount,
+      totalPool: current.totalPool,
+    };
   }
 }
-
