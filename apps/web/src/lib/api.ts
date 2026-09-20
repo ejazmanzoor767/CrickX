@@ -96,8 +96,8 @@ export const api = {
   createFantasyTeam: (payload: unknown) => apiFetch('/fantasy/teams', { method: 'POST', body: JSON.stringify(payload) }),
   editFantasyTeam: (teamId: string, payload: unknown) => apiFetch(`/fantasy/teams/${teamId}`, { method: 'PUT', body: JSON.stringify(payload) }),
   activeContest: (fixtureId: number) => apiFetch(`/fantasy/contests/fixture/${fixtureId}/active`),
-  prepareContestJoin: (contestId: string, fantasyTeamId: string, walletAddress: string) => apiFetch('/fantasy/contests/prepare', { method: 'POST', body: JSON.stringify({ contestId, fantasyTeamId, walletAddress }) }),
-  confirmContestJoin: (contestId: string, fantasyTeamId: string, walletAddress: string, transactionHash: string) => apiFetch('/fantasy/contests/join', { method: 'POST', body: JSON.stringify({ contestId, fantasyTeamId, walletAddress, transactionHash }) }),
+  prepareContestJoin: (contestId: string, fantasyTeamId: string) => apiFetch('/fantasy/contests/prepare', { method: 'POST', body: JSON.stringify({ contestId, fantasyTeamId }) }),
+  confirmContestJoin: (contestId: string, fantasyTeamId: string, walletAddress: string, walletSignature: string, walletMessageTimestamp: number) => apiFetch('/fantasy/contests/join', { method: 'POST', body: JSON.stringify({ contestId, fantasyTeamId, walletAddress, walletSignature, walletMessageTimestamp }) }),
   myEntries: () => apiFetch('/fantasy/contests/mine/entries'),
   fantasyDraft: (fixtureId: number) => apiFetch(`/fantasy/teams/draft/${fixtureId}`),
   saveFantasyDraft: (fixtureId: number, payload: unknown) => apiFetch(`/fantasy/teams/draft/${fixtureId}`, { method: 'PUT', body: JSON.stringify(payload) }),
@@ -106,6 +106,10 @@ export const api = {
   leaderboardMe: () => leaderboard('/me'),
   leaderboardFixture: (fixtureId: number, limit = 100) => leaderboard(`/fixture/${fixtureId}`, { limit }),
   leaderboardContest: (contestId: string, limit = 100) => leaderboard(`/contest/${contestId}`, { limit }),
+
+  subscription: () => apiFetch('/subscription'),
+  createSubscriptionCheckout: (customerMobile?: string) => apiFetch('/subscription/checkout', { method: 'POST', body: JSON.stringify(customerMobile ? { customerMobile } : {}) }),
+  subscriptionStatus: (basket: string) => apiFetch(`/subscription/status?basket=${encodeURIComponent(basket)}`),
 
   profile: () => apiFetch('/profile'),
   updateProfile: (payload: unknown) => apiFetch('/profile', { method: 'PUT', body: JSON.stringify(payload) }),
