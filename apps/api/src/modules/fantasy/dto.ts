@@ -1,6 +1,7 @@
-import { ArrayMaxSize, ArrayMinSize, Equals, IsArray, IsInt, IsString, Min, Matches } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, Equals, IsArray, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
-export const DEMO_ENTRY_FEE_GEMS = 4;
+export const FREE_CONTEST_ENTRY_FEE = 0;
+export const CRX_PRIZE_PER_PARTICIPANT = 10;
 
 export class CreateFantasyTeamDto {
   @IsInt() sportmonksFixtureId!: number;
@@ -14,8 +15,8 @@ export class CreateFantasyTeamDto {
 export class CreateContestDto {
   @IsInt() sportmonksFixtureId!: number;
   @IsString() name!: string;
-  @Equals(DEMO_ENTRY_FEE_GEMS, { message: 'CrickX contest entry fee is fixed at 4 CRX.' }) entryFee!: number;
-  @Min(0) totalSpots!: number; // ignored; contest is unlimited.
+  @IsOptional() @Equals(FREE_CONTEST_ENTRY_FEE, { message: 'CrickX contest entry is free.' }) entryFee?: number;
+  @Min(0) totalSpots!: number;
   @IsString() scoringRuleSetId!: string;
   prizeDistribution!: { rankFrom: number; rankTo: number; amount: number }[];
 }
@@ -23,9 +24,10 @@ export class CreateContestDto {
 export class PrepareJoinContestDto {
   @IsString() contestId!: string;
   @IsString() fantasyTeamId!: string;
-  @Matches(/^0x[a-fA-F0-9]{40}$/, { message: 'walletAddress must be a valid EVM address.' }) walletAddress!: string;
 }
 
 export class JoinContestDto extends PrepareJoinContestDto {
-  @Matches(/^0x[a-fA-F0-9]{64}$/, { message: 'transactionHash must be a valid EVM transaction hash.' }) transactionHash!: string;
+  @IsString() walletAddress!: string;
+  @IsString() walletSignature!: string;
+  @IsInt() walletMessageTimestamp!: number;
 }
