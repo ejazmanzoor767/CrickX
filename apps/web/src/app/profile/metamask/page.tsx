@@ -50,7 +50,7 @@ export default function MetaMaskPage() {
         <h2>Send your CRX to any Polygon wallet</h2>
         <p className="section-subtitle" style={{ lineHeight: 1.75 }}>
           You can send CRX from the CrickX Wallet section to another Polygon-compatible wallet such as
-          <strong>MetaMask, Trust Wallet, or Coinbase Wallet</strong>. This is a normal on-chain token
+          <strong>MetaMask, Trust Wallet, Coinbase Wallet, and other compatible wallets</strong>. This is a normal on-chain token
           transfer, so MetaMask will ask you to confirm the transaction and the wallet sending CRX needs
           enough POL for network gas.
         </p>
