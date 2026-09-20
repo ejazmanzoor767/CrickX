@@ -49,7 +49,7 @@ export class OnchainContestService {
   constructor(private readonly config: ConfigService) {
     this.rpcUrl = this.config.get<string>('POLYGON_RPC_URL') || 'https://polygon-rpc.com';
     const pool = this.config.get<string>('CRX_CONTEST_POOL_ADDRESS');
-    const token = this.config.get<string>('CRX_TOKEN_ADDRESS') || '0x0706508638A6cBaaC482f971326299eCdd2D0731';
+    const token = this.config.get<string>('CRX_TOKEN_ADDRESS') || '';
     this.poolAddress = pool ? getAddress(pool) : null;
     this.tokenAddress = token ? getAddress(token) : null;
     this.prizeBatchSize = Math.max(1, Number(this.config.get<string>('CRX_PRIZE_DISTRIBUTION_BATCH_SIZE', '50')) || 50);
