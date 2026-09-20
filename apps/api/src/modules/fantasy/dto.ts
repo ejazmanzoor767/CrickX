@@ -16,9 +16,9 @@ export class CreateContestDto {
   @IsInt() sportmonksFixtureId!: number;
   @IsString() name!: string;
   @IsOptional() @Equals(FREE_CONTEST_ENTRY_FEE, { message: 'CrickX contest entry is free.' }) entryFee?: number;
-  @Min(0) totalSpots!: number;
+  @IsOptional() @Min(0) totalSpots?: number;
   @IsString() scoringRuleSetId!: string;
-  prizeDistribution!: { rankFrom: number; rankTo: number; amount: number }[];
+  @IsOptional() @IsArray() prizeDistribution!: { rankFrom: number; rankTo: number; amount: number }[];
 }
 
 export class PrepareJoinContestDto {
