@@ -44,6 +44,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileDto | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [state, setState] = useState('');
+  const [country, setCountry] = useState('Pakistan');
   const [saving, setSaving] = useState(false);
   const [photoSaving, setPhotoSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -64,6 +65,7 @@ export default function ProfilePage() {
         setProfile(p);
         setDisplayName(p.displayName ?? user.displayName ?? '');
         setState(p.state ?? '');
+        setCountry(p.country ?? 'Pakistan');
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Unable to load profile.'));
   }, [authLoading, user, router]);
@@ -78,6 +80,7 @@ export default function ProfilePage() {
         await api.updateProfile({
           displayName: displayName.trim(),
           state: state.trim() || undefined,
+          country: country.trim() || undefined,
         }) as ProfileDto,
       );
       setSaved(true);
@@ -110,6 +113,7 @@ export default function ProfilePage() {
     if (!profile) return;
     setDisplayName(profile.displayName ?? user?.displayName ?? '');
     setState(profile.state ?? '');
+    setCountry(profile.country ?? 'Pakistan');
     setError('');
     setPhotoError('');
     setEditing(false);
@@ -192,6 +196,10 @@ export default function ProfilePage() {
               <div>
                 <label className="form-label">State / region</label>
                 <input value={state} onChange={(e) => setState(e.target.value)} placeholder="e.g. Punjab" />
+              </div>
+              <div>
+                <label className="form-label">Country</label>
+                <input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. Pakistan" />
               </div>
             </div>
             {error && <p className="error-text">{error}</p>}
