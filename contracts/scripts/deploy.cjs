@@ -11,19 +11,35 @@ async function main() {
   console.log('Deploying from:', deployer.address);
   console.log('Funding wallet:', fundingWallet);
 
-  const tokenContract = await ethers.getContractAt(['function decimals() view returns (uint8)'], CRX_TOKEN_ADDRESS);
+  const tokenContract = await ethers.getContractAt(
+    [
+      'function decimals() view returns (uint8)',
+      'function approve(address spender, uint256 amount) returns (bool)',
+    ],
+    CRX_TOKEN_ADDRESS,
+  );
   const decimals = Number(await tokenContract.decimals());
 
   const Factory = await ethers.getContractFactory('CRXContestPool');
   const pool = await Factory.deploy(CRX_TOKEN_ADDRESS, fundingWallet);
   await pool.waitForDeployment();
 
-  console.log('CRXContestPool:', await pool.getAddress());
+  const poolAddress = await pool.getAddress();
+  console.log('CRXContestPool:', poolAddress);
   console.log('CRX token:', CRX_TOKEN_ADDRESS);
   console.log('Token decimals:', decimals);
   console.log('Pool funding:', '10 CRX per participant');
   console.log('Owner must have the CRX_CONTEST_OWNER_PRIVATE_KEY used by the API.');
-  console.log('Funding wallet must approve the pool contract to spend the required CRX.');
+
+  if (fundingWallet.toLowerCase() === deployer.address.toLowerCase()) {
+    const maxUint256 = (2n ** 256n) - 1n;
+    const approvalTx = await tokenContract.approve(poolAddress, maxUint256);
+    await approvalTx.wait();
+    console.log('Funding approval: max uint256 approved from deployer/funding wallet.');
+  } else {
+    console.log('Funding wallet:', fundingWallet);
+    console.log('The funding wallet must approve this pool contract before participants can join.');
+  }
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });
