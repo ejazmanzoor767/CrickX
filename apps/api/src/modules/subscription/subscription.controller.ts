@@ -17,6 +17,9 @@ export class SubscriptionController {
   ) {}
 
   @Get()
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
   @UseGuards(JwtAuthGuard)
   status(@Req() req: Request) {
     return this.subscriptions.status(uid(req));
