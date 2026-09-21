@@ -51,4 +51,5 @@ export class SubscriptionController {
     }
 
     return this.subscriptions.handleWebhook(payload);
-  }}
+  }
+}
