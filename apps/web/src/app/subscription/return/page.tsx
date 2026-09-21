@@ -49,8 +49,12 @@ function SubscriptionReturnContent() {
     };
   }, [basket]);
 
+  const isActive =
+    result?.active === true ||
+    result?.subscriptionStatus === 'ACTIVE';
+
   const title = useMemo(() => {
-    if (result?.active) return 'Subscription Active';
+    if (isActive) return 'Subscription Active';
     if (result?.paymentStatus === 'FAILED') return 'Payment Not Completed';
     return 'Confirming Your Payment';
   }, [result]);
@@ -65,7 +69,7 @@ function SubscriptionReturnContent() {
           <p className="error-text">{error}</p>
           <Link className="primary-button" href="/subscription" style={{ marginTop: 12 }}>Return to Subscription</Link>
         </>
-      ) : result?.active ? (
+      ) : isActive ? (
         <>
           <p className="section-subtitle">Your 50 PKR payment was confirmed and your weekly access is now active.</p>
           <p style={{ marginTop: 14 }}>Expires: <strong>{new Date(result.expiresAt).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' })}</strong></p>
