@@ -68,9 +68,14 @@ export class SubscriptionService {
 
     if (current.status === 'PENDING' && current.basketId) {
       const pendingPayment = await this.firestore.subscriptionPayment.findFirst({ where: { basketId: current.basketId } });
-      if (pendingPayment?.checkoutUrl) {
+      if (pendingPayment?.provider === 'OXAPAY' && pendingPayment.checkoutUrl) {
         return { checkoutUrl: pendingPayment.checkoutUrl, basketId: current.basketId, amount: PRICE_PKR, currency: 'PKR', durationDays: 7 };
       }
+
+      await this.firestore.subscription.update({
+        where: { id: current.basketId ? current.id : '' },
+        data: { status: 'PAYMENT_FAILED' },
+      });
     }
 
     const user = await this.firestore.user.findUnique({ where: { id: userId } });
@@ -96,6 +101,7 @@ export class SubscriptionService {
         basketId,
         amount: PRICE_PKR,
         currency: 'PKR',
+        provider: 'OXAPAY',
         status: 'INITIATED',
         environment: this.config.get<string>('OXAPAY_SANDBOX', 'false').toLowerCase() === 'true' ? 'SANDBOX' : 'LIVE',
         createdAt: new Date(),
