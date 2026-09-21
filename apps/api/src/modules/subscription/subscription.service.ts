@@ -37,10 +37,11 @@ export class SubscriptionService {
     }
     let current = subscription;
     if (current.status === 'ACTIVE' && current.expiresAt && new Date(current.expiresAt).getTime() <= Date.now()) {
-      current = await this.firestore.subscription.update({
+      await this.firestore.subscription.update({
         where: { id: current.id },
         data: { status: 'EXPIRED' },
       });
+      current = { ...current, status: 'EXPIRED' };
     }
     return {
       active: current.status === 'ACTIVE' && !!current.expiresAt && new Date(current.expiresAt).getTime() > Date.now(),
