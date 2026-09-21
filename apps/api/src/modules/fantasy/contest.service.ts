@@ -108,15 +108,20 @@ export class ContestService {
     // Read the live on-chain pool when a chain contest is configured. This makes
     // the UI display the actual contract participant count and CRX balance.
     let chain: any = null;
+    let chainCheckFailed = false;
     const storedChainContestId = Number((contest as any).chainContestId);
     if (Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
-      chain = await this.onchain.contestSummaryOrNull(storedChainContestId);
+      try {
+        chain = await this.onchain.contestSummaryOrNull(storedChainContestId);
+      } catch {
+        chainCheckFailed = true;
+      }
     }
 
     // During migration to a new pool contract, an older Firestore contest may
     // point at a chain contest ID that no longer exists. Re-create that chain
     // contest and back-fund any already-recorded participant wallets once.
-    if (isOpen && !chain && Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
+    if (isOpen && !chain && !chainCheckFailed && Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
       try {
         const deadline = Math.floor(new Date(fixtureForClock?.starting_at ?? contest.lineupLockAt).getTime() / 1000);
         const recreated = await this.onchain.createContest(deadline);
