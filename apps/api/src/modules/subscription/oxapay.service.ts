@@ -42,9 +42,11 @@ export class OxaPayService {
           amount: input.amount,
           currency: 'PKR',
           lifetime: 60,
-          callback_url:
-            this.config.get<string>('OXAPAY_CALLBACK_URL') ||
-            `${this.config.get<string>('CRICKX_API_URL', 'https://crickx-api.onrender.com').replace(/\/$/, '')}/api/v1/subscription/webhook`,
+          callback_url: (() => {
+            const configured = this.config.get<string>('OXAPAY_CALLBACK_URL', '').trim().replace(/^["']|["']$/g, '');
+            const apiBase = this.config.get<string>('CRICKX_API_URL', 'https://crickx-api.onrender.com').trim().replace(/^["']|["']$/g, '').replace(/\/$/, '');
+            return configured || `${apiBase}/api/v1/subscription/webhook`;
+          })(),
           return_url: input.returnUrl,
           ...(input.customerEmail ? { email: input.customerEmail } : {}),
           order_id: input.orderId,
