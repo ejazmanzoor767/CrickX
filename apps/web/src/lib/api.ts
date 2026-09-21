@@ -112,13 +112,7 @@ export const api = {
   subscriptionStatus: (basket: string) =>
     apiFetch(
       `/subscription/status?basket=${encodeURIComponent(basket)}&_=${Date.now()}`,
-      {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, max-age=0',
-          Pragma: 'no-cache',
-        },
-      },
+      { cache: 'no-store' },
     ),
 
   profile: () => apiFetch('/profile'),
