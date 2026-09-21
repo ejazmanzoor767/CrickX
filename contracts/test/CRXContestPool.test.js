@@ -100,12 +100,18 @@ describe('CRXContestPool - free app entry with company-funded prizes', function 
     expect(await pool.stage(1)).to.equal(0n);
     expect(await pool.stage(2)).to.equal(0n);
 
+    await pool.fundParticipant(1, a.address);
+    await pool.fundParticipant(1, b.address);
+    await pool.fundParticipant(2, c.address);
+
     const deadline = await pool.joinDeadline(1);
     await ethers.provider.send('evm_setNextBlockTimestamp', [Number(deadline)]);
     await ethers.provider.send('evm_mine');
-    await pool.fundParticipant(2, c.address);
+
     await pool.finalizeRankingAndFund(1, [a.address, b.address]);
     expect(await pool.stage(1)).to.equal(1n);
     expect(await pool.stage(2)).to.equal(0n);
+    expect(await pool.totalPool(1)).to.equal(20n * 10n ** 18n);
+    expect(await pool.totalPool(2)).to.equal(10n * 10n ** 18n);
   });
 });
