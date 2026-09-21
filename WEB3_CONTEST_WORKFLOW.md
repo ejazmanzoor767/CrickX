@@ -23,8 +23,9 @@ CrickX uses one deployed CRXContestPool contract that manages one contest per Sp
 1. Sportmonks scoring produces the final fantasy ranking.
 2. Every joined participant is included in the ranking; there is no top-30% winner cutoff.
 3. The backend sends the complete ordered wallet list to CRXContestPool.
-4. The contract pulls 10 CRX × participantCount from its configured fundingWallet.
-5. The contract stores the final ranking.
+4. The contract verifies that every ranked wallet was already funded during the join period.
+5. No additional CRX is pulled at settlement because the pool was funded per participant at join time.
+6. The contract stores the final ranking.
 6. The contract distributes the entire pool to every ranked participant. The current default weighting is rank 1 through rank N with weights N through 1; the final rank receives the rounding remainder.
 7. The backend records each participant's rank and prize and marks the contest completed only after the contract reaches Distributed.
 
