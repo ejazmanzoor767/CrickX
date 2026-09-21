@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Headers, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Header, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CreateSubscriptionCheckoutDto } from './dto';
@@ -29,6 +29,9 @@ export class SubscriptionController {
   }
 
   @Get('status')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
   @UseGuards(JwtAuthGuard)
   paymentStatus(@Req() req: Request, @Query('basket') basket?: string) {
     if (!basket) throw new BadRequestException('basket query parameter is required.');
