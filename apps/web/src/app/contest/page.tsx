@@ -40,19 +40,37 @@ function ContestContent() {
         if (active) setError(e instanceof Error ? e.message : 'Unable to load the contest.');
       }
     })();
-    return () => { active = false; };
+
+    const refreshSubscriptionTimer = window.setInterval(async () => {
+      try {
+        const latestSubscription: any = await api.subscription();
+        if (active) setSubscription(latestSubscription);
+      } catch {
+        // Keep the current UI state when a background refresh temporarily fails.
+      }
+    }, 30000);
+
+    return () => {
+      active = false;
+      window.clearInterval(refreshSubscriptionTimer);
+    };
   }, [fixtureId]);
 
   async function join() {
     if (!contest?.id) return setError('No contest is configured for this match.');
-    if (!subscription?.active) return setError('An active 50 PKR weekly subscription is required to join this contest.');
     if (!teamId) return setError('Select your fantasy team first.');
 
     setBusy(true);
     setError('');
-    setMessage('Checking your subscription and preparing the free entry…');
+    setMessage('Refreshing your subscription and preparing the free entry…');
 
     try {
+      const latestSubscription: any = await api.subscription();
+      setSubscription(latestSubscription);
+      if (!latestSubscription?.active) {
+        throw new Error('An active 50 PKR weekly subscription is required to join this contest.');
+      }
+
       const prepared: any = await api.prepareContestJoin(contest.id, teamId);
       setMessage('Connect your wallet to confirm the prize wallet address…');
       const connected: Address = address || await connectWallet();
