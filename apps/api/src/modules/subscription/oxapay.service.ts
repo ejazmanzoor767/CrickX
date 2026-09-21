@@ -72,10 +72,19 @@ export class OxaPayService {
       return { paymentUrl, trackId };
     } catch (error) {
       const detail = axios.isAxiosError(error)
-        ? error.response?.data?.message ||
-          error.response?.data?.error?.message ||
-          error.response?.data?.error ||
-          error.response?.data?.detail
+        ? (() => {
+            const body = error.response?.data;
+            const errorDetail = body?.error;
+            if (errorDetail && typeof errorDetail === 'object') {
+              const parts = [
+                errorDetail.key,
+                errorDetail.message,
+                errorDetail.type,
+              ].filter(Boolean).map(String);
+              if (parts.length) return parts.join(': ');
+            }
+            return body?.message || body?.detail || (typeof body?.error === 'string' ? body.error : undefined);
+          })()
         : error instanceof Error
           ? error.message
           : undefined;
