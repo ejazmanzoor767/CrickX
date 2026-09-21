@@ -2,7 +2,7 @@ import { ConflictException, ForbiddenException, Injectable } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import { FirestoreService } from '../../common/firestore.service';
-import { RapidGatewayService } from './rapidgateway.service';
+import { OxaPayService } from './oxapay.service';
 
 const PRICE_PKR = 50;
 const DURATION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -12,7 +12,7 @@ export class SubscriptionService {
   constructor(
     private readonly firestore: FirestoreService,
     private readonly config: ConfigService,
-    private readonly rapid: RapidGatewayService,
+    private readonly oxapay: OxaPayService,
   ) {}
 
   private basketId() {
@@ -97,22 +97,31 @@ export class SubscriptionService {
         amount: PRICE_PKR,
         currency: 'PKR',
         status: 'INITIATED',
-        environment: this.config.get<string>('RAPIDGATEWAY_ENVIRONMENT', 'LIVE'),
+        environment: this.config.get<string>('OXAPAY_SANDBOX', 'false').toLowerCase() === 'true' ? 'SANDBOX' : 'LIVE',
         createdAt: new Date(),
       },
     });
 
     try {
-      const checkoutUrl = await this.rapid.createHostedCheckout({
+      const checkout = await this.oxapay.createHostedCheckout({
         amount: PRICE_PKR,
-        basketId,
-        customerPhone: user.phone ? this.toE164(String(user.phone)) : undefined,
+        orderId: basketId,
         customerEmail: String(user.email || ''),
-        successUrl: `${this.webUrl()}/subscription/return?basket=${encodeURIComponent(basketId)}`,
+        returnUrl: `${this.webUrl()}/subscription/return?basket=${encodeURIComponent(basketId)}`,
       });
 
-      await this.firestore.subscriptionPayment.update({ where: { id: payment.id }, data: { checkoutUrl } });
-      return { checkoutUrl, basketId, amount: PRICE_PKR, currency: 'PKR', durationDays: 7 };
+      await this.firestore.subscriptionPayment.update({
+        where: { id: payment.id },
+        data: { checkoutUrl: checkout.paymentUrl, gatewayTxnRef: checkout.trackId || undefined },
+      });
+
+      return {
+        checkoutUrl: checkout.paymentUrl,
+        basketId,
+        amount: PRICE_PKR,
+        currency: 'PKR',
+        durationDays: 7,
+      };
     } catch (error) {
       await this.firestore.subscriptionPayment.update({ where: { id: payment.id }, data: { status: 'FAILED', failureReason: error instanceof Error ? error.message : 'Checkout creation failed' } });
       await this.firestore.subscription.update({ where: { id: subscription.id }, data: { status: 'PAYMENT_FAILED' } });
@@ -135,10 +144,11 @@ export class SubscriptionService {
   }
 
   async handleWebhook(payload: any) {
-    const eventType = String(payload?.eventType || '');
-    if (!['transaction.completed', 'transaction.failed'].includes(eventType)) return { received: true, ignored: true };
+    if (String(payload?.type || '').toLowerCase() !== 'invoice') {
+      return { received: true, ignored: true };
+    }
 
-    const basketId = String(payload?.merchantTransactionId || '');
+    const basketId = String(payload?.order_id || '');
     if (!basketId) return { received: true, ignored: true };
 
     const payment = await this.firestore.subscriptionPayment.findFirst({ where: { basketId } });
@@ -148,50 +158,71 @@ export class SubscriptionService {
       return { received: true, duplicate: true };
     }
 
-    const configuredMerchantId = this.config.get<string>('RAPIDGATEWAY_MERCHANT_ID', '').trim();
-    const payloadMerchantId = payload?.merchantId !== undefined ? String(payload.merchantId) : '';
-    const configuredEnvironment = this.config.get<string>('RAPIDGATEWAY_ENVIRONMENT', 'LIVE').toUpperCase();
-    const payloadEnvironment = payload?.environment ? String(payload.environment).toUpperCase() : configuredEnvironment;
-    if (configuredMerchantId && payloadMerchantId && payloadMerchantId !== configuredMerchantId) {
-      return { received: true, rejected: true };
-    }
-    if (payloadEnvironment !== configuredEnvironment) {
-      return { received: true, rejected: true };
-    }
-    if (String(payload?.currency || 'PKR').toUpperCase() !== 'PKR') {
-      return { received: true, rejected: true };
-    }
-
+    const status = String(payload?.status || '').toLowerCase();
     const amount = Number(payload?.amount);
-    if (eventType === 'transaction.completed' && (!Number.isFinite(amount) || Math.abs(amount - PRICE_PKR) > 0.000001)) {
-      await this.firestore.subscriptionPayment.update({ where: { id: payment.id }, data: { status: 'FAILED', failureReason: 'Webhook amount mismatch' } });
-      await this.firestore.subscription.update({ where: { id: payment.subscriptionId }, data: { status: 'PAYMENT_FAILED' } });
-      return { received: true, rejected: true };
-    }
+    const currency = String(payload?.currency || '').toUpperCase();
+    const gatewayTxnRef = payload?.track_id !== undefined && payload?.track_id !== null
+      ? String(payload.track_id)
+      : undefined;
 
-    const gatewayTxnRef = payload?.gatewayTxnRef ? String(payload.gatewayTxnRef) : undefined;
-    const environment = payload?.environment ? String(payload.environment) : undefined;
-    const eventId = payload?.eventId ? String(payload.eventId) : undefined;
+    if (status === 'paid') {
+      if (!Number.isFinite(amount) || Math.abs(amount - PRICE_PKR) > 0.000001) {
+        await this.firestore.subscriptionPayment.update({
+          where: { id: payment.id },
+          data: { status: 'FAILED', gatewayTxnRef, failureReason: 'OxaPay webhook amount mismatch' },
+        });
+        await this.firestore.subscription.update({
+          where: { id: payment.subscriptionId },
+          data: { status: 'PAYMENT_FAILED' },
+        });
+        return { received: true, rejected: true };
+      }
 
-    if (eventType === 'transaction.failed') {
+      if (currency !== 'PKR') {
+        await this.firestore.subscriptionPayment.update({
+          where: { id: payment.id },
+          data: { status: 'FAILED', gatewayTxnRef, failureReason: 'OxaPay webhook currency mismatch' },
+        });
+        await this.firestore.subscription.update({
+          where: { id: payment.subscriptionId },
+          data: { status: 'PAYMENT_FAILED' },
+        });
+        return { received: true, rejected: true };
+      }
+
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + DURATION_MS);
       await this.firestore.subscriptionPayment.update({
         where: { id: payment.id },
-        data: { status: 'FAILED', gatewayTxnRef, eventId, environment, failureReason: String(payload?.status || 'Payment failed') },
+        data: {
+          status: 'SUCCEEDED',
+          gatewayTxnRef,
+          eventId: gatewayTxnRef,
+          completedAt: now,
+        },
       });
-      await this.firestore.subscription.update({ where: { id: payment.subscriptionId }, data: { status: 'PAYMENT_FAILED' } });
+      await this.firestore.subscription.update({
+        where: { id: payment.subscriptionId },
+        data: { status: 'ACTIVE', startedAt: now, expiresAt },
+      });
       return { received: true };
     }
 
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + DURATION_MS);
-    await this.firestore.subscriptionPayment.update({
-      where: { id: payment.id },
-      data: { status: 'SUCCEEDED', gatewayTxnRef, eventId, environment, completedAt: now },
-    });
-    await this.firestore.subscription.update({
-      where: { id: payment.subscriptionId },
-      data: { status: 'ACTIVE', startedAt: now, expiresAt },
-    });
-    return { received: true };
-  }
-}
+    if (status === 'failed' || status === 'expired' || status === 'cancelled' || status === 'canceled') {
+      await this.firestore.subscriptionPayment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'FAILED',
+          gatewayTxnRef,
+          failureReason: `OxaPay payment status: ${status}`,
+        },
+      });
+      await this.firestore.subscription.update({
+        where: { id: payment.subscriptionId },
+        data: { status: 'PAYMENT_FAILED' },
+      });
+      return { received: true };
+    }
+
+    return { received: true, pending: true };
+  }}
