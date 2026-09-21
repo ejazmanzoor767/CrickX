@@ -303,6 +303,7 @@ model SubscriptionPayment {
   basketId        String                    @unique
   amount          Decimal                   @db.Decimal(10, 2)
   currency        String                    @default("PKR")
+  provider        String                    @default("OXAPAY")
   status          SubscriptionPaymentStatus @default(INITIATED)
   gatewayTxnRef   String?
   eventId         String?
