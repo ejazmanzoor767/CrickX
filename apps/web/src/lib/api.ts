@@ -109,7 +109,17 @@ export const api = {
 
   subscription: () => apiFetch('/subscription'),
   createSubscriptionCheckout: (customerMobile?: string) => apiFetch('/subscription/checkout', { method: 'POST', body: JSON.stringify(customerMobile ? { customerMobile } : {}) }),
-  subscriptionStatus: (basket: string) => apiFetch(`/subscription/status?basket=${encodeURIComponent(basket)}`),
+  subscriptionStatus: (basket: string) =>
+    apiFetch(
+      `/subscription/status?basket=${encodeURIComponent(basket)}&_=${Date.now()}`,
+      {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          Pragma: 'no-cache',
+        },
+      },
+    ),
 
   profile: () => apiFetch('/profile'),
   updateProfile: (payload: unknown) => apiFetch('/profile', { method: 'PUT', body: JSON.stringify(payload) }),
