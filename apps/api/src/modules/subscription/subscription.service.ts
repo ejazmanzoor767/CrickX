@@ -45,36 +45,81 @@ export class SubscriptionService {
   }
 
 
-  private async latest(userId: string) {
-    return this.firestore.subscription.findFirst({
+  private async subscriptionsForUser(userId: string) {
+    return this.firestore.subscription.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
     });
   }
 
   async status(userId: string) {
-    const subscription = await this.latest(userId);
-    if (!subscription) {
-      return { id: null, active: false, plan: 'WEEKLY', amount: PRICE_PKR, currency: 'PKR', durationDays: 7, status: 'NONE', expiresAt: null };
+    const rows = await this.subscriptionsForUser(userId);
+    if (!rows.length) {
+      return {
+        id: null,
+        active: false,
+        plan: 'WEEKLY',
+        amount: PRICE_PKR,
+        currency: 'PKR',
+        durationDays: 7,
+        status: 'NONE',
+        expiresAt: null,
+        basketId: null,
+      };
     }
-    let current = subscription;
-    const expiresDate = this.asDate(current.expiresAt);
-    if (current.status === 'ACTIVE' && expiresDate && expiresDate.getTime() <= Date.now()) {
-      await this.firestore.subscription.update({
-        where: { id: current.id },
-        data: { status: 'EXPIRED' },
-      });
-      current = { ...current, status: 'EXPIRED' };
+
+    const now = Date.now();
+    const normalized = rows.map((row: any) => ({
+      row,
+      createdMs: this.asDate(row.createdAt)?.getTime() ?? 0,
+      expiresMs: this.asDate(row.expiresAt)?.getTime() ?? 0,
+    }));
+
+    // A valid ACTIVE subscription must win over newer pending/failed records.
+    const active = normalized
+      .filter(({ row, expiresMs }) => row.status === 'ACTIVE' && expiresMs > now)
+      .sort((a, b) => b.expiresMs - a.expiresMs)[0];
+
+    if (active) {
+      const current = active.row;
+      return {
+        active: true,
+        plan: current.plan,
+        amount: Number(current.amount),
+        currency: current.currency,
+        durationDays: 7,
+        status: 'ACTIVE',
+        expiresAt: this.isoDate(current.expiresAt),
+        basketId: current.basketId ?? null,
+        id: current.id,
+      };
     }
+
+    // Mark stale ACTIVE rows as expired, then report the newest non-active
+    // subscription so checkout can safely start a fresh payment.
+    for (const item of normalized) {
+      if (item.row.status === 'ACTIVE' && item.expiresMs > 0 && item.expiresMs <= now) {
+        try {
+          await this.firestore.subscription.update({
+            where: { id: item.row.id },
+            data: { status: 'EXPIRED' },
+          });
+        } catch {
+          // Status reporting should not fail just because an expiry update failed.
+        }
+      }
+    }
+
+    const current = [...normalized].sort((a, b) => b.createdMs - a.createdMs)[0].row;
     const currentExpiresDate = this.asDate(current.expiresAt);
+
     return {
-      active: current.status === 'ACTIVE' && !!currentExpiresDate && currentExpiresDate.getTime() > Date.now(),
+      active: false,
       plan: current.plan,
       amount: Number(current.amount),
       currency: current.currency,
       durationDays: 7,
       status: current.status,
-      expiresAt: this.isoDate(current.expiresAt),
+      expiresAt: currentExpiresDate ? currentExpiresDate.toISOString() : null,
       basketId: current.basketId ?? null,
       id: current.id,
     };
