@@ -294,20 +294,22 @@ export class OnchainContestService {
         );
       }
 
-      const perParticipant = Number(await this.publicClient.readContract({
+      const perParticipant = await this.publicClient.readContract({
         address: this.poolAddress!,
         abi: POOL_ABI,
         functionName: 'POOL_PER_PARTICIPANT',
-      }));
+      });
 
-      if (!Number.isFinite(perParticipant) || current.totalPool <= 0) {
+      const perParticipantCrx = Number(formatUnits(
+        perParticipant as bigint,
+        current.tokenDecimals,
+      ));
+
+      if (!Number.isFinite(perParticipantCrx) || perParticipantCrx <= 0 || current.totalPool <= 0) {
         throw new BadRequestException('On-chain contest has not been funded for its participants.');
       }
 
-      const expectedPool = ranking.length * Number(formatUnits(
-        BigInt(perParticipant),
-        current.tokenDecimals,
-      ));
+      const expectedPool = ranking.length * perParticipantCrx;
 
       if (Math.abs(current.totalPool - expectedPool) > 1e-9) {
         throw new BadRequestException('On-chain contest funding state is inconsistent.');
