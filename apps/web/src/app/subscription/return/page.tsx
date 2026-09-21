@@ -72,12 +72,12 @@ function SubscriptionReturnContent() {
         </>
       ) : result?.paymentStatus === 'FAILED' ? (
         <>
-          <p className="section-subtitle">RapidGateway reported that this payment did not complete. No subscription access was activated.</p>
+          <p className="section-subtitle">OxaPay reported that this payment did not complete. No subscription access was activated.</p>
           <Link className="primary-button" href="/subscription" style={{ marginTop: 16 }}>Try Again</Link>
         </>
       ) : (
         <>
-          <p className="section-subtitle">We are waiting for the verified RapidGateway webhook. Keep this page open while the payment is being confirmed.</p>
+          <p className="section-subtitle">We are waiting for the verified OxaPay webhook. Keep this page open while the payment is being confirmed.</p>
           <small style={{ color: 'var(--muted)' }}>Checking payment status… {attempts}/20</small>
         </>
       )}
