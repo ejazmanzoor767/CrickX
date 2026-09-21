@@ -206,12 +206,8 @@ export class OnchainContestService {
 
   async contestSummaryOrNull(contestId: number | null | undefined) {
     if (!Number.isFinite(Number(contestId)) || Number(contestId) <= 0) return null;
-    try {
-      const summary = await this.summary(Number(contestId));
-      return summary.exists ? summary : null;
-    } catch {
-      return null;
-    }
+    const summary = await this.summary(Number(contestId));
+    return summary.exists ? summary : null;
   }
 
   async walletInfo(contestId: number, address: string) {
