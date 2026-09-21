@@ -50,6 +50,7 @@ export class SubscriptionController {
       throw new BadRequestException('Invalid webhook JSON.');
     }
 
-    return this.subscriptions.handleWebhook(payload);
+    await this.subscriptions.handleWebhook(payload);
+    return 'ok';
   }
 }
