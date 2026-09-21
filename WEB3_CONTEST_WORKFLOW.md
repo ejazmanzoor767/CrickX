@@ -13,9 +13,10 @@ CrickX uses one deployed CRXContestPool contract that manages one contest per Sp
 7. User selects the single contest for that fixture.
 8. The backend requires an active subscription and verifies the match has not started.
 9. The user connects MetaMask on Polygon and signs a short, contest-specific message proving control of the intended payout wallet.
-10. No CRX is deducted and no blockchain entry transaction is sent.
-11. The backend creates the contest entry and atomically increases the participant count by one.
-12. The displayed/projected pool becomes participantCount × 10 CRX.
+10. No CRX is deducted from the participant. MetaMask is used only to sign a wallet-ownership message.
+11. The backend owner wallet calls the pool contract to fund exactly 10 CRX for the participant.
+12. The backend then creates the contest entry and increases the participant count.
+13. The on-chain pool and the displayed pool become participantCount × 10 CRX.
 
 ## Prize settlement
 
