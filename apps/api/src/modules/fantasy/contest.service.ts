@@ -120,7 +120,20 @@ export class ContestService {
 
     // During migration to a new pool contract, an older Firestore contest may
     // point at a chain contest ID that no longer exists. Re-create that chain
-    // contest and back-fund any already-recorded participant wallets once.
+    // contest and back-fund any already-recorded participant wallets. Backfill
+    // is resumable because fundParticipant() is idempotent per wallet.
+    let existingWallets: string[] = [];
+    if (isOpen && !chainCheckFailed) {
+      const existingEntries = await this.prisma.contestEntry.findMany({
+        where: { contestId: contest.id },
+      });
+      existingWallets = Array.from(new Set(
+        existingEntries
+          .map((entry: any) => String(entry.walletAddress || '').trim())
+          .filter((wallet: string) => /^0x[a-fA-F0-9]{40}$/.test(wallet)),
+      ));
+    }
+
     if (isOpen && !chain && !chainCheckFailed && Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
       try {
         const deadline = Math.floor(new Date(fixtureForClock?.starting_at ?? contest.lineupLockAt).getTime() / 1000);
@@ -129,23 +142,21 @@ export class ContestService {
           where: { id: contest.id },
           data: { chainContestId: recreated.chainContestId },
         });
-
-        const existingEntries = await this.prisma.contestEntry.findMany({
-          where: { contestId: contest.id },
-        });
-        const wallets = Array.from(new Set(
-          existingEntries
-            .map((entry: any) => String(entry.walletAddress || '').trim())
-            .filter((wallet: string) => /^0x[a-fA-F0-9]{40}$/.test(wallet)),
-        ));
-
-        for (const wallet of wallets) {
-          await this.onchain.fundParticipant(recreated.chainContestId, wallet);
-        }
-
         chain = await this.onchain.summary(recreated.chainContestId);
       } catch {
         chain = null;
+      }
+    }
+
+    // Resume any incomplete funding for entries already stored in Firestore.
+    if (isOpen && chain?.exists && existingWallets.length > Number(chain.participantCount)) {
+      try {
+        for (const wallet of existingWallets) {
+          await this.onchain.fundParticipant(Number(chain.chainContestId), wallet);
+        }
+        chain = await this.onchain.summary(Number(chain.chainContestId));
+      } catch {
+        // Keep the last verified chain state visible; the next request can resume.
       }
     }
 
