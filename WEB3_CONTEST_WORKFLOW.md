@@ -37,6 +37,7 @@ CrickX uses one deployed CRXContestPool contract that manages one contest per Sp
 - The contract owner is the backend settlement/deployment wallet.
 - Winner wallets are the participant wallet addresses in the final ranking.
 - The participant does not pay CRX to join.
+- The company funding wallet deposits 10 CRX per participant through the backend owner wallet.
 
 ## Important wallet distinction
 
