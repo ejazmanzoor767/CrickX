@@ -236,6 +236,16 @@ export class ContestService {
     const existingWallet = await this.prisma.contestEntry.findFirst({ where: { contestId: contest.id, walletAddress: wallet } });
     if (existingWallet && existingWallet.userId !== userId) throw new ForbiddenException('This wallet has already joined the contest.');
 
+    const chainContestId = Number((contest as any).chainContestId);
+    if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
+      throw new ServiceUnavailableException('This contest is missing its on-chain contest ID. Please reopen the contest and try again.');
+    }
+
+    // The user's signature only proves wallet ownership. The participant still
+    // pays 0 CRX. The backend owner funds the prize pool with 10 CRX on-chain.
+    // The funding call is idempotent so a retried confirmation cannot add CRX twice.
+    const funding = await this.onchain.fundParticipant(chainContestId, wallet);
+
     const entryId = `entry_${contest.id}_${userId}`;
     const result = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.contestEntry.findUnique({ where: { id: entryId } });
@@ -277,6 +287,8 @@ export class ContestService {
       participantCount: result.participantCount,
       prizePoolTotal: result.participantCount * CRX_PRIZE_PER_PARTICIPANT,
       prizePoolPerParticipant: CRX_PRIZE_PER_PARTICIPANT,
+      poolFundingTxHash: funding.txHash,
+      poolFundingAlreadyRecorded: funding.alreadyFunded,
     };
   }
 
