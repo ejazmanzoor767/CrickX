@@ -83,7 +83,13 @@ export class SubscriptionService {
 
   async checkout(userId: string) {
     const current = await this.status(userId);
-    if (current.active) throw new ConflictException(`Your subscription is already active until ${new Date(current.expiresAt).toLocaleString('en-PK')}.`);
+    if (current.active) {
+      const expiresAt = current.expiresAt ? new Date(current.expiresAt) : null;
+      const expiresLabel = expiresAt && !Number.isNaN(expiresAt.getTime())
+        ? expiresAt.toLocaleString('en-PK')
+        : 'the current expiry date';
+      throw new ConflictException(`Your subscription is already active until ${expiresLabel}.`);
+    }
 
     if (current.status === 'PENDING' && current.basketId && current.id) {
       const pendingPayment = await this.firestore.subscriptionPayment.findFirst({ where: { basketId: current.basketId } });
