@@ -323,7 +323,7 @@ export class ContestService {
           userId,
           fantasyTeamId: team.id,
           entryFeePaid: 0,
-          transactionHash: null,
+          transactionHash: funding.txHash,
           walletAddress: wallet,
           paymentStatus: 'SUBSCRIPTION_ACTIVE',
         },
