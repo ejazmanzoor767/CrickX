@@ -110,9 +110,19 @@ export class ContestService {
     let chain: any = null;
     let chainCheckFailed = false;
     const storedChainContestId = Number((contest as any).chainContestId);
+    const expectedJoinDeadline = Math.floor(
+      new Date(fixtureForClock?.starting_at ?? contest.lineupLockAt).getTime() / 1000,
+    );
     if (Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
       try {
-        chain = await this.onchain.contestSummaryOrNull(storedChainContestId);
+        const candidate = await this.onchain.contestSummaryOrNull(storedChainContestId);
+        if (
+          candidate &&
+          Number.isFinite(expectedJoinDeadline) &&
+          Math.abs(Number(candidate.joinDeadline) - expectedJoinDeadline) <= 60
+        ) {
+          chain = candidate;
+        }
       } catch {
         chainCheckFailed = true;
       }
@@ -136,7 +146,7 @@ export class ContestService {
 
     if (isOpen && !chain && !chainCheckFailed && Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
       try {
-        const deadline = Math.floor(new Date(fixtureForClock?.starting_at ?? contest.lineupLockAt).getTime() / 1000);
+        const deadline = expectedJoinDeadline;
         const recreated = await this.onchain.createContest(deadline);
         contest = await this.prisma.contest.update({
           where: { id: contest.id },
