@@ -89,13 +89,21 @@ function ContestContent() {
       );
 
       const count = Number(result?.participantCount ?? Number(contest.filledSpots || 0) + 1);
+      const fundingHash = result?.poolFundingTxHash ? String(result.poolFundingTxHash) : '';
       setContest((prev: any) => prev ? {
         ...prev,
         filledSpots: count,
         prizePoolTotal: count * 10,
         entryFee: 0,
       } : prev);
-      setMessage(`Contest joined successfully. Participant ${count} joined. Your wallet is registered for any CRX prize earned by this entry.`);
+
+      if (fundingHash) {
+        setMessage(
+          `Contest joined successfully. Participant ${count} joined and 10 CRX was funded into the on-chain prize pool. Funding transaction: ${fundingHash.slice(0, 10)}…${fundingHash.slice(-8)}`,
+        );
+      } else {
+        setMessage(`Contest joined successfully. Participant ${count} joined. The 10 CRX pool funding was already recorded on-chain. Your wallet is registered for any CRX prize earned by this entry.`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to join the contest.');
     } finally {
