@@ -326,6 +326,17 @@ export class ContestService {
       if (currentContest.status === 'COMPLETED' || currentContest.status === 'CANCELLED') throw new ForbiddenException('Contest is already closed.');
 
       const currentCount = Number(currentContest.filledSpots || 0);
+      // Firestore transactions require every read to happen before the first write.
+      // Update the contest first, then create the entry; both operations below are writes.
+      await tx.contest.update({
+        where: { id: contest.id },
+        data: {
+          filledSpots: { increment: 1 },
+          prizePoolTotal: { increment: CRX_PRIZE_PER_PARTICIPANT },
+          entryFee: 0,
+        },
+      });
+
       const entry = await tx.contestEntry.create({
         data: {
           id: entryId,
@@ -336,15 +347,6 @@ export class ContestService {
           transactionHash: funding.txHash,
           walletAddress: wallet,
           paymentStatus: 'SUBSCRIPTION_ACTIVE',
-        },
-      });
-
-      await tx.contest.update({
-        where: { id: contest.id },
-        data: {
-          filledSpots: { increment: 1 },
-          prizePoolTotal: { increment: CRX_PRIZE_PER_PARTICIPANT },
-          entryFee: 0,
         },
       });
 
