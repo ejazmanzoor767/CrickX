@@ -12,7 +12,7 @@
 
 The deployed pool contract owner is the deployer. Render CRX_CONTEST_OWNER_PRIVATE_KEY must correspond to that owner wallet.
 
-The pool fundingWallet is the wallet from which the contract pulls 10 CRX × final participant count. For the simplest deployment, make the funding wallet the same wallet as the contract owner. If you use a different funding wallet, that wallet must approve the pool contract to spend CRX.
+The pool fundingWallet is the treasury wallet from which the contract pulls 10 CRX for each participant at join time. For the simplest deployment, make the funding wallet the same wallet as the contract owner. If you use a different funding wallet, that wallet must approve the pool contract to spend CRX before users can join.
 
 ## RapidGateway subscription variables
 
