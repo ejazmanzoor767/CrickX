@@ -107,7 +107,7 @@ export const api = {
   leaderboardFixture: (fixtureId: number, limit = 100) => leaderboard(`/fixture/${fixtureId}`, { limit }),
   leaderboardContest: (contestId: string, limit = 100) => leaderboard(`/contest/${contestId}`, { limit }),
 
-  subscription: () => apiFetch('/subscription'),
+  subscription: () => apiFetch(`/subscription?_=${Date.now()}`, { cache: 'no-store' }),
   createSubscriptionCheckout: (customerMobile?: string) => apiFetch('/subscription/checkout', { method: 'POST', body: JSON.stringify(customerMobile ? { customerMobile } : {}) }),
   subscriptionStatus: (basket: string) =>
     apiFetch(
