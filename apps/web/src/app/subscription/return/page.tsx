@@ -31,11 +31,11 @@ function SubscriptionReturnContent() {
         tries += 1;
         setAttempts(tries);
 
-        if (response.active || response.paymentStatus === 'FAILED') return;
+        if (response.active || response.subscriptionStatus === 'ACTIVE' || response.paymentStatus === 'FAILED') return;
         if (tries >= 20) {
           setDelayed(true);
         }
-        timer = window.setTimeout(check, 5000);
+        timer = window.setTimeout(check, 3000);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : 'Unable to verify the subscription payment.');
@@ -86,7 +86,7 @@ function SubscriptionReturnContent() {
               ? 'OxaPay has not yet delivered the final confirmation to CrickX. We are continuing to check automatically.'
               : 'We are waiting for the verified OxaPay webhook. Keep this page open while the payment is being confirmed.'}
           </p>
-          <small style={{ color: 'var(--muted)' }}>Checking payment status… {attempts}/60</small>
+          <small style={{ color: 'var(--muted)' }}>Checking payment status… {attempts}/120</small>
         </>
       )}
 
