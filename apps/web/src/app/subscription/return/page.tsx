@@ -11,6 +11,7 @@ function SubscriptionReturnContent() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
   const [attempts, setAttempts] = useState(0);
+  const [delayed, setDelayed] = useState(false);
 
   useEffect(() => {
     if (!basket) {
@@ -30,8 +31,11 @@ function SubscriptionReturnContent() {
         tries += 1;
         setAttempts(tries);
 
-        if (response.active || response.paymentStatus === 'FAILED' || tries >= 20) return;
-        timer = window.setTimeout(check, 2000);
+        if (response.active || response.paymentStatus === 'FAILED') return;
+        if (tries >= 20) {
+          setDelayed(true);
+        }
+        timer = window.setTimeout(check, 5000);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : 'Unable to verify the subscription payment.');
@@ -77,8 +81,12 @@ function SubscriptionReturnContent() {
         </>
       ) : (
         <>
-          <p className="section-subtitle">We are waiting for the verified OxaPay webhook. Keep this page open while the payment is being confirmed.</p>
-          <small style={{ color: 'var(--muted)' }}>Checking payment status… {attempts}/20</small>
+          <p className="section-subtitle">
+            {delayed
+              ? 'OxaPay has not yet delivered the final confirmation to CrickX. We are continuing to check automatically.'
+              : 'We are waiting for the verified OxaPay webhook. Keep this page open while the payment is being confirmed.'}
+          </p>
+          <small style={{ color: 'var(--muted)' }}>Checking payment status… {attempts}/60</small>
         </>
       )}
 

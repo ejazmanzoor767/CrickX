@@ -96,6 +96,21 @@ export class OxaPayService {
     }
   }
 
+  async getPaymentInfo(trackId: string) {
+    this.requireCredentials();
+    const response = await axios.get(
+      `${this.baseUrl}/v1/payment/${encodeURIComponent(trackId)}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          merchant_api_key: this.merchantApiKey,
+        },
+        timeout: 10_000,
+      },
+    );
+    return response.data?.data ?? response.data ?? {};
+  }
+
   verifyWebhook(rawBody: Buffer | string, signature: string) {
     if (!this.merchantApiKey || !signature) return false;
 
