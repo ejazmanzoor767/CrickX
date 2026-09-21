@@ -41,7 +41,7 @@ export default function SubscriptionPage() {
       const result: any = await api.createSubscriptionCheckout();
       window.location.assign(result.checkoutUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to start RapidGateway checkout.');
+      setError(err instanceof Error ? err.message : 'Unable to start OxaPay checkout.');
       setPaying(false);
     }
   }
@@ -86,7 +86,7 @@ export default function SubscriptionPage() {
       ) : (
         <div style={{ marginTop: 20 }}>
           <p className="section-subtitle" style={{ maxWidth: 650 }}>
-            You will be redirected to RapidGateway's secure branded checkout, where the payment methods enabled for CrickX are shown.
+            You will be redirected to OxaPay's secure checkout to complete your 50 PKR weekly subscription payment.
           </p>
           <button className="primary-button full" type="button" disabled={paying} onClick={subscribe} style={{ marginTop: 16 }}>
             {paying ? 'Opening secure checkout…' : 'Subscribe for 50 PKR'}
@@ -97,7 +97,7 @@ export default function SubscriptionPage() {
 
     <div className="card" style={{ marginTop: 14, lineHeight: 1.7 }}>
       <p className="eyebrow">PAYMENT CONFIRMATION</p>
-      <p className="section-subtitle">CrickX activates the 7-day subscription only after a verified RapidGateway <code>transaction.completed</code> webhook. Returning to the success page alone does not activate access.</p>
+      <p className="section-subtitle">CrickX activates the 7-day subscription only after a verified OxaPay <code>Paid</code> webhook. Returning to the success page alone does not activate access.</p>
     </div>
   </section>;
 }
