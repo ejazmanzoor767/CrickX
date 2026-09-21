@@ -33,7 +33,7 @@ export class SubscriptionService {
   async status(userId: string) {
     const subscription = await this.latest(userId);
     if (!subscription) {
-      return { active: false, plan: 'WEEKLY', amount: PRICE_PKR, currency: 'PKR', durationDays: 7, status: 'NONE', expiresAt: null };
+      return { id: null, active: false, plan: 'WEEKLY', amount: PRICE_PKR, currency: 'PKR', durationDays: 7, status: 'NONE', expiresAt: null };
     }
     let current = subscription;
     if (current.status === 'ACTIVE' && current.expiresAt && new Date(current.expiresAt).getTime() <= Date.now()) {
@@ -52,6 +52,7 @@ export class SubscriptionService {
       status: current.status,
       expiresAt: current.expiresAt ?? null,
       basketId: current.basketId ?? null,
+      id: current.id,
     };
   }
 
@@ -60,7 +61,7 @@ export class SubscriptionService {
     const current = await this.status(userId);
     if (current.active) throw new ConflictException(`Your subscription is already active until ${new Date(current.expiresAt).toLocaleString('en-PK')}.`);
 
-    if (current.status === 'PENDING' && current.basketId) {
+    if (current.status === 'PENDING' && current.basketId && current.id) {
       const pendingPayment = await this.firestore.subscriptionPayment.findFirst({ where: { basketId: current.basketId } });
       if (pendingPayment?.provider === 'OXAPAY' && pendingPayment.checkoutUrl) {
         return { checkoutUrl: pendingPayment.checkoutUrl, basketId: current.basketId, amount: PRICE_PKR, currency: 'PKR', durationDays: 7 };
