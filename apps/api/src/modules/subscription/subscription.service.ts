@@ -225,4 +225,5 @@ export class SubscriptionService {
     }
 
     return { received: true, pending: true };
-  }}
+  }
+}
