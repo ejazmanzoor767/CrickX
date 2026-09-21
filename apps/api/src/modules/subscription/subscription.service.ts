@@ -133,7 +133,62 @@ export class SubscriptionService {
   async paymentStatus(userId: string, basketId: string) {
     const payment = await this.firestore.subscriptionPayment.findFirst({ where: { basketId } });
     if (!payment || payment.userId !== userId) throw new ForbiddenException('Subscription payment not found.');
-    const subscription = await this.firestore.subscription.findUnique({ where: { id: payment.subscriptionId } });
+
+    let subscription = await this.firestore.subscription.findUnique({ where: { id: payment.subscriptionId } });
+
+    // Webhooks are the primary source of truth. As a fallback, query OxaPay while
+    // the local payment is still pending so a delayed webhook does not leave the
+    // customer stuck on the confirmation page.
+    if (
+      payment.status === 'INITIATED' &&
+      payment.gatewayTxnRef &&
+      subscription?.status === 'PENDING' &&
+      Date.now() - new Date(payment.createdAt).getTime() >= 5_000
+    ) {
+      try {
+        const gateway = await this.oxapay.getPaymentInfo(String(payment.gatewayTxnRef));
+        const gatewayStatus = String(gateway?.status || '').toLowerCase();
+        const gatewayAmount = Number(gateway?.amount);
+        const gatewayCurrency = String(gateway?.currency || '').toUpperCase();
+
+        if (
+          (gatewayStatus === 'paid' || gatewayStatus === 'manual_accept') &&
+          Number.isFinite(gatewayAmount) &&
+          Math.abs(gatewayAmount - PRICE_PKR) <= 0.000001 &&
+          gatewayCurrency === 'PKR'
+        ) {
+          const now = new Date();
+          const expiresAt = new Date(now.getTime() + DURATION_MS);
+
+          await this.firestore.subscriptionPayment.update({
+            where: { id: payment.id },
+            data: {
+              status: 'SUCCEEDED',
+              gatewayTxnRef: String(gateway.track_id ?? gateway.trackId ?? payment.gatewayTxnRef),
+              eventId: String(gateway.track_id ?? gateway.trackId ?? payment.gatewayTxnRef),
+              completedAt: now,
+            },
+          });
+          await this.firestore.subscription.update({
+            where: { id: payment.subscriptionId },
+            data: { status: 'ACTIVE', startedAt: now, expiresAt },
+          });
+
+          subscription = { ...subscription, status: 'ACTIVE', startedAt: now, expiresAt };
+          return {
+            basketId,
+            paymentStatus: 'SUCCEEDED',
+            subscriptionStatus: 'ACTIVE',
+            active: true,
+            expiresAt,
+            gatewayTxnRef: String(gateway.track_id ?? gateway.trackId ?? payment.gatewayTxnRef),
+          };
+        }
+      } catch {
+        // Keep waiting for the webhook if the gateway status lookup is temporarily unavailable.
+      }
+    }
+
     return {
       basketId,
       paymentStatus: payment.status,
