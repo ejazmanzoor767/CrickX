@@ -224,15 +224,27 @@ export class OnchainContestService {
 
     let hash: Hex;
     try {
-      hash = await this.walletClient!.writeContract({
+      const simulation = await this.publicClient.simulateContract({
+        account: this.ownerAccount!.address,
         address: this.poolAddress!,
         abi: POOL_ABI,
         functionName: 'fundParticipant',
         args: [id, account],
       });
+
+      hash = await this.walletClient!.writeContract(simulation.request);
       await this.publicClient.waitForTransactionReceipt({ hash });
     } catch (error) {
-      const detail = error instanceof Error ? error.message.split('\\n')[0] : String(error);
+      const record = typeof error === 'object' && error !== null ? error as Record<string, unknown> : {};
+      const cause = record.cause && typeof record.cause === 'object'
+        ? record.cause as Record<string, unknown>
+        : {};
+      const detail =
+        (typeof record.shortMessage === 'string' && record.shortMessage) ||
+        (typeof cause.shortMessage === 'string' && cause.shortMessage) ||
+        (typeof record.details === 'string' && record.details) ||
+        (error instanceof Error ? error.message.split('\\n')[0] : String(error));
+
       throw new ServiceUnavailableException(
         `The configured CRX contest pool rejected participant funding. Pool=${this.poolAddress}; fundingWallet=${fundingWallet}; reason=${detail}`,
       );
