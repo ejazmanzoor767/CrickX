@@ -54,13 +54,6 @@ export class SubscriptionService {
     };
   }
 
-  private toE164(phone: string) {
-    const digits = phone.replace(/\D/g, '');
-    if (digits.startsWith('92')) return `+${digits}`;
-    if (digits.startsWith('0')) return `+92${digits.slice(1)}`;
-    if (digits.startsWith('3')) return `+92${digits}`;
-    return phone;
-  }
 
   async checkout(userId: string) {
     const current = await this.status(userId);
@@ -73,7 +66,7 @@ export class SubscriptionService {
       }
 
       await this.firestore.subscription.update({
-        where: { id: current.basketId ? current.id : '' },
+        where: { id: current.id },
         data: { status: 'PAYMENT_FAILED' },
       });
     }
