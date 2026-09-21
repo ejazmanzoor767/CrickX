@@ -204,6 +204,16 @@ export class OnchainContestService {
     };
   }
 
+  async contestSummaryOrNull(contestId: number | null | undefined) {
+    if (!Number.isFinite(Number(contestId)) || Number(contestId) <= 0) return null;
+    try {
+      const summary = await this.summary(Number(contestId));
+      return summary.exists ? summary : null;
+    } catch {
+      return null;
+    }
+  }
+
   async walletInfo(contestId: number, address: string) {
     this.requireConfigured();
     const account = getAddress(address);
@@ -284,7 +294,22 @@ export class OnchainContestService {
         );
       }
 
-      if (current.totalPool !== ranking.length * Number(current.totalPool / Math.max(1, current.participantCount))) {
+      const perParticipant = Number(await this.publicClient.readContract({
+        address: this.poolAddress!,
+        abi: POOL_ABI,
+        functionName: 'POOL_PER_PARTICIPANT',
+      }));
+
+      if (!Number.isFinite(perParticipant) || current.totalPool <= 0) {
+        throw new BadRequestException('On-chain contest has not been funded for its participants.');
+      }
+
+      const expectedPool = ranking.length * Number(formatUnits(
+        BigInt(perParticipant),
+        current.tokenDecimals,
+      ));
+
+      if (Math.abs(current.totalPool - expectedPool) > 1e-9) {
         throw new BadRequestException('On-chain contest funding state is inconsistent.');
       }
 
