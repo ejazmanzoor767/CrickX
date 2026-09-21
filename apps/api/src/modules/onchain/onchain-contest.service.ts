@@ -25,6 +25,8 @@ const POOL_ABI = parseAbi([
   'function contestExists(uint256 contestId) view returns (bool)',
   'function createContest(uint256 joinDeadline) returns (uint256 contestId)',
   'function fundingWallet() view returns (address)',
+  'function crxToken() view returns (address)',
+  'function owner() view returns (address)',
   'function POOL_PER_PARTICIPANT() view returns (uint256)',
   'function getContestSummary(uint256 contestId) view returns (uint256 joinDeadline, uint8 contestStage, uint256 participantCount, uint256 totalPool, uint256 distributedAmount, uint256 distributedCount, bool fundingComplete)',
   'function hasEntered(uint256 contestId, address participant) view returns (bool)',
@@ -162,12 +164,45 @@ export class OnchainContestService {
       throw new BadRequestException('The on-chain contest entry deadline has been reached.');
     }
 
-    const entered = Boolean(await this.publicClient.readContract({
-      address: this.poolAddress!,
-      abi: POOL_ABI,
-      functionName: 'hasEntered',
-      args: [id, account],
-    }));
+    const [entered, poolTokenRaw, poolOwnerRaw, fundingWalletRaw] = await Promise.all([
+      this.publicClient.readContract({
+        address: this.poolAddress!,
+        abi: POOL_ABI,
+        functionName: 'hasEntered',
+        args: [id, account],
+      }),
+      this.publicClient.readContract({
+        address: this.poolAddress!,
+        abi: POOL_ABI,
+        functionName: 'crxToken',
+      }),
+      this.publicClient.readContract({
+        address: this.poolAddress!,
+        abi: POOL_ABI,
+        functionName: 'owner',
+      }),
+      this.publicClient.readContract({
+        address: this.poolAddress!,
+        abi: POOL_ABI,
+        functionName: 'fundingWallet',
+      }),
+    ]);
+
+    const poolToken = getAddress(poolTokenRaw as Address);
+    const poolOwner = getAddress(poolOwnerRaw as Address);
+    const fundingWallet = getAddress(fundingWalletRaw as Address);
+
+    if (poolToken.toLowerCase() !== this.tokenAddress!.toLowerCase()) {
+      throw new ServiceUnavailableException(
+        `CRX pool token mismatch. Pool uses ${poolToken}, but CRX_TOKEN_ADDRESS is ${this.tokenAddress}. Deploy the updated pool with the same CRX token.`,
+      );
+    }
+
+    if (poolOwner.toLowerCase() !== this.ownerAccount!.address.toLowerCase()) {
+      throw new ServiceUnavailableException(
+        `CRX pool owner ${poolOwner} does not match the configured contest owner ${this.ownerAccount!.address}.`,
+      );
+    }
 
     if (entered) {
       const already = await this.summary(contestId);
@@ -187,13 +222,21 @@ export class OnchainContestService {
 
     await this.ensureFundingAllowance(perParticipant);
 
-    const hash = await this.walletClient!.writeContract({
-      address: this.poolAddress!,
-      abi: POOL_ABI,
-      functionName: 'fundParticipant',
-      args: [id, account],
-    });
-    await this.publicClient.waitForTransactionReceipt({ hash });
+    let hash: Hex;
+    try {
+      hash = await this.walletClient!.writeContract({
+        address: this.poolAddress!,
+        abi: POOL_ABI,
+        functionName: 'fundParticipant',
+        args: [id, account],
+      });
+      await this.publicClient.waitForTransactionReceipt({ hash });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message.split('\\n')[0] : String(error);
+      throw new ServiceUnavailableException(
+        `The configured CRX contest pool rejected participant funding. Pool=${this.poolAddress}; fundingWallet=${fundingWallet}; reason=${detail}`,
+      );
+    }
 
     const updated = await this.summary(contestId);
     return {
