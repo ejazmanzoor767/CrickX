@@ -23,6 +23,28 @@ export class SubscriptionService {
     return (this.config.get<string>('CRICKX_WEB_URL') || 'https://crickx-3d806.web.app').replace(/\/$/, '');
   }
 
+  private asDate(value: any): Date | null {
+    if (value instanceof Date) return value;
+    if (value && typeof value.toDate === 'function') {
+      const date = value.toDate();
+      return date instanceof Date ? date : null;
+    }
+    if (value && typeof value === 'object' && typeof value._seconds === 'number') {
+      return new Date(value._seconds * 1000 + Math.floor(Number(value._nanoseconds || 0) / 1_000_000));
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+    return null;
+  }
+
+  private isoDate(value: any): string | null {
+    const date = this.asDate(value);
+    return date ? date.toISOString() : null;
+  }
+
+
   private async latest(userId: string) {
     return this.firestore.subscription.findFirst({
       where: { userId },
@@ -36,21 +58,23 @@ export class SubscriptionService {
       return { id: null, active: false, plan: 'WEEKLY', amount: PRICE_PKR, currency: 'PKR', durationDays: 7, status: 'NONE', expiresAt: null };
     }
     let current = subscription;
-    if (current.status === 'ACTIVE' && current.expiresAt && new Date(current.expiresAt).getTime() <= Date.now()) {
+    const expiresDate = this.asDate(current.expiresAt);
+    if (current.status === 'ACTIVE' && expiresDate && expiresDate.getTime() <= Date.now()) {
       await this.firestore.subscription.update({
         where: { id: current.id },
         data: { status: 'EXPIRED' },
       });
       current = { ...current, status: 'EXPIRED' };
     }
+    const currentExpiresDate = this.asDate(current.expiresAt);
     return {
-      active: current.status === 'ACTIVE' && !!current.expiresAt && new Date(current.expiresAt).getTime() > Date.now(),
+      active: current.status === 'ACTIVE' && !!currentExpiresDate && currentExpiresDate.getTime() > Date.now(),
       plan: current.plan,
       amount: Number(current.amount),
       currency: current.currency,
       durationDays: 7,
       status: current.status,
-      expiresAt: current.expiresAt ?? null,
+      expiresAt: this.isoDate(current.expiresAt),
       basketId: current.basketId ?? null,
       id: current.id,
     };
@@ -189,12 +213,13 @@ export class SubscriptionService {
       }
     }
 
+    const subscriptionExpiresDate = this.asDate(subscription?.expiresAt);
     return {
       basketId,
       paymentStatus: payment.status,
       subscriptionStatus: subscription?.status ?? 'NONE',
-      active: subscription?.status === 'ACTIVE' && subscription.expiresAt && new Date(subscription.expiresAt).getTime() > Date.now(),
-      expiresAt: subscription?.expiresAt ?? null,
+      active: subscription?.status === 'ACTIVE' && !!subscriptionExpiresDate && subscriptionExpiresDate.getTime() > Date.now(),
+      expiresAt: this.isoDate(subscription?.expiresAt),
       gatewayTxnRef: payment.gatewayTxnRef ?? null,
     };
   }
