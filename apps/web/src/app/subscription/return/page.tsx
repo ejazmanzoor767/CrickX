@@ -30,8 +30,11 @@ function SubscriptionReturnContent() {
         tries += 1;
         setAttempts(tries);
 
-        if (response.active || response.paymentStatus === 'FAILED' || tries >= 20) return;
-        timer = window.setTimeout(check, 2000);
+        if (response.active || response.paymentStatus === 'FAILED') return;
+        if (tries >= 20) {
+          setError('Payment is still being confirmed by OxaPay. You can keep this page open; we will continue checking automatically.');
+        }
+        timer = window.setTimeout(check, 5000);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : 'Unable to verify the subscription payment.');
@@ -78,7 +81,7 @@ function SubscriptionReturnContent() {
       ) : (
         <>
           <p className="section-subtitle">We are waiting for the verified OxaPay webhook. Keep this page open while the payment is being confirmed.</p>
-          <small style={{ color: 'var(--muted)' }}>Checking payment status… {attempts}/20</small>
+          <small style={{ color: 'var(--muted)' }}>Checking payment status… {attempts}/60</small>
         </>
       )}
 
