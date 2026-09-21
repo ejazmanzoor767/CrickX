@@ -28,6 +28,7 @@ const POOL_ABI = parseAbi([
   'function POOL_PER_PARTICIPANT() view returns (uint256)',
   'function getContestSummary(uint256 contestId) view returns (uint256 joinDeadline, uint8 contestStage, uint256 participantCount, uint256 totalPool, uint256 distributedAmount, uint256 distributedCount, bool fundingComplete)',
   'function hasEntered(uint256 contestId, address participant) view returns (bool)',
+  'function fundParticipant(uint256 contestId, address participant)',
   'function finalizeRankingAndFund(uint256 contestId, address[] ranking)',
   'function distributePrizes(uint256 contestId, uint256 maxRecipients)',
   'function stage(uint256 contestId) view returns (uint8)',
@@ -147,6 +148,62 @@ export class OnchainContestService {
     };
   }
 
+  async fundParticipant(contestId: number, participant: string) {
+    this.requireConfigured();
+    this.requireOwner();
+
+    const account = getAddress(participant);
+    const id = BigInt(contestId);
+    const current = await this.summary(contestId);
+
+    if (!current.exists) throw new BadRequestException('The on-chain contest does not exist.');
+    if (current.stage !== 0) throw new BadRequestException('The on-chain contest is no longer open.');
+    if (Math.floor(Date.now() / 1000) >= current.joinDeadline) {
+      throw new BadRequestException('The on-chain contest entry deadline has been reached.');
+    }
+
+    const entered = Boolean(await this.publicClient.readContract({
+      address: this.poolAddress!,
+      abi: POOL_ABI,
+      functionName: 'hasEntered',
+      args: [id, account],
+    }));
+
+    if (entered) {
+      const already = await this.summary(contestId);
+      return {
+        alreadyFunded: true,
+        txHash: null,
+        participantCount: already.participantCount,
+        totalPool: already.totalPool,
+      };
+    }
+
+    const perParticipant = BigInt(await this.publicClient.readContract({
+      address: this.poolAddress!,
+      abi: POOL_ABI,
+      functionName: 'POOL_PER_PARTICIPANT',
+    }));
+
+    await this.ensureFundingAllowance(perParticipant);
+
+    const hash = await this.walletClient!.writeContract({
+      address: this.poolAddress!,
+      abi: POOL_ABI,
+      functionName: 'fundParticipant',
+      args: [id, account],
+    });
+    await this.publicClient.waitForTransactionReceipt({ hash });
+
+    const updated = await this.summary(contestId);
+    return {
+      alreadyFunded: false,
+      txHash: String(hash),
+      participantCount: updated.participantCount,
+      totalPool: updated.totalPool,
+    };
+  }
+
   async walletInfo(contestId: number, address: string) {
     this.requireConfigured();
     const account = getAddress(address);
@@ -221,15 +278,15 @@ export class OnchainContestService {
 
     if (!current.exists) throw new BadRequestException('The on-chain contest does not exist.');
     if (current.stage === 0) {
-      const [perParticipant, decimals] = await Promise.all([
-        this.publicClient.readContract({ address: this.poolAddress!, abi: POOL_ABI, functionName: 'POOL_PER_PARTICIPANT' }),
-        this.publicClient.readContract({ address: this.tokenAddress!, abi: CRX_ABI, functionName: 'decimals' }),
-      ]);
-      const required = BigInt(ranking.length) * (perParticipant as bigint);
-      // The deployed CRX token uses 18 decimals; this calculation still reads
-      // the contract constant rather than hard-coding the funding amount.
-      void decimals;
-      await this.ensureFundingAllowance(required);
+      if (current.participantCount !== ranking.length) {
+        throw new BadRequestException(
+          `On-chain participant count ${current.participantCount} does not match final ranking ${ranking.length}.`,
+        );
+      }
+
+      if (current.totalPool !== ranking.length * Number(current.totalPool / Math.max(1, current.participantCount))) {
+        throw new BadRequestException('On-chain contest funding state is inconsistent.');
+      }
 
       const hash = await this.walletClient!.writeContract({
         address: this.poolAddress!,
