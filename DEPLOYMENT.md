@@ -38,9 +38,11 @@ The subscription is 50 PKR for 7 days. Contest joining is free while the subscri
 
 ## Contest prize funding
 
-Joining a contest does not charge the participant's wallet. The application records the participant and displays a projected pool of 10 CRX × participants.
+Joining a contest does not charge the participant's wallet. MetaMask only signs a wallet-ownership message.
 
-When final rankings are ready, the backend submits every ranked participant wallet to CRXContestPool. The contract pulls the required CRX from fundingWallet, records the ranking and distributes 100% of the pool to all ranked wallets.
+After the signature is verified, the backend owner calls CRXContestPool.fundParticipant() and the fundingWallet transfers exactly 10 CRX into the pool contract. The application then records the participant and the on-chain pool increases immediately.
+
+When final rankings are ready, the backend submits every ranked participant wallet to CRXContestPool. The contract only finalizes the existing funded pool, records the ranking and distributes 100% of the pool to all ranked wallets.
 
 The current default payout formula is rank-weighted: rank 1 receives the largest share, rank N receives the smallest share, and the final participant receives any rounding remainder so the pool reaches exactly zero.
 
