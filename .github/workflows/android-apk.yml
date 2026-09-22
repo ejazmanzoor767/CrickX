@@ -77,7 +77,7 @@ jobs:
           expo_cli = resolve("@expo/cli")
 
           replacements = {
-              "entryFile =": 'entryFile = file("${projectRoot}/App.tsx")',
+              "entryFile =": 'entryFile = file("\${projectRoot}/App.tsx")',
               "reactNativeDir =": f'reactNativeDir = file("{rn_dir}")',
               "hermesCommand =": f'hermesCommand = file("{rn_dir}/sdks/hermesc/%OS-BIN%/hermesc").getAbsolutePath()',
               "codegenDir =": f'codegenDir = file("{codegen_dir}")',
@@ -86,6 +86,7 @@ jobs:
 
           lines = p.read_text().splitlines()
           found = set()
+
           for i, line in enumerate(lines):
               stripped = line.strip()
               for key, replacement in replacements.items():
@@ -99,20 +100,27 @@ jobs:
           if missing:
               raise SystemExit("Missing generated Expo Gradle settings: " + ", ".join(sorted(missing)))
 
-          s = "
-".join(lines) + "
-"
-          release = re.search(r"(?ms)(^s*releases*{)(.*?)(^s*})", s)
+          s = "\n".join(lines) + "\n"
+
+          release = re.search(r"(?ms)(^\s*release\s*\{)(.*?)(^\s*\})", s)
           if not release:
               raise SystemExit("Could not find Android release build type")
+
           body = release.group(2)
           if "signingConfig signingConfigs." not in body:
               start, end = release.span(2)
-              indent = re.match(r"s*", release.group(1)).group(0) + "    "
-              s = s[:start] + "
-" + indent + "signingConfig signingConfigs.debug" + s[start:end] + s[end:]
+              indent = re.match(r"\s*", release.group(1)).group(0) + "    "
+              s = (
+                  s[:start]
+                  + "\n"
+                  + indent
+                  + "signingConfig signingConfigs.debug"
+                  + s[start:end]
+                  + s[end:]
+              )
 
           p.write_text(s)
+
           print("Android Gradle configuration stabilized.")
           print("React Native:", rn_dir)
           print("Codegen:", codegen_dir)
@@ -138,16 +146,20 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk dist/CrickX-${{ github.run_number }}.apk
+          cp android/app/build/outputs/apk/release/app-release.apk dist/CrickX-\${{ github.run_number }}.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CrickX-Android-APK-${{ github.run_number }}
-          path: apps/mobile/dist/CrickX-${{ github.run_number }}.apk
+          name: CrickX-Android-APK-\${{ github.run_number }}
+          path: apps/mobile/dist/CrickX-\${{ github.run_number }}.apk
           retention-days: 30
 
       - name: Publish GitHub release
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "mobile-v1.0.${{ github.run_number }}" "dist/CrickX-${{ github.run_number }}.apk" --repo "${{ github.repository }}" --title "CrickX Android v1.0.${{ github.run_number }}" --notes "Installable CrickX Android APK built from main."
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          gh release create "mobile-v1.0.\${{ github.run_number }}" "dist/CrickX-\${{ github.run_number }}.apk" \
+            --repo "\${{ github.repository }}" \
+            --title "CrickX Android v1.0.\${{ github.run_number }}" \
+            --notes "Installable CrickX Android APK built from main."
