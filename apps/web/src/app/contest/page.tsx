@@ -103,7 +103,7 @@ function ContestContent() {
         prizePoolFundingStatus: 'PENDING_MATCH_START',
       } : prev);
 
-      setMessage(`Contest joined successfully. Participant ${count} joined. +10 CRX has been added to the prize pool database. The full pool will be transferred to the on-chain prize pool in one transaction when the match starts.`);
+      setMessage(`Contest joined successfully. Participant ${count} joined. +10 CRX has been added to the prize pool database.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to join the contest.');
     } finally {
@@ -139,7 +139,7 @@ function ContestContent() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 12 }}>
         <div><span className="muted-label">ENTRY</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>FREE</strong><small className="section-subtitle">0 CRX charged</small></div>
         <div><span className="muted-label">PARTICIPANTS</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{participantCount}</strong><small className="section-subtitle">{participantCount === 1 ? '1 participant joined' : 'participants joined'} · Unlimited</small></div>
-        <div><span className="muted-label">PRIZE POOL</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{prizePool} CRX</strong><small className="section-subtitle">10 CRX per participant · {contest.prizePoolFundingStatus === 'FUNDED' ? 'Funded on-chain' : 'Reserved in database'}</small></div>
+        <div><span className="muted-label">PRIZE POOL</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{prizePool} CRX</strong><small className="section-subtitle">10 CRX per participant · {contest.prizePoolFundingStatus === 'FUNDED' ? 'Funded on-chain' : ''}</small></div>
         <div><span className="muted-label">STATUS</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{open ? 'OPEN' : 'CLOSED'}</strong></div>
       </div>
     </div>
