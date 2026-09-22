@@ -1,0 +1,83 @@
+name: CrickX Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/android-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        working-directory: .
+        run: npm install --workspaces --include-workspace-root
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --non-interactive --no-install
+
+      - name: Configure production APK signing
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle")
+          s = p.read_text()
+          old = "buildTypes {\n        release {\n"
+          new = "buildTypes {\n        release {\n            signingConfig signingConfigs.debug\n"
+          if old not in s:
+              raise SystemExit("Unable to find release build type block")
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+      - name: Assemble APK
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Rename APK
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk dist/CrickX-${{ github.run_number }}.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CrickX-Android-APK-${{ github.run_number }}
+          path: apps/mobile/dist/CrickX-${{ github.run_number }}.apk
+          retention-days: 30
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "mobile-v1.0.${{ github.run_number }}" "dist/CrickX-${{ github.run_number }}.apk" \
+            --repo "${{ github.repository }}" \
+            --title "CrickX Android v1.0.${{ github.run_number }}" \
+            --notes "Installable CrickX Android APK built from main."
