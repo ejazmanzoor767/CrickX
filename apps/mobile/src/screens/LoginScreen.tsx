@@ -36,8 +36,8 @@ export default function LoginScreen({ navigation }: any) {
           <TextInput autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder="Email" placeholderTextColor={colors.muted} value={email} onChangeText={setEmail} style={inputStyle} />
           <TextInput secureTextEntry placeholder="Password" placeholderTextColor={colors.muted} value={password} onChangeText={setPassword} style={inputStyle} />
           <PrimaryButton title={busy ? 'Signing in…' : 'Sign in'} onPress={submit} disabled={busy} />
-          <TouchableOpacity onPress={() => {}} style={{ marginTop: 14, alignItems: 'center' }}>
-            <Text style={{ color: colors.muted, fontSize: 12 }}>Use your existing CrickX account</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Register')} style={{ marginTop: 14, alignItems: 'center' }}>
+            <Text style={{ color: colors.green, fontSize: 12, fontWeight: '800' }}>Create a new CrickX account</Text>
           </TouchableOpacity>
         </Card>
         <ErrorBox message={error} />
