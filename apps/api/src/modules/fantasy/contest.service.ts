@@ -276,7 +276,7 @@ export class ContestService {
 
   async confirmJoin(userId: string, dto: JoinContestDto) {
     await this.assertActiveSubscription(userId);
-    const contest = await this.prisma.contest.findUnique({ where: { id: dto.contestId } });
+    let contest = await this.prisma.contest.findUnique({ where: { id: dto.contestId } });
     if (!contest) throw new NotFoundException('Contest not found.');
     if (contest.status === 'COMPLETED' || contest.status === 'CANCELLED') throw new ForbiddenException('Contest is already closed.');
 
