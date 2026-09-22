@@ -20,7 +20,7 @@ async function main() {
 
   const poolAddress = await pool.getAddress();
   console.log('CRXContestPool:', poolAddress);
-  console.log('Pool funding model: funding wallet transfers 10 CRX directly to the pool before each participant is recorded.');
+  console.log('Pool funding model: Firestore records +10 CRX per join; at match start the funding wallet transfers the full contest pool to the pool contract in one ERC20 transaction.');
   console.log('No ERC20 allowance/approve is required for the pool.');
   console.log('Owner must match the CRX_CONTEST_OWNER_PRIVATE_KEY used by the API.');
 }
