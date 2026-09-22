@@ -88,9 +88,11 @@ contract CRXContestPool {
         emit ContestCreated(contestId, joinDeadline_);
     }
 
-    /// @notice The backend pre-funds the pool with exactly 10 CRX, then calls this
-    ///         function to atomically account for that escrowed amount.
-    function fundParticipant(uint256 contestId, address participant)
+    /// @notice Called once when the match starts.
+    ///         The backend first transfers the full contest CRX pool directly
+    ///         from the funding wallet to this contract in one ERC-20 transfer.
+    ///         This function then records that already-held balance for the contest.
+    function fundContest(uint256 contestId, uint256 participantCount_, uint256 totalPool_)
         external
         onlyOwner
         nonReentrant
@@ -98,17 +100,18 @@ contract CRXContestPool {
         Contest storage c = contests[contestId];
         require(contestExists[contestId], "contest not found");
         require(c.stage == Stage.Open, "contest not open");
-        require(block.timestamp < c.joinDeadline, "entry deadline reached");
-        require(participant != address(0), "zero participant");
-        require(!c.isParticipant[participant], "participant already funded");
-        require(availableFunding() >= POOL_PER_PARTICIPANT, "pool must be pre-funded");
+        require(block.timestamp >= c.joinDeadline, "match has not started");
+        require(!c.fundingComplete, "contest already funded");
+        require(participantCount_ > 0, "no participants");
+        require(totalPool_ == participantCount_ * POOL_PER_PARTICIPANT, "pool amount mismatch");
+        require(availableFunding() >= totalPool_, "pool balance is insufficient");
 
-        c.isParticipant[participant] = true;
-        c.participantCount += 1;
-        c.totalPool += POOL_PER_PARTICIPANT;
-        totalEscrowed += POOL_PER_PARTICIPANT;
+        c.participantCount = participantCount_;
+        c.totalPool = totalPool_;
+        c.fundingComplete = true;
+        totalEscrowed += totalPool_;
 
-        emit ParticipantFunded(contestId, participant, c.participantCount, c.totalPool);
+        emit ContestFunded(contestId, participantCount_, totalPool_);
     }
 
     function finalizeRankingAndFund(uint256 contestId, address[] calldata ranking)
@@ -121,21 +124,19 @@ contract CRXContestPool {
         require(c.stage == Stage.Open, "contest not open");
         require(block.timestamp >= c.joinDeadline, "entry deadline not reached");
         require(ranking.length > 0, "no participants");
+        require(c.fundingComplete, "pool not funded");
         require(ranking.length == c.participantCount, "participant count mismatch");
 
         for (uint256 i = 0; i < ranking.length; i++) {
             address participant = ranking[i];
             require(participant != address(0), "zero participant");
-            require(c.isParticipant[participant], "participant not funded");
             require(!c.isRanked[participant], "duplicate participant");
             c.isRanked[participant] = true;
             c.ranking.push(participant);
         }
 
-        c.fundingComplete = true;
         c.stage = Stage.Ranked;
 
-        emit ContestFunded(contestId, c.participantCount, c.totalPool);
         emit RankingFinalized(contestId, c.participantCount);
     }
 
