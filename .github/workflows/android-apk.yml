@@ -56,7 +56,8 @@ jobs:
         run: |
           test -f android/gradlew
           chmod +x android/gradlew
-          bash android/gradlew assembleRelease --no-daemon
+          cd android
+          ./gradlew assembleRelease --no-daemon
 
       - name: Rename APK
         shell: bash
