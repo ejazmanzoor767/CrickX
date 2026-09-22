@@ -56,7 +56,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
 
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <View style={{ flex: 1 }}><SecondaryButton title="Leaderboard" onPress={() => navigation.navigate('Leaderboard', { fixtureId })} /></View>
-        <View style={{ flex: 1 }}><SecondaryButton title="My Team" onPress={() => navigation.navigate('Fantasy', { fixtureId })} /></View>
+        <View style={{ flex: 1 }}><SecondaryButton title="My Team" onPress={() => navigation.navigate('Main', { screen: 'Fantasy', params: { fixtureId } })} /></View>
       </View>
     </ScrollView>
   );
