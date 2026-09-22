@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   createPublicClient,
@@ -21,6 +21,8 @@ const CRX_ABI = parseAbi([
 ]);
 
 const POOL_ABI = parseAbi([
+  'error SafeERC20FailedOperation(address token)',
+  'error SafeERC20FailedDecreaseAllowance(address spender, uint256 currentAllowance, uint256 requestedDecrease)',
   'function nextContestId() view returns (uint256)',
   'function contestExists(uint256 contestId) view returns (bool)',
   'function createContest(uint256 joinDeadline) returns (uint256 contestId)',
@@ -48,6 +50,7 @@ export class OnchainContestService {
   private readonly walletClient;
   private readonly ownerAccount;
   private readonly prizeBatchSize: number;
+  private readonly logger = new Logger(OnchainContestService.name);
 
   constructor(private readonly config: ConfigService) {
     this.rpcUrl = this.config.get<string>('POLYGON_RPC_URL') || 'https://polygon-rpc.com';
@@ -220,7 +223,11 @@ export class OnchainContestService {
       functionName: 'POOL_PER_PARTICIPANT',
     }));
 
-    await this.ensureFundingAllowance(perParticipant);
+    const fundingState = await this.ensureFundingAllowance(perParticipant);
+
+    this.logger.log(
+      `CRX funding preflight contest=${contestId} participant=${account} stage=${current.stage} deadline=${current.joinDeadline} entered=${Boolean(entered)} poolToken=${poolToken} configuredToken=${this.tokenAddress} poolOwner=${poolOwner} owner=${this.ownerAccount!.address} fundingWallet=${fundingWallet} perParticipant=${perParticipant.toString()} balance=${fundingState.balance.toString()} allowance=${fundingState.allowance.toString()}`,
+    );
 
     let hash: Hex;
     try {
@@ -239,11 +246,21 @@ export class OnchainContestService {
       const cause = record.cause && typeof record.cause === 'object'
         ? record.cause as Record<string, unknown>
         : {};
+      const causeData = cause.data && typeof cause.data === 'object'
+        ? cause.data as Record<string, unknown>
+        : {};
       const detail =
         (typeof record.shortMessage === 'string' && record.shortMessage) ||
-        (typeof cause.shortMessage === 'string' && cause.shortMessage) ||
         (typeof record.details === 'string' && record.details) ||
+        (typeof cause.shortMessage === 'string' && cause.shortMessage) ||
+        (typeof cause.details === 'string' && cause.details) ||
+        (typeof causeData.errorName === 'string' && causeData.errorName) ||
+        (typeof causeData.reason === 'string' && causeData.reason) ||
         (error instanceof Error ? error.message.split('\\n')[0] : String(error));
+
+      this.logger.error(
+        `CRX fund simulation/write failed contest=${contestId} participant=${account} pool=${this.poolAddress} fundingWallet=${fundingWallet} detail=${detail} rawCause=${JSON.stringify(cause)} rawData=${JSON.stringify(record.data ?? null)}`,
+      );
 
       throw new ServiceUnavailableException(
         `The configured CRX contest pool rejected participant funding. Pool=${this.poolAddress}; fundingWallet=${fundingWallet}; reason=${detail}`,
@@ -306,7 +323,9 @@ export class OnchainContestService {
       );
     }
 
-    if ((allowance as bigint) >= requiredAmount) return;
+    if ((allowance as bigint) >= requiredAmount) {
+      return { balance: balance as bigint, allowance: allowance as bigint };
+    }
 
     if (getAddress(this.ownerAccount!.address) !== fundingWallet) {
       throw new ServiceUnavailableException(
@@ -322,6 +341,21 @@ export class OnchainContestService {
       args: [this.poolAddress!, maxUint256],
     });
     await this.publicClient.waitForTransactionReceipt({ hash });
+
+    const refreshedAllowance = await this.publicClient.readContract({
+      address: this.tokenAddress!,
+      abi: CRX_ABI,
+      functionName: 'allowance',
+      args: [fundingWallet, this.poolAddress!],
+    });
+
+    if ((refreshedAllowance as bigint) < requiredAmount) {
+      throw new ServiceUnavailableException(
+        `Funding approval transaction confirmed but allowance is still below the required amount.`,
+      );
+    }
+
+    return { balance: balance as bigint, allowance: refreshedAllowance as bigint };
   }
 
   async settleFinal(contestId: number, rankingWallets: string[]) {
