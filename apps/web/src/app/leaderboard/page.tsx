@@ -195,20 +195,21 @@ function LeaderboardPageInner() {
       const captain = Number(team?.captainSportmonksPlayerId) === id;
       const viceCaptain = Number(team?.viceCaptainSportmonksPlayerId) === id;
       const multiplier = captain ? 2 : viceCaptain ? 1.5 : 1;
-      const hasStoredScore = [player?.battingPoints, player?.bowlingPoints, player?.fieldingPoints, player?.bonusPoints, player?.powerupPoints, player?.totalPoints]
+      const selectedPlayer = Array.isArray(team?.players) ? team.players.find((p: any) => Number(p?.sportmonksPlayerId) === id) : null;
+      const hasStoredScore = [selectedPlayer?.battingPoints, selectedPlayer?.bowlingPoints, selectedPlayer?.fieldingPoints, selectedPlayer?.bonusPoints, selectedPlayer?.powerupPoints, selectedPlayer?.totalPoints]
         .some((value) => value !== undefined && value !== null);
       const storedScore = hasStoredScore
         ? {
-            batting: num(player?.battingPoints, 0) ?? 0,
-            bowling: num(player?.bowlingPoints, 0) ?? 0,
-            fielding: num(player?.fieldingPoints, 0) ?? 0,
-            bonus: num(player?.bonusPoints, 0) ?? 0,
-            powerupPoints: num(player?.powerupPoints, 0) ?? 0,
-            total: (num(player?.battingPoints, 0) ?? 0) +
-              (num(player?.bowlingPoints, 0) ?? 0) +
-              (num(player?.fieldingPoints, 0) ?? 0) +
-              (num(player?.bonusPoints, 0) ?? 0) +
-              (num(player?.powerupPoints, 0) ?? 0),
+            batting: num(selectedPlayer?.battingPoints, 0) ?? 0,
+            bowling: num(selectedPlayer?.bowlingPoints, 0) ?? 0,
+            fielding: num(selectedPlayer?.fieldingPoints, 0) ?? 0,
+            bonus: num(selectedPlayer?.bonusPoints, 0) ?? 0,
+            powerupPoints: num(selectedPlayer?.powerupPoints, 0) ?? 0,
+            total: (num(selectedPlayer?.battingPoints, 0) ?? 0) +
+              (num(selectedPlayer?.bowlingPoints, 0) ?? 0) +
+              (num(selectedPlayer?.fieldingPoints, 0) ?? 0) +
+              (num(selectedPlayer?.bonusPoints, 0) ?? 0) +
+              (num(selectedPlayer?.powerupPoints, 0) ?? 0),
           }
         : null;
       const score = storedScore ?? playerScore(fixture, id, multiplier);
