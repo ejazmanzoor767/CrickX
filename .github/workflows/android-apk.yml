@@ -52,7 +52,11 @@ jobs:
           grep -q 'signingConfig signingConfigs.debug' android/app/build.gradle
 
       - name: Assemble APK
-        run: ./gradlew assembleRelease --no-daemon
+        shell: bash
+        run: |
+          test -f android/gradlew
+          chmod +x android/gradlew
+          bash android/gradlew assembleRelease --no-daemon
 
       - name: Rename APK
         shell: bash
