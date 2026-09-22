@@ -52,7 +52,10 @@ const query = (params: Record<string, string | number>) =>
   `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}`;
 
 export const api = {
-  register: (email: string, password: string, displayName: string, phone?: string) => apiFetch<{ accessToken: string; refreshToken: string }>('/auth/register', {\n    method: 'POST', body: JSON.stringify({ email, password, displayName, ...(phone ? { phone } : {}) }), skipAuth: true,\n  }),\n  login: (email: string, password: string) => apiFetch<{ accessToken: string; refreshToken: string }>('/auth/login', {
+  register: (email: string, password: string, displayName: string, phone?: string) => apiFetch<{ accessToken: string; refreshToken: string }>('/auth/register', {
+    method: 'POST', body: JSON.stringify({ email, password, displayName, ...(phone ? { phone } : {}) }), skipAuth: true,
+  }),
+  login: (email: string, password: string) => apiFetch<{ accessToken: string; refreshToken: string }>('/auth/login', {
     method: 'POST', body: JSON.stringify({ email, password }), skipAuth: true,
   }),
   matches: () => apiFetch('/matches'),
