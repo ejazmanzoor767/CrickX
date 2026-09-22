@@ -18,7 +18,7 @@ const CRX_ABI = parseAbi([
   'function balanceOf(address account) view returns (uint256)',
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
-  'function transferFrom(address from, address to, uint256 amount) returns (bool)',
+  'function transfer(address to, uint256 amount) returns (bool)',
 ]);
 
 const POOL_ABI = parseAbi([
@@ -31,6 +31,7 @@ const POOL_ABI = parseAbi([
   'function crxToken() view returns (address)',
   'function owner() view returns (address)',
   'function POOL_PER_PARTICIPANT() view returns (uint256)',
+  'function availableFunding() view returns (uint256)',
   'function getContestSummary(uint256 contestId) view returns (uint256 joinDeadline, uint8 contestStage, uint256 participantCount, uint256 totalPool, uint256 distributedAmount, uint256 distributedCount, bool fundingComplete)',
   'function hasEntered(uint256 contestId, address participant) view returns (bool)',
   'function fundParticipant(uint256 contestId, address participant)',
@@ -224,40 +225,31 @@ export class OnchainContestService {
       functionName: 'POOL_PER_PARTICIPANT',
     }));
 
-    const fundingState = await this.ensureFundingAllowance(perParticipant);
+    const availableFunding = BigInt(await this.publicClient.readContract({
+      address: this.poolAddress!,
+      abi: POOL_ABI,
+      functionName: 'availableFunding',
+    }));
 
-    try {
-      await this.publicClient.simulateContract({
-        account: this.poolAddress!,
+    let fundingTxHash: Hex | null = null;
+
+    // The funding wallet sends CRX directly to the pool. The pool then
+    // records that pre-funded amount, avoiding a nested token transferFrom.
+    if (availableFunding < perParticipant) {
+      if (fundingWallet.toLowerCase() !== this.ownerAccount!.address.toLowerCase()) {
+        throw new ServiceUnavailableException(
+          `Funding wallet ${fundingWallet} must be the contest owner for direct CRX funding.`,
+        );
+      }
+
+      fundingTxHash = await this.walletClient!.writeContract({
         address: this.tokenAddress!,
         abi: CRX_ABI,
-        functionName: 'transferFrom',
-        args: [fundingWallet, this.poolAddress!, perParticipant],
+        functionName: 'transfer',
+        args: [this.poolAddress!, perParticipant],
       });
-    } catch (error) {
-      const record = typeof error === 'object' && error !== null ? error as Record<string, unknown> : {};
-      const cause = record.cause && typeof record.cause === 'object'
-        ? record.cause as Record<string, unknown>
-        : {};
-      const detail =
-        (typeof record.shortMessage === 'string' && record.shortMessage) ||
-        (typeof record.details === 'string' && record.details) ||
-        (typeof cause.shortMessage === 'string' && cause.shortMessage) ||
-        (typeof cause.details === 'string' && cause.details) ||
-        (error instanceof Error ? error.message.split('\\n')[0] : String(error));
-
-      this.logger.error(
-        `CRX token transferFrom simulation failed fundingWallet=${fundingWallet} pool=${this.poolAddress} amount=${perParticipant.toString()} detail=${detail} raw=${JSON.stringify(record.data ?? null)} cause=${JSON.stringify(cause)}`,
-      );
-
-      throw new ServiceUnavailableException(
-        `CRX token transferFrom failed before pool funding. Token=${this.tokenAddress}; from=${fundingWallet}; to=${this.poolAddress}; amount=${formatUnits(perParticipant, current.tokenDecimals)} CRX; reason=${detail}`,
-      );
+      await this.publicClient.waitForTransactionReceipt({ hash: fundingTxHash });
     }
-
-    this.logger.log(
-      `CRX funding preflight contest=${contestId} participant=${account} stage=${current.stage} deadline=${current.joinDeadline} entered=${Boolean(entered)} poolToken=${poolToken} configuredToken=${this.tokenAddress} poolOwner=${poolOwner} owner=${this.ownerAccount!.address} fundingWallet=${fundingWallet} perParticipant=${perParticipant.toString()} balance=${fundingState.balance.toString()} allowance=${fundingState.allowance.toString()}`,
-    );
 
     let hash: Hex;
     try {
@@ -276,24 +268,19 @@ export class OnchainContestService {
       const cause = record.cause && typeof record.cause === 'object'
         ? record.cause as Record<string, unknown>
         : {};
-      const causeData = cause.data && typeof cause.data === 'object'
-        ? cause.data as Record<string, unknown>
-        : {};
       const detail =
         (typeof record.shortMessage === 'string' && record.shortMessage) ||
         (typeof record.details === 'string' && record.details) ||
         (typeof cause.shortMessage === 'string' && cause.shortMessage) ||
         (typeof cause.details === 'string' && cause.details) ||
-        (typeof causeData.errorName === 'string' && causeData.errorName) ||
-        (typeof causeData.reason === 'string' && causeData.reason) ||
         (error instanceof Error ? error.message.split('\\n')[0] : String(error));
 
       this.logger.error(
-        `CRX fund simulation/write failed contest=${contestId} participant=${account} pool=${this.poolAddress} fundingWallet=${fundingWallet} detail=${detail} rawCause=${JSON.stringify(cause)} rawData=${JSON.stringify(record.data ?? null)}`,
+        `CRX pool registration failed contest=${contestId} participant=${account} pool=${this.poolAddress} detail=${detail}`,
       );
 
       throw new ServiceUnavailableException(
-        `The configured CRX contest pool rejected participant funding. Pool=${this.poolAddress}; fundingWallet=${fundingWallet}; reason=${detail}`,
+        `The CRX pool could not register the pre-funded participant. Pool=${this.poolAddress}; reason=${detail}`,
       );
     }
 
