@@ -314,7 +314,35 @@ export class ContestService {
     // The user's signature only proves wallet ownership. The participant still
     // pays 0 CRX. The backend owner funds the prize pool with 10 CRX on-chain.
     // The funding call is idempotent so a retried confirmation cannot add CRX twice.
-    const funding = await this.onchain.fundParticipant(chainContestId, wallet);
+    // If this specific on-chain contest instance is stale/corrupted, create one
+    // fresh contest for the same fixture deadline and retry exactly once.
+    let funding: any;
+    let effectiveChainContestId = chainContestId;
+    try {
+      funding = await this.onchain.fundParticipant(effectiveChainContestId, wallet);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const retryablePoolFailure =
+        message.includes('configured CRX contest pool rejected participant funding') ||
+        message.includes('CRX token transferFrom failed before pool funding');
+
+      if (!retryablePoolFailure) throw error;
+
+      const expectedDeadline = Math.floor(
+        new Date((contest as any).lineupLockAt).getTime() / 1000,
+      );
+      try {
+        const recreated = await this.onchain.createContest(expectedDeadline);
+        effectiveChainContestId = Number(recreated.chainContestId);
+        contest = await this.prisma.contest.update({
+          where: { id: contest.id },
+          data: { chainContestId: effectiveChainContestId },
+        });
+        funding = await this.onchain.fundParticipant(effectiveChainContestId, wallet);
+      } catch (retryError) {
+        throw retryError;
+      }
+    }
 
     const entryId = `entry_${contest.id}_${userId}`;
     const result = await this.prisma.$transaction(async (tx) => {
