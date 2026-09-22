@@ -40,10 +40,21 @@ jobs:
         working-directory: .
         run: npm install --workspaces --include-workspace-root
 
+      - name: Configure Node module resolution
+        shell: bash
+        run: |
+          echo "NODE_PATH=$GITHUB_WORKSPACE/node_modules:$GITHUB_WORKSPACE/apps/mobile/node_modules" >> "$GITHUB_ENV"
+
       - name: Generate Android project
         env:
           CI: "1"
         run: npx expo prebuild --platform android --no-install
+
+      - name: Verify Node module resolution
+        shell: bash
+        run: |
+          cd android
+          node -e "console.log('expo=', require.resolve('expo/package.json')); console.log('react-native=', require.resolve('react-native/package.json')); console.log('codegen=', require.resolve('@react-native/codegen/package.json')); console.log('expo-cli=', require.resolve('@expo/cli/package.json'));"
 
       - name: Verify release signing
         shell: bash
