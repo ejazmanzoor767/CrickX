@@ -29,6 +29,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Setup Java
         uses: actions/setup-java@v5
@@ -40,92 +41,98 @@ jobs:
         working-directory: .
         run: npm install --workspaces --include-workspace-root
 
-      - name: Configure Node module resolution
+      - name: Configure Node resolution
         shell: bash
         run: |
           echo "NODE_PATH=$GITHUB_WORKSPACE/node_modules:$GITHUB_WORKSPACE/apps/mobile/node_modules" >> "$GITHUB_ENV"
 
-      - name: Generate Android project
+      - name: Generate clean Android project
         env:
           CI: "1"
-        run: npx expo prebuild --platform android --no-install
+        run: npx expo prebuild --clean --platform android --no-install
 
-      - name: Fix Expo monorepo Android entry point
+      - name: Stabilize generated Gradle configuration
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import subprocess
+          import re
+
+          def resolve(name):
+              return subprocess.check_output(
+                  ["node", "-p", f"require.resolve('{name}')"],
+                  text=True
+              ).strip()
+
+          def pkg_dir(name):
+              return str(Path(resolve(name)).parent)
+
           p = Path("android/app/build.gradle")
-          s = p.read_text()
-          lines = s.splitlines()
-          replaced = False
+          if not p.exists():
+              raise SystemExit("android/app/build.gradle was not generated")
+
+          rn_dir = pkg_dir("react-native/package.json")
+          codegen_dir = pkg_dir("@react-native/codegen/package.json")
+          expo_cli = resolve("@expo/cli")
+
+          replacements = {
+              "entryFile =": 'entryFile = file("${projectRoot}/App.tsx")',
+              "reactNativeDir =": f'reactNativeDir = file("{rn_dir}")',
+              "hermesCommand =": f'hermesCommand = file("{rn_dir}/sdks/hermesc/%OS-BIN%/hermesc").getAbsolutePath()',
+              "codegenDir =": f'codegenDir = file("{codegen_dir}")',
+              "cliFile =": f'cliFile = file("{expo_cli}")',
+          }
+
+          lines = p.read_text().splitlines()
+          found = set()
           for i, line in enumerate(lines):
-              if "entryFile = file(" in line:
-                  lines[i] = '    entryFile = file("
-        shell: bash
-        run: |
-          cd android
-          node -e "console.log('expo=', require.resolve('expo/package.json')); console.log('react-native=', require.resolve('react-native/package.json')); console.log('codegen=', require.resolve('@react-native/codegen/package.json')); console.log('expo-cli=', require.resolve('@expo/cli/package.json'));"
+              stripped = line.strip()
+              for key, replacement in replacements.items():
+                  if stripped.startswith(key):
+                      indent = line[:len(line) - len(line.lstrip())]
+                      lines[i] = indent + replacement
+                      found.add(key)
+                      break
 
-      - name: Verify release signing
-        shell: bash
-        run: |
-          grep -n -A8 -B3 'release {' android/app/build.gradle
-          grep -q 'signingConfig signingConfigs.debug' android/app/build.gradle
+          missing = set(replacements) - found
+          if missing:
+              raise SystemExit("Missing generated Expo Gradle settings: " + ", ".join(sorted(missing)))
 
-      - name: Assemble APK
-        shell: bash
-        run: |
-          test -f android/gradlew
-          chmod +x android/gradlew
-          cd android
-          ./gradlew assembleRelease --no-daemon
+          s = "
+".join(lines) + "
+"
+          release = re.search(r"(?ms)(^s*releases*{)(.*?)(^s*})", s)
+          if not release:
+              raise SystemExit("Could not find Android release build type")
+          body = release.group(2)
+          if "signingConfig signingConfigs." not in body:
+              start, end = release.span(2)
+              indent = re.match(r"s*", release.group(1)).group(0) + "    "
+              s = s[:start] + "
+" + indent + "signingConfig signingConfigs.debug" + s[start:end] + s[end:]
 
-      - name: Rename APK
-        shell: bash
-        run: |
-          mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk dist/CrickX-${{ github.run_number }}.apk
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: CrickX-Android-APK-${{ github.run_number }}
-          path: apps/mobile/dist/CrickX-${{ github.run_number }}.apk
-          retention-days: 30
-
-      - name: Publish GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "mobile-v1.0.${{ github.run_number }}" "dist/CrickX-${{ github.run_number }}.apk" --repo "${{ github.repository }}" --title "CrickX Android v1.0.${{ github.run_number }}" --notes "Installable CrickX Android APK built from main."
- + "{projectRoot}/App.tsx")'
-                  replaced = True
-                  break
-          if not replaced:
-              raise SystemExit("Expo entryFile line was not found in android/app/build.gradle")
-          p.write_text("\n".join(lines) + "\n")
-          print("Android entry point set to apps/mobile/App.tsx")
+          p.write_text(s)
+          print("Android Gradle configuration stabilized.")
+          print("React Native:", rn_dir)
+          print("Codegen:", codegen_dir)
+          print("Expo CLI:", expo_cli)
           PY
 
-      - name: Verify Node module resolution
+      - name: Verify Android project
         shell: bash
         run: |
-          cd android
-          node -e "console.log('expo=', require.resolve('expo/package.json')); console.log('react-native=', require.resolve('react-native/package.json')); console.log('codegen=', require.resolve('@react-native/codegen/package.json')); console.log('expo-cli=', require.resolve('@expo/cli/package.json'));"
-
-      - name: Verify release signing
-        shell: bash
-        run: |
-          grep -n -A8 -B3 'release {' android/app/build.gradle
-          grep -q 'signingConfig signingConfigs.debug' android/app/build.gradle
+          test -f android/settings.gradle || test -f android/settings.gradle.kts
+          test -f android/app/build.gradle
+          test -f android/gradlew
+          grep -n -E "entryFile =|reactNativeDir =|hermesCommand =|codegenDir =|cliFile =" android/app/build.gradle
 
       - name: Assemble APK
         shell: bash
         run: |
-          test -f android/gradlew
           chmod +x android/gradlew
           cd android
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Rename APK
         shell: bash
