@@ -51,6 +51,39 @@ jobs:
           CI: "1"
         run: npx expo prebuild --clean --platform android --no-install
 
+      - name: Ensure Android splash resources
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          color = "#0B0D12"
+
+          for folder in [
+              Path("android/app/src/main/res/values"),
+              Path("android/app/src/main/res/values-night"),
+          ]:
+              folder.mkdir(parents=True, exist_ok=True)
+              p = folder / "colors.xml"
+              if p.exists():
+                  s = p.read_text()
+                  if 'name="splashscreen_background"' not in s:
+                      s = s.replace("</resources>", f'    <color name="splashscreen_background">{color}</color>\n</resources>')
+                      p.write_text(s)
+              else:
+                  p.write_text(f'<resources>\n    <color name="splashscreen_background">{color}</color>\n</resources>\n')
+
+          splash = Path("android/app/src/main/res/drawable/splashscreen.xml")
+          if not splash.exists():
+              splash.parent.mkdir(parents=True, exist_ok=True)
+              splash.write_text(
+                  '<layer-list xmlns:android="http://schemas.android.com/apk/res/android">\n'
+                  '    <item android:drawable="@color/splashscreen_background"/>\n'
+                  '</layer-list>\n'
+              )
+
+          print("Android splash resources verified.")
+          PY
+
       - name: Stabilize generated Gradle configuration
         shell: bash
         run: |
@@ -136,6 +169,8 @@ jobs:
           grep -n -E "entryFile =|reactNativeDir =|hermesCommand =|codegenDir =|cliFile =" android/app/build.gradle
 
       - name: Assemble APK
+        env:
+          NODE_ENV: production
         shell: bash
         run: |
           chmod +x android/gradlew
