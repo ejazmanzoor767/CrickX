@@ -53,55 +53,70 @@ export class FirestoreService implements OnModuleInit, OnModuleDestroy {
   private async getAll(model: string): Promise<any[]> { const docs = (await this.col(model).get()).docs; return docs.map((d) => decorateRecord(model, { id: d.id, ...(d.data() as any) })); }
   private async findRows(model: string, args: any = {}) {
     const where = this.expandWhere(args?.where);
-
-    // Most application queries are simple single-field lookups (fixture ID,
-    // contest ID, status, user ID, etc.). The old adapter loaded the entire
-    // collection for every findMany/findFirst/count call, which multiplied
-    // Firestore reads and eventually exhausted the free quota. Push simple
-    // predicates to Firestore so only matching documents are read.
     const entries = where && typeof where === 'object' ? Object.entries(where) : [];
+
+    // Push every simple predicate to Firestore. The previous adapter only
+    // pushed a single predicate; queries such as
+    // { sportmonksFixtureId, status: { in: [...] } } therefore loaded the
+    // entire collection on every call, which can exhaust Firestore quota.
     const canUseServerFilter =
-      entries.length === 1 &&
+      entries.length > 0 &&
       !('AND' in where) &&
-      !('OR' in where);
+      !('OR' in where) &&
+      entries.every(([, expected]) => {
+        if (
+          expected &&
+          typeof expected === 'object' &&
+          !(expected instanceof Date) &&
+          !Array.isArray(expected) &&
+          !(expected instanceof FirestoreDecimal)
+        ) {
+          return (
+            'in' in expected ||
+            'notIn' in expected ||
+            'lt' in expected ||
+            'lte' in expected ||
+            'gt' in expected ||
+            'gte' in expected ||
+            'equals' in expected
+          );
+        }
+        return true;
+      });
 
     let rows: any[];
 
     if (canUseServerFilter) {
-      const [field, expected] = entries[0] as [string, any];
       let query: any = this.col(model);
 
-      if (
-        expected &&
-        typeof expected === 'object' &&
-        !(expected instanceof Date) &&
-        !Array.isArray(expected) &&
-        !(expected instanceof FirestoreDecimal)
-      ) {
-        if ('in' in expected) query = query.where(field, 'in', (expected as any).in);
-        else if ('notIn' in expected) query = query.where(field, 'not-in', (expected as any).notIn);
-        else if ('lt' in expected) query = query.where(field, '<', (expected as any).lt);
-        else if ('lte' in expected) query = query.where(field, '<=', (expected as any).lte);
-        else if ('gt' in expected) query = query.where(field, '>', (expected as any).gt);
-        else if ('gte' in expected) query = query.where(field, '>=', (expected as any).gte);
-        else if ('equals' in expected) query = query.where(field, '==', (expected as any).equals);
-        else query = null;
-      } else if (expected instanceof FirestoreDecimal) {
-        query = query.where(field, '==', expected.toNumber());
-      } else if (expected instanceof Date) {
-        query = query.where(field, '==', expected);
-      } else {
-        query = query.where(field, '==', expected);
+      for (const [field, expected] of entries) {
+        if (
+          expected &&
+          typeof expected === 'object' &&
+          !(expected instanceof Date) &&
+          !Array.isArray(expected) &&
+          !(expected instanceof FirestoreDecimal)
+        ) {
+          if ('in' in expected) query = query.where(field, 'in', (expected as any).in);
+          else if ('notIn' in expected) query = query.where(field, 'not-in', (expected as any).notIn);
+          else if ('lt' in expected) query = query.where(field, '<', (expected as any).lt);
+          else if ('lte' in expected) query = query.where(field, '<=', (expected as any).lte);
+          else if ('gt' in expected) query = query.where(field, '>', (expected as any).gt);
+          else if ('gte' in expected) query = query.where(field, '>=', (expected as any).gte);
+          else if ('equals' in expected) query = query.where(field, '==', (expected as any).equals);
+        } else if (expected instanceof FirestoreDecimal) {
+          query = query.where(field, '==', expected.toNumber());
+        } else if (expected instanceof Date) {
+          query = query.where(field, '==', expected);
+        } else {
+          query = query.where(field, '==', expected);
+        }
       }
 
-      if (query) {
-        const snapshot = await query.get();
-        rows = snapshot.docs.map((d: any) =>
-          decorateRecord(model, { id: d.id, ...(d.data() as any) }),
-        );
-      } else {
-        rows = await this.getAll(model);
-      }
+      const snapshot = await query.get();
+      rows = snapshot.docs.map((d: any) =>
+        decorateRecord(model, { id: d.id, ...(d.data() as any) }),
+      );
     } else {
       rows = await this.getAll(model);
     }
@@ -112,6 +127,7 @@ export class FirestoreService implements OnModuleInit, OnModuleDestroy {
     if (args?.take !== undefined) rows = rows.slice(0, Number(args.take));
     return rows;
   }
+
   async findUnique(model: string, args: any) { const where = this.expandWhere(args?.where); let row = null; const direct = this.uniqueDirectId(model, where); if (direct) row = await this.readDoc(model, direct); if (!row) row = (await this.findRows(model, { where }))[0] ?? null; return row ? this.hydrate(model, row, args?.include, args?.select) : null; }
   async findFirstOp(model: string, args: any) { const row = (await this.findRows(model, args))[0] ?? null; return row ? this.hydrate(model, row, args?.include, args?.select) : null; }
   async findMany(model: string, args: any = {}) { return Promise.all((await this.findRows(model, args)).map((r) => this.hydrate(model, r, args?.include, args?.select))); }
