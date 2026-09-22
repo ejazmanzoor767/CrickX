@@ -1,17 +1,5 @@
 import React, { Component, useEffect, useMemo, useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
-import { hasSession, clearSession } from './src/lib/api';
-import { colors } from './src/theme';
-import { Loading } from './src/components';
-import LoginScreen from './src/screens/LoginScreen';
-import RegisterScreen from './src/screens/RegisterScreen';
-import MatchesScreen from './src/screens/MatchesScreen';
-import MatchDetailScreen from './src/screens/MatchDetailScreen';
-import ContestScreen from './src/screens/ContestScreen';
-import LeaderboardScreen from './src/screens/LeaderboardScreen';
-import FantasyScreen from './src/screens/FantasyScreen';
-import WalletScreen from './src/screens/WalletScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 
 type Route =
   | 'Login'
@@ -22,6 +10,15 @@ type Route =
   | 'Leaderboard';
 
 type Params = Record<string, any> | undefined;
+
+const BG = '#080b10';
+const SURFACE = '#111722';
+const BORDER = 'rgba(255,255,255,.08)';
+const TEXT = '#f4f7fb';
+const MUTED = '#96a0b3';
+const GREEN = '#9bf34a';
+const GREEN_DARK = '#12220a';
+const RED = '#ff6b6b';
 
 class StartupErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -36,24 +33,24 @@ class StartupErrorBoundary extends Component<
   render() {
     if (this.state.error) {
       return (
-        <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center', padding: 24 }}>
-          <Text style={{ color: colors.green, fontSize: 12, fontWeight: '900', letterSpacing: 2 }}>
+        <View style={{ flex: 1, backgroundColor: BG, justifyContent: 'center', padding: 24 }}>
+          <Text style={{ color: GREEN, fontSize: 12, fontWeight: '900', letterSpacing: 2 }}>
             CRICKX
           </Text>
-          <Text style={{ color: colors.text, fontSize: 26, fontWeight: '900', marginTop: 8 }}>
+          <Text style={{ color: TEXT, fontSize: 26, fontWeight: '900', marginTop: 8 }}>
             CrickX could not start
           </Text>
-          <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 21, marginTop: 10 }}>
-            Please close and reopen the app. Technical details:
+          <Text style={{ color: MUTED, fontSize: 14, lineHeight: 21, marginTop: 10 }}>
+            The app reached its error screen. Technical details:
           </Text>
-          <Text style={{ color: colors.red, fontSize: 12, lineHeight: 18, marginTop: 12 }}>
-            {this.state.error.message}
+          <Text style={{ color: RED, fontSize: 12, lineHeight: 18, marginTop: 12 }}>
+            {this.state.error.message || String(this.state.error)}
           </Text>
           <TouchableOpacity
             onPress={() => this.setState({ error: null })}
-            style={{ marginTop: 18, backgroundColor: colors.green, borderRadius: 12, paddingVertical: 13, alignItems: 'center' }}
+            style={{ marginTop: 18, backgroundColor: GREEN, borderRadius: 12, paddingVertical: 13, alignItems: 'center' }}
           >
-            <Text style={{ color: colors.greenDark, fontWeight: '900' }}>Try Again</Text>
+            <Text style={{ color: GREEN_DARK, fontWeight: '900' }}>Try Again</Text>
           </TouchableOpacity>
         </View>
       );
@@ -73,7 +70,6 @@ export default function App() {
 
 function CrickXApp() {
   const [ready, setReady] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(false);
   const [route, setRoute] = useState<Route>('Login');
   const [params, setParams] = useState<Params>(undefined);
   const [tab, setTab] = useState<'Matches' | 'Fantasy' | 'Wallet' | 'Profile'>('Matches');
@@ -82,13 +78,13 @@ function CrickXApp() {
     let mounted = true;
     (async () => {
       try {
+        // Lazy-load storage/API only after the first React render.
+        const { hasSession } = require('./src/lib/api') as typeof import('./src/lib/api');
         const session = await hasSession();
         if (!mounted) return;
-        setLoggedIn(session);
         setRoute(session ? 'Main' : 'Login');
       } catch {
         if (!mounted) return;
-        setLoggedIn(false);
         setRoute('Login');
       } finally {
         if (mounted) setReady(true);
@@ -110,7 +106,12 @@ function CrickXApp() {
       }
       if (name === 'Main') {
         const requestedTab = nextParams?.screen;
-        if (requestedTab === 'Fantasy' || requestedTab === 'Wallet' || requestedTab === 'Profile' || requestedTab === 'Matches') {
+        if (
+          requestedTab === 'Fantasy' ||
+          requestedTab === 'Wallet' ||
+          requestedTab === 'Profile' ||
+          requestedTab === 'Matches'
+        ) {
           setTab(requestedTab);
         }
         setRoute('Main');
@@ -123,12 +124,16 @@ function CrickXApp() {
     replace: (name: string, nextParams?: Params) => {
       if (name === 'Main') {
         const requestedTab = nextParams?.screen;
-        if (requestedTab === 'Fantasy' || requestedTab === 'Wallet' || requestedTab === 'Profile' || requestedTab === 'Matches') {
+        if (
+          requestedTab === 'Fantasy' ||
+          requestedTab === 'Wallet' ||
+          requestedTab === 'Profile' ||
+          requestedTab === 'Matches'
+        ) {
           setTab(requestedTab);
         }
         setRoute('Main');
         setParams(nextParams?.params);
-        setLoggedIn(true);
         return;
       }
       setRoute(name as Route);
@@ -145,29 +150,59 @@ function CrickXApp() {
     },
   }), [route]);
 
-  if (!ready) return <Loading />;
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, backgroundColor: BG, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: GREEN, fontSize: 30, fontWeight: '900', letterSpacing: 4 }}>CRICKX</Text>
+        <Text style={{ color: MUTED, marginTop: 8, fontSize: 13 }}>Starting app…</Text>
+        <ActivityIndicator size="small" color={GREEN} style={{ marginTop: 16 }} />
+      </View>
+    );
+  }
 
-  if (route === 'Login') return <LoginScreen navigation={navigation} />;
-  if (route === 'Register') return <RegisterScreen navigation={navigation} />;
-  if (route === 'MatchDetail') return <MatchDetailScreen route={{ params }} navigation={navigation} />;
-  if (route === 'Contest') return <ContestScreen route={{ params }} navigation={navigation} />;
-  if (route === 'Leaderboard') return <LeaderboardScreen route={{ params }} navigation={navigation} />;
+  try {
+    if (route === 'Login') {
+      const LoginScreen = require('./src/screens/LoginScreen').default;
+      return <LoginScreen navigation={navigation} />;
+    }
+    if (route === 'Register') {
+      const RegisterScreen = require('./src/screens/RegisterScreen').default;
+      return <RegisterScreen navigation={navigation} />;
+    }
+    if (route === 'MatchDetail') {
+      const MatchDetailScreen = require('./src/screens/MatchDetailScreen').default;
+      return <MatchDetailScreen route={{ params }} navigation={navigation} />;
+    }
+    if (route === 'Contest') {
+      const ContestScreen = require('./src/screens/ContestScreen').default;
+      return <ContestScreen route={{ params }} navigation={navigation} />;
+    }
+    if (route === 'Leaderboard') {
+      const LeaderboardScreen = require('./src/screens/LeaderboardScreen').default;
+      return <LeaderboardScreen route={{ params }} navigation={navigation} />;
+    }
 
-  return (
-    <MainTabs
-      activeTab={tab}
-      setActiveTab={setTab}
-      navigation={navigation}
-      params={params}
-      onSignOut={async () => {
-        await clearSession();
-        setLoggedIn(false);
-        setRoute('Login');
-        setTab('Matches');
-        setParams(undefined);
-      }}
-    />
-  );
+    return (
+      <MainTabs
+        activeTab={tab}
+        setActiveTab={setTab}
+        navigation={navigation}
+        params={params}
+        onSignOut={async () => {
+          try {
+            const { clearSession } = require('./src/lib/api') as typeof import('./src/lib/api');
+            await clearSession();
+          } finally {
+            setRoute('Login');
+            setTab('Matches');
+            setParams(undefined);
+          }
+        }}
+      />
+    );
+  } catch (error) {
+    throw error;
+  }
 }
 
 function MainTabs({
@@ -183,41 +218,44 @@ function MainTabs({
   params: Params;
   onSignOut: () => void;
 }) {
-  const tabs = [
-    { id: 'Matches' as const, label: 'Matches' },
-    { id: 'Fantasy' as const, label: 'Fantasy' },
-    { id: 'Wallet' as const, label: 'Wallet' },
-    { id: 'Profile' as const, label: 'Profile' },
-  ];
+  let Screen: any;
+  if (activeTab === 'Matches') Screen = require('./src/screens/MatchesScreen').default;
+  if (activeTab === 'Fantasy') Screen = require('./src/screens/FantasyScreen').default;
+  if (activeTab === 'Wallet') Screen = require('./src/screens/WalletScreen').default;
+  if (activeTab === 'Profile') Screen = require('./src/screens/ProfileScreen').default;
+
+  const screenProps =
+    activeTab === 'Fantasy'
+      ? { navigation, route: { params: params ?? {} } }
+      : activeTab === 'Profile'
+        ? { navigation, onSignOut }
+        : { navigation };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: BG }}>
       <View style={{ flex: 1 }}>
-        {activeTab === 'Matches' && <MatchesScreen navigation={navigation} />}
-        {activeTab === 'Fantasy' && <FantasyScreen navigation={navigation} route={{ params: params ?? {} }} />}
-        {activeTab === 'Wallet' && <WalletScreen navigation={navigation} />}
-        {activeTab === 'Profile' && <ProfileScreen navigation={navigation} onSignOut={onSignOut} />}
+        <Screen {...screenProps} />
       </View>
 
       <View style={{
         flexDirection: 'row',
-        backgroundColor: colors.surface,
+        backgroundColor: SURFACE,
         borderTopWidth: 1,
-        borderTopColor: colors.border,
+        borderTopColor: BORDER,
         paddingTop: 8,
         paddingBottom: 10,
         paddingHorizontal: 8,
       }}>
-        {tabs.map((item) => {
-          const active = item.id === activeTab;
+        {(['Matches', 'Fantasy', 'Wallet', 'Profile'] as const).map((item) => {
+          const active = item === activeTab;
           return (
             <TouchableOpacity
-              key={item.id}
-              onPress={() => setActiveTab(item.id)}
+              key={item}
+              onPress={() => setActiveTab(item)}
               style={{ flex: 1, alignItems: 'center', paddingVertical: 8 }}
             >
-              <Text style={{ color: active ? colors.green : colors.muted, fontSize: 11, fontWeight: '900' }}>
-                {active ? '● ' : ''}{item.label}
+              <Text style={{ color: active ? GREEN : MUTED, fontSize: 11, fontWeight: '900' }}>
+                {active ? '● ' : ''}{item}
               </Text>
             </TouchableOpacity>
           );
