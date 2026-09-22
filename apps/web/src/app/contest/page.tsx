@@ -103,7 +103,7 @@ function ContestContent() {
         prizePoolFundingStatus: 'PENDING_MATCH_START',
       } : prev);
 
-      setMessage(`Contest joined successfully. Participant ${count} joined. +10 CRX has been added to the prize pool database.`);
+      setMessage(`Contest joined successfully. Participant ${count} joined. +10 CRX has been added to the prize pool.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to join the contest.');
     } finally {
