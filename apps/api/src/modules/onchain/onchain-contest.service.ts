@@ -18,6 +18,7 @@ const CRX_ABI = parseAbi([
   'function balanceOf(address account) view returns (uint256)',
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
+  'function transferFrom(address from, address to, uint256 amount) returns (bool)',
 ]);
 
 const POOL_ABI = parseAbi([
@@ -224,6 +225,35 @@ export class OnchainContestService {
     }));
 
     const fundingState = await this.ensureFundingAllowance(perParticipant);
+
+    try {
+      await this.publicClient.simulateContract({
+        account: this.poolAddress!,
+        address: this.tokenAddress!,
+        abi: CRX_ABI,
+        functionName: 'transferFrom',
+        args: [fundingWallet, this.poolAddress!, perParticipant],
+      });
+    } catch (error) {
+      const record = typeof error === 'object' && error !== null ? error as Record<string, unknown> : {};
+      const cause = record.cause && typeof record.cause === 'object'
+        ? record.cause as Record<string, unknown>
+        : {};
+      const detail =
+        (typeof record.shortMessage === 'string' && record.shortMessage) ||
+        (typeof record.details === 'string' && record.details) ||
+        (typeof cause.shortMessage === 'string' && cause.shortMessage) ||
+        (typeof cause.details === 'string' && cause.details) ||
+        (error instanceof Error ? error.message.split('\\n')[0] : String(error));
+
+      this.logger.error(
+        `CRX token transferFrom simulation failed fundingWallet=${fundingWallet} pool=${this.poolAddress} amount=${perParticipant.toString()} detail=${detail} raw=${JSON.stringify(record.data ?? null)} cause=${JSON.stringify(cause)}`,
+      );
+
+      throw new ServiceUnavailableException(
+        `CRX token transferFrom failed before pool funding. Token=${this.tokenAddress}; from=${fundingWallet}; to=${this.poolAddress}; amount=${formatUnits(perParticipant, current.tokenDecimals)} CRX; reason=${detail}`,
+      );
+    }
 
     this.logger.log(
       `CRX funding preflight contest=${contestId} participant=${account} stage=${current.stage} deadline=${current.joinDeadline} entered=${Boolean(entered)} poolToken=${poolToken} configuredToken=${this.tokenAddress} poolOwner=${poolOwner} owner=${this.ownerAccount!.address} fundingWallet=${fundingWallet} perParticipant=${perParticipant.toString()} balance=${fundingState.balance.toString()} allowance=${fundingState.allowance.toString()}`,
