@@ -31,7 +31,7 @@ export default function MatchDetailScreen({ route, navigation }: any) {
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.scroll}>
-      <Header title={`${home} vs ${away}`} subtitle={status} />
+      <Header title={`${home} vs ${away}`} subtitle={status} onBack={() => navigation.goBack()} />
       <ErrorBox message={error} />
 
       <Card style={{ padding: 22, backgroundColor: live ? '#101e14' : colors.surface }}>
