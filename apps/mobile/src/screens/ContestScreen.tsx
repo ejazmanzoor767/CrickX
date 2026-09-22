@@ -45,7 +45,7 @@ export default function ContestScreen({ route, navigation }: any) {
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.scroll}>
-      <Header title="Contest" subtitle="Free entry for active weekly subscribers." />
+      <Header title="Contest" subtitle="Free entry for active weekly subscribers." onBack={() => navigation.goBack()} />
       <ErrorBox message={error} />
 
       <Card>
