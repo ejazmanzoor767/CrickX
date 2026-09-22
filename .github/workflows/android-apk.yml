@@ -45,37 +45,11 @@ jobs:
           CI: "1"
         run: npx expo prebuild --platform android --no-install
 
-      - name: Configure production APK signing
+      - name: Verify release signing
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          p = Path("android/app/build.gradle")
-          s = p.read_text()
-
-          # Expo prebuild templates can change indentation/formatting between SDK versions.
-          # Add a debug signing config to the release block only when one is not already present.
-          build_types = re.search(r"(?ms)^\\s*buildTypes\\s*\\{.*?^\\s*\\}", s)
-          if not build_types:
-              raise SystemExit("Unable to find buildTypes block")
-
-          block = build_types.group(0)
-          release = re.search(r"(?ms)(^\\s*release\\s*\\{)(.*?)(^\\s*\\})", block)
-          if not release:
-              raise SystemExit("Unable to find release build type")
-
-          release_body = release.group(2)
-          if "signingConfig signingConfigs." not in release_body:
-              indent = re.match(r"\\s*", release.group(1)).group(0) + "    "
-              replacement = release.group(1) + "\\n" + indent + "signingConfig signingConfigs.debug" + release_body
-              block = block[:release.start()] + replacement + block[release.end():]
-              s = s[:build_types.start()] + block + s[build_types.end():]
-              p.write_text(s)
-
-          print("Release signing configuration ready.")
-          PY
+          grep -n -A8 -B3 'release {' android/app/build.gradle
+          grep -q 'signingConfig signingConfigs.debug' android/app/build.gradle
 
       - name: Assemble APK
         run: ./gradlew assembleRelease --no-daemon
@@ -84,20 +58,16 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk dist/CrickX-\${{ github.run_number }}.apk
+          cp android/app/build/outputs/apk/release/app-release.apk dist/CrickX-${{ github.run_number }}.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CrickX-Android-APK-\${{ github.run_number }}
-          path: apps/mobile/dist/CrickX-\${{ github.run_number }}.apk
+          name: CrickX-Android-APK-${{ github.run_number }}
+          path: apps/mobile/dist/CrickX-${{ github.run_number }}.apk
           retention-days: 30
 
       - name: Publish GitHub release
         env:
-          GH_TOKEN: \${{ github.token }}
-        run: |
-          gh release create "mobile-v1.0.\${{ github.run_number }}" "dist/CrickX-\${{ github.run_number }}.apk" \
-            --repo "\${{ github.repository }}" \
-            --title "CrickX Android v1.0.\${{ github.run_number }}" \
-            --notes "Installable CrickX Android APK built from main."
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "mobile-v1.0.${{ github.run_number }}" "dist/CrickX-${{ github.run_number }}.apk" --repo "${{ github.repository }}" --title "CrickX Android v1.0.${{ github.run_number }}" --notes "Installable CrickX Android APK built from main."
