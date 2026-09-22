@@ -2,9 +2,10 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, spacing } from './theme';
 
-export function Header({ title, subtitle }: { title: string; subtitle?: string }) {
+export function Header({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack?: () => void }) {
   return (
     <View style={styles.header}>
+      {!!onBack && <TouchableOpacity onPress={onBack} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}><Text style={{ color: colors.text, fontSize: 28, lineHeight: 30 }}>‹</Text></TouchableOpacity>}
       <View style={{ flex: 1 }}>
         <Text style={styles.eyebrow}>CRICKX FANTASY</Text>
         <Text style={styles.title}>{title}</Text>
