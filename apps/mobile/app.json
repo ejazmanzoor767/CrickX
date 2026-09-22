@@ -12,6 +12,10 @@
     "android": {
       "package": "com.crickx.app",
       "versionCode": 1
+    },
+    "splash": {
+      "backgroundColor": "#0B0D12",
+      "resizeMode": "contain"
     }
   }
 }
