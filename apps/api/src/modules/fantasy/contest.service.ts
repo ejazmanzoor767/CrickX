@@ -90,6 +90,10 @@ export class ContestService {
           totalSpots: null,
           filledSpots: 0,
           prizePoolTotal: 0,
+          prizePoolFundingStatus: 'PENDING_MATCH_START',
+          prizePoolFundedAmount: 0,
+          prizePoolFundingTxHash: null,
+          prizePoolFundingAt: null,
           prizeDistribution: [],
           scoringRuleSetId: scoringRuleSet.id,
           lineupLockAt: fixtureForClock.starting_at,
@@ -286,11 +290,6 @@ export class ContestService {
 
     const existingWallet = await this.prisma.contestEntry.findFirst({ where: { contestId: contest.id, walletAddress: wallet } });
     if (existingWallet && existingWallet.userId !== userId) throw new ForbiddenException('This wallet has already joined the contest.');
-
-    const chainContestId = Number((contest as any).chainContestId);
-    if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
-      throw new ServiceUnavailableException('This contest is missing its on-chain contest ID. Please reopen the contest and try again.');
-    }
 
     const chainContestId = Number((contest as any).chainContestId);
     if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
