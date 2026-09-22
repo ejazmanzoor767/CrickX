@@ -41,10 +41,16 @@ function ContestContent() {
       }
     })();
 
-    const refreshSubscriptionTimer = window.setInterval(async () => {
+    const refreshContestTimer = window.setInterval(async () => {
       try {
-        const latestSubscription: any = await api.subscription();
-        if (active) setSubscription(latestSubscription);
+        const [latestContest, latestSubscription] = await Promise.all([
+          api.activeContest(fixtureId),
+          api.subscription(),
+        ]);
+        if (active) {
+          setContest(latestContest);
+          setSubscription(latestSubscription);
+        }
       } catch {
         // Keep the current UI state when a background refresh temporarily fails.
       }
@@ -52,7 +58,7 @@ function ContestContent() {
 
     return () => {
       active = false;
-      window.clearInterval(refreshSubscriptionTimer);
+      window.clearInterval(refreshContestTimer);
     };
   }, [fixtureId]);
 
@@ -89,21 +95,15 @@ function ContestContent() {
       );
 
       const count = Number(result?.participantCount ?? Number(contest.filledSpots || 0) + 1);
-      const fundingHash = result?.poolFundingTxHash ? String(result.poolFundingTxHash) : '';
       setContest((prev: any) => prev ? {
         ...prev,
         filledSpots: count,
         prizePoolTotal: count * 10,
         entryFee: 0,
+        prizePoolFundingStatus: 'PENDING_MATCH_START',
       } : prev);
 
-      if (fundingHash) {
-        setMessage(
-          `Contest joined successfully. Participant ${count} joined and 10 CRX was funded into the on-chain prize pool. Funding transaction: ${fundingHash.slice(0, 10)}…${fundingHash.slice(-8)}`,
-        );
-      } else {
-        setMessage(`Contest joined successfully. Participant ${count} joined. The 10 CRX pool funding was already recorded on-chain. Your wallet is registered for any CRX prize earned by this entry.`);
-      }
+      setMessage(`Contest joined successfully. Participant ${count} joined. +10 CRX has been added to the prize pool database. The full pool will be transferred to the on-chain prize pool in one transaction when the match starts.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to join the contest.');
     } finally {
@@ -139,7 +139,7 @@ function ContestContent() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 12 }}>
         <div><span className="muted-label">ENTRY</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>FREE</strong><small className="section-subtitle">0 CRX charged</small></div>
         <div><span className="muted-label">PARTICIPANTS</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{participantCount}</strong><small className="section-subtitle">{participantCount === 1 ? '1 participant joined' : 'participants joined'} · Unlimited</small></div>
-        <div><span className="muted-label">PRIZE POOL</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{prizePool} CRX</strong><small className="section-subtitle">10 CRX per participant</small></div>
+        <div><span className="muted-label">PRIZE POOL</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{prizePool} CRX</strong><small className="section-subtitle">10 CRX per participant · {contest.prizePoolFundingStatus === 'FUNDED' ? 'Funded on-chain' : 'Reserved in database'}</small></div>
         <div><span className="muted-label">STATUS</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{open ? 'OPEN' : 'CLOSED'}</strong></div>
       </div>
     </div>
@@ -199,7 +199,7 @@ function ContestContent() {
     <div className="card" style={{ marginTop: 14 }}>
       <p className="eyebrow">PRIZE FUNDING & SETTLEMENT</p>
       <p className="section-subtitle">
-        CrickX funds 10 CRX for each joined participant. After the final leaderboard is calculated, the smart contract receives the full participant ranking and funding amount, then transfers the CRX prizes directly to the registered winner wallets according to rank.
+        Each successful join adds 10 CRX to the persistent database prize pool. No CRX leaves the funding wallet during joining. When the match starts, CrickX transfers the full accumulated pool to the on-chain prize pool in one transaction; settlement then pays winners from that funded pool.
       </p>
       <Link className="secondary-button" href={`/leaderboard?fixtureId=${fixtureId}`}>View Leaderboard</Link>
     </div>
