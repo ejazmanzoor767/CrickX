@@ -110,7 +110,7 @@ jobs:
           expo_cli = resolve("@expo/cli")
 
           replacements = {
-              "entryFile =": 'entryFile = file(projectRoot + "/../../node_modules/expo/AppEntry.js")',
+              "entryFile =": 'entryFile = file(projectRoot + "/index.js")',
               "reactNativeDir =": f'reactNativeDir = file("{rn_dir}")',
               "hermesCommand =": f'hermesCommand = file("{rn_dir}/sdks/hermesc/%OS-BIN%/hermesc").getAbsolutePath()',
               "codegenDir =": f'codegenDir = file("{codegen_dir}")',
