@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 import { Card, EmptyState, ErrorBox, Header, styles } from '../components';
 import { colors } from '../theme';
 
-export default function LeaderboardScreen({ route }: any) {
+export default function LeaderboardScreen({ route, navigation }: any) {
   const fixtureId = Number(route.params?.fixtureId);
   const [rows, setRows] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
