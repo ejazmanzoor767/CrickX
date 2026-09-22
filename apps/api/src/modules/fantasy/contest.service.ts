@@ -41,6 +41,10 @@ export class ContestService {
         totalSpots: null,
         filledSpots: 0,
         prizePoolTotal: 0,
+        prizePoolFundingStatus: 'PENDING_MATCH_START',
+        prizePoolFundedAmount: 0,
+        prizePoolFundingTxHash: null,
+        prizePoolFundingAt: null,
         prizeDistribution: [],
         scoringRuleSetId: dto.scoringRuleSetId,
         lineupLockAt: fixture.starting_at,
@@ -105,14 +109,14 @@ export class ContestService {
       contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE', entryFee: 0 } });
     }
 
-    // Read the live on-chain pool when a chain contest is configured. This makes
-    // the UI display the actual contract participant count and CRX balance.
+    // Firestore is the source of truth for the contest pool while entries are open.
+    // The blockchain is funded only once, when the match starts.
     let chain: any = null;
-    let chainCheckFailed = false;
     const storedChainContestId = Number((contest as any).chainContestId);
     const expectedJoinDeadline = Math.floor(
       new Date(fixtureForClock?.starting_at ?? contest.lineupLockAt).getTime() / 1000,
     );
+
     if (Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
       try {
         const candidate = await this.onchain.contestSummaryOrNull(storedChainContestId);
@@ -124,30 +128,16 @@ export class ContestService {
           chain = candidate;
         }
       } catch {
-        chainCheckFailed = true;
+        chain = null;
       }
     }
 
-    // During migration to a new pool contract, an older Firestore contest may
-    // point at a chain contest ID that no longer exists. Re-create that chain
-    // contest and back-fund any already-recorded participant wallets. Backfill
-    // is resumable because fundParticipant() is idempotent per wallet.
-    let existingWallets: string[] = [];
-    if (isOpen && !chainCheckFailed) {
-      const existingEntries = await this.prisma.contestEntry.findMany({
-        where: { contestId: contest.id },
-      });
-      existingWallets = Array.from(new Set(
-        existingEntries
-          .map((entry: any) => String(entry.walletAddress || '').trim())
-          .filter((wallet: string) => /^0x[a-fA-F0-9]{40}$/.test(wallet)),
-      ));
-    }
-
-    if (isOpen && !chain && !chainCheckFailed && Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
+    // During a contract migration, keep the Firestore contest linked to a valid
+    // on-chain contest ID for the same fixture deadline. No participant funding
+    // happens here; the full pool is funded once at match start.
+    if (!chain && Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
       try {
-        const deadline = expectedJoinDeadline;
-        const recreated = await this.onchain.createContest(deadline);
+        const recreated = await this.onchain.createContest(expectedJoinDeadline);
         contest = await this.prisma.contest.update({
           where: { id: contest.id },
           data: { chainContestId: recreated.chainContestId },
@@ -158,20 +148,8 @@ export class ContestService {
       }
     }
 
-    // Resume any incomplete funding for entries already stored in Firestore.
-    if (isOpen && chain?.exists && existingWallets.length > Number(chain.participantCount)) {
-      try {
-        for (const wallet of existingWallets) {
-          await this.onchain.fundParticipant(Number(chain.chainContestId), wallet);
-        }
-        chain = await this.onchain.summary(Number(chain.chainContestId));
-      } catch {
-        // Keep the last verified chain state visible; the next request can resume.
-      }
-    }
-
-    const participantCount = chain?.exists ? Number(chain.participantCount) : Number(contest.filledSpots || 0);
-    const actualPool = chain?.exists ? Number(chain.totalPool) : Number(contest.filledSpots || 0) * CRX_PRIZE_PER_PARTICIPANT;
+    const participantCount = Number(contest.filledSpots || 0);
+    const actualPool = Number(contest.prizePoolTotal || 0);
 
     return {
       ...contest,
@@ -184,6 +162,9 @@ export class ContestService {
       matchStarted: started,
       prizePoolPerParticipant: CRX_PRIZE_PER_PARTICIPANT,
       projectedPrizePool: actualPool,
+      prizePoolFundingStatus: String((contest as any).prizePoolFundingStatus || (started ? 'PENDING_MATCH_START' : 'PENDING_MATCH_START')),
+      prizePoolFundedAmount: Number((contest as any).prizePoolFundedAmount || 0),
+      prizePoolFundingTxHash: (contest as any).prizePoolFundingTxHash ?? null,
       chain,
     };
   }
@@ -311,38 +292,15 @@ export class ContestService {
       throw new ServiceUnavailableException('This contest is missing its on-chain contest ID. Please reopen the contest and try again.');
     }
 
-    // The user's signature only proves wallet ownership. The participant still
-    // pays 0 CRX. The backend owner funds the prize pool with 10 CRX on-chain.
-    // The funding call is idempotent so a retried confirmation cannot add CRX twice.
-    // If this specific on-chain contest instance is stale/corrupted, create one
-    // fresh contest for the same fixture deadline and retry exactly once.
-    let funding: any;
-    let effectiveChainContestId = chainContestId;
-    try {
-      funding = await this.onchain.fundParticipant(effectiveChainContestId, wallet);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const retryablePoolFailure =
-        message.includes('configured CRX contest pool rejected participant funding') ||
-        message.includes('CRX token transferFrom failed before pool funding');
-
-      if (!retryablePoolFailure) throw error;
-
-      const expectedDeadline = Math.floor(
-        new Date((contest as any).lineupLockAt).getTime() / 1000,
-      );
-      try {
-        const recreated = await this.onchain.createContest(expectedDeadline);
-        effectiveChainContestId = Number(recreated.chainContestId);
-        contest = await this.prisma.contest.update({
-          where: { id: contest.id },
-          data: { chainContestId: effectiveChainContestId },
-        });
-        funding = await this.onchain.fundParticipant(effectiveChainContestId, wallet);
-      } catch (retryError) {
-        throw retryError;
-      }
+    const chainContestId = Number((contest as any).chainContestId);
+    if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
+      throw new ServiceUnavailableException('This contest is missing its on-chain contest ID. Please reopen the contest and try again.');
     }
+
+    // The user's signature only proves wallet ownership. The participant pays 0 CRX.
+    // Firestore records +10 CRX immediately so the prize pool persists across refreshes.
+    // No blockchain transaction is made during join; the complete pool is transferred
+    // once when the match starts.
 
     const entryId = `entry_${contest.id}_${userId}`;
     const result = await this.prisma.$transaction(async (tx) => {
@@ -372,7 +330,7 @@ export class ContestService {
           userId,
           fantasyTeamId: team.id,
           entryFeePaid: 0,
-          transactionHash: funding.txHash,
+          transactionHash: null,
           walletAddress: wallet,
           paymentStatus: 'SUBSCRIPTION_ACTIVE',
         },
@@ -381,14 +339,17 @@ export class ContestService {
       return { entry, participantCount: currentCount + 1 };
     }) as { entry: any; participantCount: number };
 
+    const latestContest = await this.prisma.contest.findUnique({ where: { id: contest.id } });
+
     return {
       ...result.entry,
       freeEntry: true,
       participantCount: result.participantCount,
       prizePoolTotal: result.participantCount * CRX_PRIZE_PER_PARTICIPANT,
       prizePoolPerParticipant: CRX_PRIZE_PER_PARTICIPANT,
-      poolFundingTxHash: funding.txHash,
-      poolFundingAlreadyRecorded: funding.alreadyFunded,
+      poolFundingTxHash: null,
+      poolFundingAlreadyRecorded: false,
+      poolFundingStatus: String((latestContest as any)?.prizePoolFundingStatus ?? 'PENDING_MATCH_START'),
     };
   }
 
