@@ -4,9 +4,11 @@
     "slug": "crickx",
     "version": "1.0.0",
     "orientation": "portrait",
-    "platforms": ["android", "ios"],
+    "platforms": [
+      "android",
+      "ios"
+    ],
     "scheme": "crickx",
-    "userInterfaceStyle": "dark",
     "android": {
       "package": "com.crickx.app",
       "versionCode": 1
