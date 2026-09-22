@@ -118,7 +118,43 @@ export class FirestoreService implements OnModuleInit, OnModuleDestroy {
   private async write(model: string, id: string, data: any, merge = true) { const ref = this.ref(model, id); const payload = unwrap(data) as any; const tx = this.transactionContext.getStore(); if (tx) tx.set(ref, payload, { merge }); else await ref.set(payload, { merge }); }
   async create(model: string, args: any) { const data = unwrap(args.data ?? {}) as Record<string, any>; const id = String(data.id ?? randomUUID()); delete data.id; const now = new Date(); if (data.createdAt === undefined) data.createdAt = now; if (['user','profile','wallet','scoringRuleSet','contest','fantasyTeam'].includes(model) && data.updatedAt === undefined) data.updatedAt = now; if (model === 'user') { const profile = args.data?.profile?.create; const wallet = args.data?.wallet?.create; delete data.profile; delete data.wallet; await this.write(model, id, data, false); if (profile) await this.create('profile', { data: { ...profile, userId: id } }); if (wallet) await this.create('wallet', { data: { ...wallet, userId: id, id } }); } else if (model === 'fantasyTeam') { const players = Array.isArray(args.data?.players?.create) ? args.data.players.create : []; delete data.players; await this.write(model, id, data, false); for (const p of players) await this.create('fantasyTeamPlayer', { data: { ...p, fantasyTeamId: id } }); } else await this.write(model, id, data, false); const tx = this.transactionContext.getStore(); if (tx) return this.hydrate(model, decorateRecord(model, { id, ...data }), args?.include, args?.select); const row = await this.readDoc(model, id); return this.hydrate(model, row!, args?.include, args?.select); }
   private applyPatch(base: any, patch: any) { const out = { ...base }; for (const [key, value] of Object.entries(patch ?? {})) { if (value === undefined) continue; if (isPlainObject(value) && 'increment' in value) out[key] = Number(out[key] ?? 0) + Number((value as any).increment); else if (isPlainObject(value) && 'decrement' in value) out[key] = Number(out[key] ?? 0) - Number((value as any).decrement); else out[key] = unwrap(value); } if ('updatedAt' in out) out.updatedAt = new Date(); return out; }
-  async update(model: string, args: any) { const current = await this.findUnique(model, { where: this.expandWhere(args.where) }); if (!current) throw new Error(`${model} record not found`); const patch = { ...(args.data ?? {}) }; const nestedPlayers = patch.players?.create; delete patch.players; const updated = this.applyPatch(current, patch); await this.write(model, current.id, updated, true); if (model === 'fantasyTeam' && Array.isArray(nestedPlayers)) for (const p of nestedPlayers) await this.create('fantasyTeamPlayer', { data: { ...p, fantasyTeamId: current.id } }); const row = await this.readDoc(model, current.id); return this.hydrate(model, row!, args?.include, args?.select); }
+  async update(model: string, args: any) {
+    const where = this.expandWhere(args.where);
+    const tx = this.transactionContext.getStore();
+
+    // Firestore transactions require all reads before all writes. The old
+    // implementation always read the document again after tx.set(), which
+    // causes "Firestore transactions require all reads to be executed before
+    // all writes" when update() is called from inside $transaction().
+    if (tx) {
+      const direct = this.uniqueDirectId(model, where);
+      let current: any = direct ? await this.readDoc(model, direct) : null;
+      if (!current) current = (await this.findRows(model, { where }))[0] ?? null;
+      if (!current) throw new Error(`${model} record not found`);
+
+      const patch = { ...(args.data ?? {}) };
+      const nestedPlayers = patch.players?.create;
+      delete patch.players;
+      const updated = this.applyPatch(current, patch);
+
+      await this.write(model, current.id, updated, true);
+
+      // Do not perform any transaction reads during hydration. Transaction
+      // callers in this codebase use updates without relational includes.
+      return this.hydrate(model, updated, args?.include, args?.select);
+    }
+
+    const current = await this.findUnique(model, { where });
+    if (!current) throw new Error(`${model} record not found`);
+    const patch = { ...(args.data ?? {}) };
+    const nestedPlayers = patch.players?.create;
+    delete patch.players;
+    const updated = this.applyPatch(current, patch);
+    await this.write(model, current.id, updated, true);
+    if (model === 'fantasyTeam' && Array.isArray(nestedPlayers)) for (const p of nestedPlayers) await this.create('fantasyTeamPlayer', { data: { ...p, fantasyTeamId: current.id } });
+    const row = await this.readDoc(model, current.id);
+    return this.hydrate(model, row!, args?.include, args?.select);
+  }
   async updateMany(model: string, args: any) { if (model === 'wallet' && args?.where?.userId !== undefined) { const row = await this.findUnique(model, { where: { userId: args.where.userId } }); if (!row || !whereMatches(row, this.expandWhere(args.where))) return { count: 0 }; await this.write(model, row.id, this.applyPatch(row, args.data), true); return { count: 1 }; } const rows = await this.findRows(model, { where: args.where }); for (const row of rows) await this.write(model, row.id, this.applyPatch(row, args.data), true); return { count: rows.length }; }
   async deleteMany(model: string, args: any) { const rows = await this.findRows(model, { where: args.where }); for (const row of rows) { const r = this.ref(model, row.id); const tx = this.transactionContext.getStore(); if (tx) tx.delete(r); else await r.delete(); } return { count: rows.length }; }
   async count(model: string, args: any = {}) { return (await this.findRows(model, args)).length; }
