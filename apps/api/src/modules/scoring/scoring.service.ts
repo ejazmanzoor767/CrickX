@@ -33,13 +33,12 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    // Do not depend solely on @Cron for prize settlement. Render/container
-    // restarts and scheduler registration can otherwise leave a finished contest
-    // untouched. Run an immediate sweep, then repeat every 30 seconds.
+    // Recovery is intentionally infrequent. The main 30-second scoring loop
+    // handles live contests; this sweep is only a terminal-state safety net.
     void this.runFinishedContestSweep();
     this.settlementSweepTimer = setInterval(() => {
       void this.runFinishedContestSweep();
-    }, 30_000);
+    }, 5 * 60_000);
   }
 
   onModuleDestroy() {
@@ -727,26 +726,17 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async pollLiveContests() {
-    // Score every fixture for which at least one fantasy team exists. The old
-    // implementation only selected locked teams, which meant newly created
-    // teams were never scored and could never reach the leaderboard.
-    // Use lightweight Firestore projections instead of materializing entire
-    // collections. The custom Prisma-compatible adapter is intentionally broad,
-    // while this scoring loop needs only fixture IDs and the lock timestamp.
-    const [teamSnapshot, contestSnapshot] = await Promise.all([
-      this.prisma.db.collection('fantasyTeams').select('sportmonksFixtureId').get(),
-      this.prisma.db
-        .collection('contests')
-        .where('status', 'in', ['UPCOMING', 'LIVE'])
-        .select('sportmonksFixtureId', 'lineupLockAt')
-        .get(),
-    ]);
+    // Contest documents are the source of truth for fantasy scoring.
+    // Do not scan the entire fantasyTeams collection every 30 seconds just to
+    // discover fixture IDs; score only contests that are actually UPCOMING/LIVE.
+    const contestSnapshot = await this.prisma.db
+      .collection('contests')
+      .where('status', 'in', ['UPCOMING', 'LIVE'])
+      .select('sportmonksFixtureId', 'lineupLockAt')
+      .get();
 
     const now = Date.now();
     const fixtureIds = new Set<number>();
-    for (const doc of teamSnapshot.docs) {
-      fixtureIds.add(Number((doc.data() as any).sportmonksFixtureId));
-    }
     for (const doc of contestSnapshot.docs) {
       const data = doc.data() as any;
       const lockValue = data.lineupLockAt;
