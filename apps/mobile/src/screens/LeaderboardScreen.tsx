@@ -29,7 +29,7 @@ export default function LeaderboardScreen({ route }: any) {
       contentContainerStyle={styles.scroll}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.green} />}
     >
-      <Header title="Leaderboard" subtitle="Live standings update automatically during matches." />
+      <Header title="Leaderboard" subtitle="Live standings update automatically during matches." onBack={() => navigation.goBack()} />
       <ErrorBox message={error} />
       {rows.length ? <Card style={{ padding: 0, overflow: 'hidden' }}>
         {rows.map((row, index) => (
