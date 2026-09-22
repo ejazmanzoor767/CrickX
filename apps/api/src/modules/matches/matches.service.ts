@@ -149,9 +149,12 @@ export class MatchesService {
         catch { fixture = normalize(todayFound); }
       } else fixture = normalize(await this.sportmonks.getFixture(fixtureId, { forceLive: true }));
     }
-    await this.persistFallOfWickets(fixture);
-    const fallOfWickets = await this.readFallOfWickets(fixtureId);
-    return { ...fixture, fallOfWickets };
+    // Live scorecard data comes directly from Sportmonks. Do not make
+    // Firestore a dependency of the high-frequency live endpoint: auxiliary
+    // fall-of-wickets persistence can exhaust quota and otherwise blank the
+    // live scorecard. Keep the live path available even when Firestore is
+    // unavailable.
+    return { ...fixture, fallOfWickets: [] };
   }
 
   async getFixtureSquads(fixtureId: number) { return this.sportmonks.getFixtureSquads(fixtureId); }
