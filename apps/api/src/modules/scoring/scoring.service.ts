@@ -294,6 +294,8 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       'Fixture ' + fixtureId + ' scoring check: status=' + String(fixture.status ?? '') + ', live=' + fixture.live + ', final=' + final,
     );
 
+    if (fixture.live === 1 || final) await this.fundStartedContestPrizePools(fixtureId);
+
     const fantasyTeams = await this.prisma.fantasyTeam.findMany({
       where: { sportmonksFixtureId: fixtureId },
       include: { players: true },
@@ -433,8 +435,6 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (!contest || contest.status === 'COMPLETED') return;
-
-    if (fixture.live === 1 || final) await this.fundStartedContestPrizePools(fixtureId);
 
     const batting = fixture.batting ?? [];
     const bowling = fixture.bowling ?? [];
