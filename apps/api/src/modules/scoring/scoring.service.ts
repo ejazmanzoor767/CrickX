@@ -233,6 +233,57 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  private async fundStartedContestPrizePools(fixtureId: number) {
+    const contests = await this.prisma.contest.findMany({
+      where: { sportmonksFixtureId: fixtureId, status: { in: ['UPCOMING', 'LIVE'] } },
+    });
+
+    for (const contest of contests) {
+      const participantCount = Number(contest.filledSpots || 0);
+      if (!Number.isInteger(participantCount) || participantCount <= 0) continue;
+
+      const chainContestId = Number((contest as any).chainContestId);
+      if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
+        this.logger.warn(`Cannot bulk-fund contest ${contest.id}: missing on-chain contest ID.`);
+        continue;
+      }
+
+      try {
+        // Idempotent: if the pool was already funded before a restart/retry,
+        // the on-chain service records it without sending CRX again.
+        const funding = await this.onchain.fundContestPrizePool(chainContestId, participantCount);
+        const totalPool = Number(funding.totalPool || participantCount * 10);
+        const nextStatus = funding.skipped ? 'PENDING_MATCH_START' : 'FUNDED';
+
+        await this.prisma.contest.update({
+          where: { id: contest.id },
+          data: {
+            prizePoolFundingStatus: nextStatus,
+            prizePoolFundedAmount: totalPool,
+            prizePoolFundingTxHash: funding.fundingTxHash ?? (contest as any).prizePoolFundingTxHash ?? null,
+            prizePoolFundingAt: nextStatus === 'FUNDED' ? new Date() : (contest as any).prizePoolFundingAt ?? null,
+            prizePoolFundingError: null,
+          },
+        });
+
+        this.logger.log(
+          `Contest ${contest.id} bulk CRX funding complete: participants=${participantCount}, pool=${totalPool} CRX, tokenTx=${funding.fundingTxHash ?? 'none'}, accountingTx=${funding.registrationTxHash ?? 'none'}`,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await this.prisma.contest.update({
+          where: { id: contest.id },
+          data: {
+            prizePoolFundingStatus: 'FAILED',
+            prizePoolFundingError: message.slice(0, 1000),
+          },
+        }).catch(() => undefined);
+        this.logger.error(
+          `Bulk CRX funding failed for contest ${contest.id}: ${message}`,
+        );
+      }
+    }
+  }
   async scoreFixture(fixtureId: number) {
     const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
     const batting = fixture.batting ?? [];
@@ -370,6 +421,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   private async scoreAndSettleFinishedContest(contestId: string, fixtureId: number) {
     const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
     if (!isFinished(fixture.status, fixture.live)) return;
+    await this.fundStartedContestPrizePools(fixtureId);
 
     const contest = await this.prisma.contest.findUnique({
       where: { id: contestId },
@@ -381,6 +433,8 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (!contest || contest.status === 'COMPLETED') return;
+
+    if (fixture.live === 1 || final) await this.fundStartedContestPrizePools(fixtureId);
 
     const batting = fixture.batting ?? [];
     const bowling = fixture.bowling ?? [];
