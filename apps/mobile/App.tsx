@@ -36,9 +36,14 @@ export default function App() {
   function handleNavigationRequest(request: WebViewNavigation) {
     const url = request.url;
 
-    // Keep the entire CrickX web application and its HTTPS payment pages inside
-    // the APK. Native wallet/payment deeplinks are handed to Android.
-    if (url.startsWith('http://') || url.startsWith('https://')) {
+    // Keep CrickX and HTTPS payment/checkout pages inside the APK.
+    // Native wallet/deeplink URLs are handed to Android.
+    if (
+      url.startsWith('http://') ||
+      url.startsWith('https://') ||
+      url.startsWith('about:blank') ||
+      url.startsWith('blob:')
+    ) {
       return true;
     }
 
@@ -99,9 +104,12 @@ export default function App() {
             setFailed(event.nativeEvent.description || 'Unable to connect to CrickX.');
           }}
           onHttpError={(event) => {
+            // Only treat an error on the main CrickX document as a page-load
+            // failure. API/resource HTTP errors must remain inside the website.
             const status = event.nativeEvent.statusCode;
-            if (status >= 500) {
-              setFailed(`CrickX server returned HTTP ${status}.`);
+            const url = event.nativeEvent.url || '';
+            if (status >= 500 && url.startsWith(WEB_URL)) {
+              setFailed(`CrickX page returned HTTP ${status}.`);
             }
           }}
           cacheEnabled
