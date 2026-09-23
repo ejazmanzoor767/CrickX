@@ -171,6 +171,9 @@ jobs:
       - name: Assemble APK
         env:
           NODE_ENV: production
+          EXPO_PUBLIC_API_BASE_URL: https://crickx-api.onrender.com/api/v1
+          EXPO_PUBLIC_WEB_URL: https://crickx-3d806.web.app
+          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
         shell: bash
         run: |
           chmod +x android/gradlew
