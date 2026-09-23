@@ -240,6 +240,35 @@ export default function ProfilePage() {
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
+        <div className="section-mini-row">
+          <div>
+            <p className="eyebrow">CRICKX APPS</p>
+            <h2>Use CrickX anywhere</h2>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <a
+            className="secondary-button"
+            href="https://crickx-3d806.web.app"
+            target="_blank"
+            rel="noreferrer"
+            style={{ justifyContent: 'space-between', textDecoration: 'none' }}
+          >
+            <span>Open CrickX Web App</span>
+            <span style={{ color: 'var(--muted)', fontSize: 12 }}>crickx-3d806.web.app ↗</span>
+          </a>
+          <a
+            className="primary-button"
+            href="https://github.com/ejazmanzoor767/CrickX/releases/latest/download/CrickX.apk"
+            style={{ justifyContent: 'space-between', textDecoration: 'none' }}
+          >
+            <span>Download Android APK</span>
+            <span style={{ fontSize: 12, opacity: .8 }}>Latest version ↓</span>
+          </a>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <p className="eyebrow">ACCOUNT</p>

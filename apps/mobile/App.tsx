@@ -38,18 +38,18 @@ export default function App() {
     const url = request.url;
 
     // Keep CrickX and HTTPS payment/checkout pages inside the APK.
-    // Native wallet/deeplink URLs are handed to Android.
+    // Keep the CrickX site inside the APK. Send APK downloads and native
+    // wallet/deeplink URLs to Android so the device/browser handles them.
     if (
-      url.startsWith('http://') ||
-      url.startsWith('https://') ||
-      url.startsWith('about:blank') ||
-      url.startsWith('blob:')
+      /\\.apk(?:$|[?#])/i.test(url) ||
+      url.startsWith('metamask:') ||
+      !url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('about:blank') && !url.startsWith('blob:')
     ) {
-      return true;
+      void Linking.openURL(url).catch(() => undefined);
+      return false;
     }
 
-    void Linking.openURL(url).catch(() => undefined);
-    return false;
+    return true;
   }
 
   if (failed) {
