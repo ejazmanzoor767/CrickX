@@ -2,7 +2,7 @@
   "expo": {
     "name": "CrickX",
     "slug": "crickx",
-    "version": "1.0.9",
+    "version": "1.0.10",
     "orientation": "portrait",
     "platforms": [
       "android",
@@ -12,11 +12,7 @@
     "icon": "./assets/crickx-app-icon.png",
     "android": {
       "package": "com.crickx.app",
-      "versionCode": 10,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/crickx-app-icon.png",
-        "backgroundColor": "#0B0D12"
-      }
+      "versionCode": 11
     },
     "splash": {
       "backgroundColor": "#0B0D12",
