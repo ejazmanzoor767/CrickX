@@ -20,6 +20,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
+  const initialLoadComplete = useRef(false);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -95,13 +96,29 @@ export default function App() {
           }}
           onShouldStartLoadWithRequest={handleNavigationRequest}
           onLoadStart={() => {
-            setLoading(true);
-            setFailed(null);
+            // Show the native splash only for the first document load.
+            // Internal Next.js route changes should never cover the app with
+            // a permanent native loading screen.
+            if (!initialLoadComplete.current) {
+              setLoading(true);
+              setFailed(null);
+            }
           }}
-          onLoadEnd={() => setLoading(false)}
+          onLoadProgress={({ nativeEvent }) => {
+            // Android WebView can emit a second load-start during history/
+            // client navigation without a matching load-end. Once the page
+            // has made real progress, do not keep the native overlay up.
+            if (nativeEvent.progress >= 0.35) setLoading(false);
+          }}
+          onLoadEnd={() => {
+            initialLoadComplete.current = true;
+            setLoading(false);
+          }}
           onError={(event) => {
             setLoading(false);
-            setFailed(event.nativeEvent.description || 'Unable to connect to CrickX.');
+            if (!initialLoadComplete.current) {
+              setFailed(event.nativeEvent.description || 'Unable to connect to CrickX.');
+            }
           }}
           onHttpError={(event) => {
             // Only treat an error on the main CrickX document as a page-load
