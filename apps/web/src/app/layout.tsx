@@ -5,6 +5,12 @@ import { AuthProvider } from '../lib/auth-context';
 import Nav from '../components/nav';
 import Footer from '../components/footer';
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
+
 export const metadata = {
   title: 'CrickX — Fantasy Cricket',
   description: 'Fantasy cricket powered by CrickX.',
