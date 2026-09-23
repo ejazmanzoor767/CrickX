@@ -35,9 +35,16 @@ export default function Footer() {
               <Link href="/profile/refund">Refund Policy</Link>
               <Link href="/profile/shipping">Shipping Policy</Link>
               <Link href="/profile/metamask">CRX in MetaMask</Link>
+              <a href="https://crickx-3d806.web.app" target="_blank" rel="noreferrer">Web App</a>
+              <a href="https://github.com/ejazmanzoor767/CrickX/releases/latest/download/CrickX.apk">Download Android APK</a>
             </div>
           </div>
-          <span>© {new Date().getFullYear()} CrickX</span>
+          <div style={{ textAlign: 'right' }}>
+            <span>© {new Date().getFullYear()} CrickX</span>
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted)' }}>
+              Web App: <a href="https://crickx-3d806.web.app" target="_blank" rel="noreferrer">https://crickx-3d806.web.app</a>
+            </div>
+          </div>
         </div>
       </div>
     </footer>
