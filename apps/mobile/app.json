@@ -2,18 +2,21 @@
   "expo": {
     "name": "CrickX",
     "slug": "crickx",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "orientation": "portrait",
     "platforms": [
       "android",
       "ios"
     ],
     "scheme": "crickx",
-    "icon": "https://crickx-3d806.web.app/crickx-app-logo.webp",
+    "icon": "./assets/crickx-app-icon.png",
     "android": {
       "package": "com.crickx.app",
-      "versionCode": 9,
-      "icon": "https://crickx-3d806.web.app/crickx-app-logo.webp"
+      "versionCode": 10,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/crickx-app-icon.png",
+        "backgroundColor": "#0B0D12"
+      }
     },
     "splash": {
       "backgroundColor": "#0B0D12",
