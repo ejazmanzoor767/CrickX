@@ -11,7 +11,8 @@
     "expo": "~51.0.0",
     "react": "18.3.1",
     "react-native": "0.74.5",
-    "@react-native-async-storage/async-storage": "1.23.1"
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "react-native-webview": "13.8.6"
   },
   "devDependencies": {
     "typescript": "^5.5.4",
