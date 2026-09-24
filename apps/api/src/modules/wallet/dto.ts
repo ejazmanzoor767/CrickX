@@ -1,4 +1,4 @@
-import { IsNumber, IsString, Min, Max, MaxLength, Matches } from 'class-validator';
+import { IsNumber, IsString, Min, Max, MaxLength, MinLength, Matches } from 'class-validator';
 
 export class InitiateDepositDto {
   @IsNumber() @Min(1) @Max(1_000_000) amount!: number;
