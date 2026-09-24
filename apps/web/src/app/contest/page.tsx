@@ -125,7 +125,7 @@ function ContestContent() {
   const subscriptionActive = Boolean(subscription?.active);
   const expires = subscription?.expiresAt ? new Date(subscription.expiresAt).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' }) : null;
 
-  return <section className="app-page" style={{ maxWidth: 980, paddingBottom: 96 }}>
+  return <section className="app-page contest-page" style={{ maxWidth: 980, paddingBottom: 96 }}>
     <div className="page-intro">
       <div>
         <p className="eyebrow">CRICKX FANTASY CONTEST</p>
