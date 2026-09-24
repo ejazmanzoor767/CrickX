@@ -2,6 +2,7 @@ import { BadRequestException, Controller, Headers, Post, Req } from '@nestjs/com
 import { Request } from 'express';
 import { RazorpayService } from './razorpay.service';
 import { WalletService } from './wallet.service';
+import { OxaPayService } from '../subscription/oxapay.service';
 
 /**
  * Razorpay webhook receiver. This is the ONLY fully-trusted confirmation
@@ -50,7 +51,7 @@ export class RazorpayWebhookController {
 export class OxaPayWalletWebhookController {
   constructor(
     private readonly wallet: WalletService,
-    private readonly oxapay: import('../subscription/oxapay.service').OxaPayService,
+    private readonly oxapay: OxaPayService,
   ) {}
 
   @Post()
