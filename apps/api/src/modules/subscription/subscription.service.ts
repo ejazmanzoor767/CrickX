@@ -1,10 +1,10 @@
 import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { FirestoreService } from '../../common/firestore.service';
 import { OxaPayService } from './oxapay.service';
 
-const PRICE_PKR = 50;
+const PRICE_USD = 0.18;
 const DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 @Injectable()
@@ -45,6 +45,112 @@ export class SubscriptionService {
   }
 
 
+  private async ensureReferralCode(userId: string) {
+    const existing = await this.firestore.db.collection('referralCodes').where('userId', '==', userId).limit(1).get();
+    if (!existing.empty) return String(existing.docs[0].data()?.code);
+
+    const base = createHash('sha256').update(userId).digest('hex').slice(0, 8).toUpperCase();
+    let code = `CRX${base}`;
+    let ref = this.firestore.db.collection('referralCodes').doc(code);
+    let snap = await ref.get();
+
+    if (snap.exists && String(snap.data()?.userId) !== userId) {
+      code = `CRX${base}${randomBytes(2).toString('hex').toUpperCase()}`;
+      ref = this.firestore.db.collection('referralCodes').doc(code);
+      snap = await ref.get();
+    }
+
+    if (!snap.exists) {
+      await ref.set({ id: code, code, userId, createdAt: new Date() }, { merge: true });
+    }
+    return code;
+  }
+
+  async referralInfo(userId: string) {
+    const code = await this.ensureReferralCode(userId);
+    const snapshot = await this.firestore.db.collection('referrals').where('referrerId', '==', userId).get();
+    const referrals = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }) as any)
+      .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+
+    return {
+      code,
+      totalReferrals: referrals.length,
+      validReferrals: referrals.filter((row: any) => row.status === 'VALID').length,
+      referrals: referrals.map((row: any) => ({
+        id: row.id,
+        userId: row.referredUserId,
+        email: row.referredEmail ?? null,
+        status: row.status,
+        createdAt: this.isoDate(row.createdAt),
+        qualifiedAt: this.isoDate(row.qualifiedAt),
+      })),
+      rewardText: 'At launch, rewards will be distributed according to the number of valid referrals.',
+    };
+  }
+
+  async applyReferral(userId: string, codeInput: string, email?: string) {
+    const code = String(codeInput ?? '').trim().toUpperCase();
+    if (!/^CRX[A-Z0-9]{8,12}$/.test(code)) {
+      throw new ConflictException('Enter a valid CrickX referral code.');
+    }
+
+    const codeDoc = await this.firestore.db.collection('referralCodes').doc(code).get();
+    if (!codeDoc.exists) throw new ConflictException('Referral code not found.');
+
+    const referrerId = String(codeDoc.data()?.userId ?? '');
+    if (!referrerId) throw new ConflictException('Referral code is not available.');
+    if (referrerId === userId) throw new ConflictException('You cannot use your own referral code.');
+
+    const existing = await this.firestore.db.collection('referrals').doc(userId).get();
+    if (existing.exists) {
+      const row = existing.data() as any;
+      if (String(row.referrerId) === referrerId) return { applied: true, status: row.status, referrerId };
+      throw new ConflictException('A referral is already attached to this account.');
+    }
+
+    const priorSubscriptions = await this.subscriptionsForUser(userId);
+    const alreadySubscribed = priorSubscriptions.some((row: any) =>
+      row.status === 'ACTIVE' || row.status === 'EXPIRED' || (row.status === 'PAYMENT_FAILED' && row.startedAt),
+    );
+    if (alreadySubscribed) {
+      throw new ConflictException('Referral can only be added before your first successful subscription.');
+    }
+
+    const now = new Date();
+    await this.firestore.db.collection('referrals').doc(userId).set({
+      id: userId,
+      referrerId,
+      referredUserId: userId,
+      referredEmail: email ?? null,
+      referralCode: code,
+      status: 'PENDING',
+      subscriptionId: null,
+      createdAt: now,
+      updatedAt: now,
+      qualifiedAt: null,
+    }, { merge: false });
+
+    return { applied: true, status: 'PENDING', referrerId };
+  }
+
+  private async markReferralValid(userId: string, subscriptionId: string) {
+    const ref = this.firestore.db.collection('referrals').doc(userId);
+    const snap = await ref.get();
+    if (!snap.exists) return;
+
+    const row = snap.data() as any;
+    if (row.status === 'VALID') return;
+
+    await ref.set({
+      status: 'VALID',
+      subscriptionId,
+      qualifiedAt: new Date(),
+      updatedAt: new Date(),
+    }, { merge: true });
+  }
+
+
   private async subscriptionsForUser(userId: string) {
     return this.firestore.subscription.findMany({
       where: { userId },
@@ -58,8 +164,8 @@ export class SubscriptionService {
         id: null,
         active: false,
         plan: 'WEEKLY',
-        amount: PRICE_PKR,
-        currency: 'PKR',
+        amount: PRICE_USD,
+        currency: 'USD',
         durationDays: 7,
         status: 'NONE',
         expiresAt: null,
@@ -126,6 +232,14 @@ export class SubscriptionService {
   }
 
 
+  async getReferralInfo(userId: string) {
+    return this.referralInfo(userId);
+  }
+
+  async attachReferral(userId: string, code: string, email?: string) {
+    return this.applyReferral(userId, code, email);
+  }
+
   async checkout(userId: string) {
     const current = await this.status(userId);
     if (current.active) {
@@ -138,8 +252,13 @@ export class SubscriptionService {
 
     if (current.status === 'PENDING' && current.basketId && current.id) {
       const pendingPayment = await this.firestore.subscriptionPayment.findFirst({ where: { basketId: current.basketId } });
-      if (pendingPayment?.provider === 'OXAPAY' && pendingPayment.checkoutUrl) {
-        return { checkoutUrl: pendingPayment.checkoutUrl, basketId: current.basketId, amount: PRICE_PKR, currency: 'PKR', durationDays: 7 };
+      if (
+        pendingPayment?.provider === 'OXAPAY' &&
+        pendingPayment.checkoutUrl &&
+        Number(pendingPayment.amount) === PRICE_USD &&
+        String(pendingPayment.currency).toUpperCase() === 'USD'
+      ) {
+        return { checkoutUrl: pendingPayment.checkoutUrl, basketId: current.basketId, amount: PRICE_USD, currency: 'USD', durationDays: 7 };
       }
 
       await this.firestore.subscription.update({
@@ -156,8 +275,8 @@ export class SubscriptionService {
       data: {
         userId,
         plan: 'WEEKLY',
-        amount: PRICE_PKR,
-        currency: 'PKR',
+        amount: PRICE_USD,
+        currency: 'USD',
         status: 'PENDING',
         basketId,
         createdAt: new Date(),
@@ -169,8 +288,8 @@ export class SubscriptionService {
         userId,
         subscriptionId: subscription.id,
         basketId,
-        amount: PRICE_PKR,
-        currency: 'PKR',
+        amount: PRICE_USD,
+        currency: 'USD',
         provider: 'OXAPAY',
         status: 'INITIATED',
         environment: this.config.get<string>('OXAPAY_SANDBOX', 'false').toLowerCase() === 'true' ? 'SANDBOX' : 'LIVE',
@@ -180,7 +299,7 @@ export class SubscriptionService {
 
     try {
       const checkout = await this.oxapay.createHostedCheckout({
-        amount: PRICE_PKR,
+        amount: PRICE_USD,
         orderId: basketId,
         customerEmail: String(user.email || ''),
         returnUrl: `${this.webUrl()}/subscription/return?basket=${encodeURIComponent(basketId)}`,
@@ -194,8 +313,8 @@ export class SubscriptionService {
       return {
         checkoutUrl: checkout.paymentUrl,
         basketId,
-        amount: PRICE_PKR,
-        currency: 'PKR',
+        amount: PRICE_USD,
+        currency: 'USD',
         durationDays: 7,
       };
     } catch (error) {
@@ -229,7 +348,7 @@ export class SubscriptionService {
         if (
           (gatewayStatus === 'paid' || gatewayStatus === 'manual_accept') &&
           Number.isFinite(gatewayAmount) &&
-          Math.abs(gatewayAmount - PRICE_PKR) <= 0.000001 &&
+          Math.abs(gatewayAmount - PRICE_USD) <= 0.000001 &&
           gatewayCurrency === 'PKR'
         ) {
           const now = new Date();
@@ -250,6 +369,7 @@ export class SubscriptionService {
           });
 
           subscription = { ...subscription, status: 'ACTIVE', startedAt: now, expiresAt };
+          await this.markReferralValid(userId, payment.subscriptionId);
           return {
             basketId,
             paymentStatus: 'SUCCEEDED',
@@ -298,7 +418,7 @@ export class SubscriptionService {
       : undefined;
 
     if (status === 'paid') {
-      if (!Number.isFinite(amount) || Math.abs(amount - PRICE_PKR) > 0.000001) {
+      if (!Number.isFinite(amount) || Math.abs(amount - PRICE_USD) > 0.000001) {
         await this.firestore.subscriptionPayment.update({
           where: { id: payment.id },
           data: { status: 'FAILED', gatewayTxnRef, failureReason: 'OxaPay webhook amount mismatch' },
@@ -337,6 +457,7 @@ export class SubscriptionService {
         where: { id: payment.subscriptionId },
         data: { status: 'ACTIVE', startedAt: now, expiresAt },
       });
+      await this.markReferralValid(payment.userId, payment.subscriptionId);
       return { received: true };
     }
 
