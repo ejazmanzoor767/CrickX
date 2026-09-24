@@ -50,6 +50,45 @@ function playerNameById(id: any, lineup: any[]) {
   return row?.fullname ?? row?.player?.fullname ?? `Player ${id ?? '—'}`;
 }
 
+function fallOfWicketsFromFixture(fixture: any) {
+  const batting = Array.isArray(fixture?.batting) ? fixture.batting : [];
+  const lineup = Array.isArray(fixture?.lineup) ? fixture.lineup : [];
+  const wicketRows = batting
+    .filter((row: any) => {
+      const active = row?.active;
+      const inactive = active === false || active === 0 || active === '0' || active === 'false';
+      return inactive && Number(row?.fow_balls) > 0 && Number.isFinite(Number(row?.fow_score));
+    })
+    .map((row: any) => {
+      const inning = Number(String(row?.scoreboard ?? '').replace(/^S/i, '')) || Number(row?.inning ?? row?.score_id ?? 0);
+      const playerId = Number(row?.player_id);
+      const teamId = Number(row?.team_id);
+      return {
+        fixtureId: Number(fixture.id),
+        inning,
+        playerId: Number.isFinite(playerId) ? playerId : null,
+        teamId: Number.isFinite(teamId) ? teamId : null,
+        score: Number(row.fow_score),
+        scoreAtWicket: Number(row.fow_score),
+        over: Number(row.fow_balls),
+        player: playerNameById(playerId, lineup),
+      };
+    })
+    .filter((item: any) =>
+      Number.isFinite(item.inning) && item.inning > 0 &&
+      Number.isFinite(item.score) && item.score >= 0 &&
+      Number.isFinite(item.over) && item.over > 0
+    )
+    .sort((a: any, b: any) => a.inning - b.inning || a.over - b.over || Number(a.playerId ?? 0) - Number(b.playerId ?? 0));
+
+  const counts = new Map<number, number>();
+  return wicketRows.map((item: any) => {
+    const wicketNumber = (counts.get(item.inning) ?? 0) + 1;
+    counts.set(item.inning, wicketNumber);
+    return { ...item, wicketNumber };
+  });
+}
+
 @Injectable()
 export class MatchesService {
   constructor(
@@ -177,7 +216,7 @@ export class MatchesService {
 
   async getDetail(fixtureId: number) {
     const fixture = normalize(await this.sportmonks.getFixture(fixtureId, { forceLive: false }));
-    const fallOfWickets = await this.readFallOfWickets(fixtureId);
+    const fallOfWickets = fallOfWicketsFromFixture(fixture);
     return { ...fixture, fallOfWickets };
   }
 
@@ -196,12 +235,11 @@ export class MatchesService {
         catch { fixture = normalize(todayFound); }
       } else fixture = normalize(await this.sportmonks.getFixture(fixtureId, { forceLive: true }));
     }
-    // Live scorecard data comes directly from Sportmonks. Do not make
-    // Firestore a dependency of the high-frequency live endpoint: auxiliary
-    // fall-of-wickets persistence can exhaust quota and otherwise blank the
-    // live scorecard. Keep the live path available even when Firestore is
-    // unavailable.
-    return { ...fixture, fallOfWickets: [] };
+
+    // Sportmonks already includes fow_score/fow_balls on the batting rows.
+    // Build FOW in memory so the high-frequency live endpoint stays fast and
+    // does not depend on Firestore writes or reads.
+    return { ...fixture, fallOfWickets: fallOfWicketsFromFixture(fixture) };
   }
 
   async getFixtureSquads(fixtureId: number) { return this.sportmonks.getFixtureSquads(fixtureId); }
