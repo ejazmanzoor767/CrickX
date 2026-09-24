@@ -25,9 +25,9 @@ function MatchCard({ fixture, live, completed, fantasyFixture, teamSaved }: { fi
   const viewTeamHref = `/fantasy/view?fixtureId=${fixture.id}`;
   const hasSavedTeam = Boolean(teamSaved);
 
-  return <article className={`card match-list-card ${live ? 'match-live-card' : ''}`}>
-    <div className="match-topline"><span className="match-meta">{fixture.league?.name ?? fixture.type ?? 'CRICKET'} · {statusText(fixture, live)}</span>{live ? <span className="badge-live">● LIVE</span> : <span className="match-date">{formatTime(fixture.starting_at)}</span>}</div>
-    <div className="match-teams">
+  return <article className={`card match-list-card match-centre-card ${live ? 'match-live-card' : ''}`}>
+    <div className="match-topline match-centre-topline"><span className="match-meta">{fixture.league?.name ?? fixture.type ?? 'CRICKET'} · {statusText(fixture, live)}</span>{live ? <span className="badge-live">● LIVE</span> : <span className="match-date">{formatTime(fixture.starting_at)}</span>}</div>
+    <div className="match-teams match-centre-teams">
       <div><small>{fixture.localteam?.code ?? 'HOME'}</small><strong>{fixture.localteam?.name ?? 'TBD'}</strong>{fixture.localteam?.image_path && <img src={fixture.localteam.image_path} alt="" style={{width:28,height:28,objectFit:'contain',marginTop:6}} />}</div>
       <span className="vs-badge">VS</span>
       <div className="team-away"><small>{fixture.visitorteam?.code ?? 'AWAY'}</small><strong>{fixture.visitorteam?.name ?? 'TBD'}</strong>{fixture.visitorteam?.image_path && <img src={fixture.visitorteam.image_path} alt="" style={{width:28,height:28,objectFit:'contain',marginTop:6}} />}</div>
@@ -38,7 +38,7 @@ function MatchCard({ fixture, live, completed, fantasyFixture, teamSaved }: { fi
       <div style={{display:'flex',alignItems:'center',gap:9,marginTop:13,paddingTop:11,borderTop:'1px solid rgba(255,255,255,.06)'}}><span style={{fontSize:12,color:'#98a0b3'}}>VENUE</span><strong style={{fontSize:14,color:'#d9dee8'}}>{fixture.venue?.name ?? 'Venue unavailable'}</strong></div>
     </div>}
     {completed && hasSavedTeam && <div className="result-note">{fixture.note ?? 'Match completed'} · Your fantasy team saved</div>}
-    <div className="match-footer">
+    <div className="match-footer match-centre-footer">
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         {completed && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/leaderboard?fixtureId=${fixture.id}`}>Leaderboard</Link>}
         {completed && hasSavedTeam && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={viewTeamHref}>View Team</Link>}
@@ -89,9 +89,9 @@ export default function MatchesPage() {
   const completedMine = useMemo(() => completed, [completed]);
   const visible = tab === 'LIVE' ? live : tab === 'UPCOMING' ? nextFour : completedMine;
 
-  return <section className="app-page">
-    <div className="page-intro"><div><p className="eyebrow">CRICKX MATCHES</p><h1 className="section-title">Match centre</h1><p className="section-subtitle">Follow live cricket, prepare upcoming fantasy teams and revisit the matches you played.</p></div><button className="secondary-button" onClick={() => void refreshAll(false)} disabled={refreshing}>{refreshing ? 'Refreshing…' : '↻ Refresh'}</button></div>
-    <div className="card" style={{padding:8}}><div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>{(['LIVE','UPCOMING','COMPLETED'] as const).map((value) => <button key={value} className={tab===value?'primary-button':'secondary-button'} onClick={() => setTab(value)} style={{minHeight:46}}>{value}<span style={{marginLeft:6,opacity:.7}}>{value==='LIVE'?live.length:value==='UPCOMING'?nextFour.length:completed.length}</span></button>)}</div></div>
+  return <section className="app-page match-centre-page">
+    <div className="page-intro match-centre-intro"><div><p className="eyebrow">CRICKX MATCHES</p><h1 className="section-title">Match centre</h1><p className="section-subtitle">Live scores, upcoming fixtures and your completed matches in one place.</p></div><button className="secondary-button" onClick={() => void refreshAll(false)} disabled={refreshing}>{refreshing ? 'Refreshing…' : '↻ Refresh'}</button></div>
+    <div className="card match-centre-tabs" style={{padding:8}}><div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>{(['LIVE','UPCOMING','COMPLETED'] as const).map((value) => <button key={value} className={tab===value?'primary-button':'secondary-button'} onClick={() => setTab(value)} style={{minHeight:46}}>{value}<span style={{marginLeft:6,opacity:.7}}>{value==='LIVE'?live.length:value==='UPCOMING'?nextFour.length:completed.length}</span></button>)}</div></div>
     {error && <div className="card"><p className="error-text">{error}</p></div>}
     {tab === 'COMPLETED' && !user && <div className="card empty-state"><strong>Sign in to see completed matches and stats.</strong><Link className="primary-button" href="/login">Sign in</Link></div>}
     {loading ? <div className="card skeleton-card">Loading match centre…</div> : visible.length === 0 ? <div className="card empty-state"><strong>{tab==='LIVE'?'No matches are live right now.':tab==='UPCOMING'?'No upcoming fantasy matches found.':'No completed matches yet.'}</strong><span>{tab==='LIVE'?'Live cards will appear automatically when play begins.':tab==='UPCOMING'?'Upcoming matches are kept separate from live play.':'Completed matches show the final result, leaderboard and stats.'}</span>{tab==='UPCOMING' && <Link className="primary-button" href="/fantasy-home">Open Fantasy</Link>}</div> : <div className="match-list">{visible.map((fixture) => <MatchCard key={fixture.id} fixture={fixture} live={tab==='LIVE'} completed={tab==='COMPLETED'} fantasyFixture={savedTeamFixtureIds.has(Number(fixture.id))} teamSaved={savedTeamFixtureIds.has(Number(fixture.id))} />)}</div>}
