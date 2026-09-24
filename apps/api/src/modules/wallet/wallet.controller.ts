@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { WalletService } from './wallet.service';
-import { InitiateDepositDto, RequestWithdrawalDto, ConfirmCheckoutDepositDto } from './dto';
+import { InitiateDepositDto, RequestWithdrawalDto, ConfirmCheckoutDepositDto, EarlyBuyCheckoutDto } from './dto';
 
 @Controller('wallet')
 @UseGuards(JwtAuthGuard)
@@ -33,6 +33,17 @@ export class WalletController {
     return this.wallet.confirmDepositFromCheckout(
       this.uid(req), dto.depositId, dto.razorpayPaymentId, dto.razorpayOrderId, dto.razorpaySignature,
     );
+  }
+
+  @Post('early-buy/checkout')
+  earlyBuyCheckout(@Req() req: Request, @Body() dto: EarlyBuyCheckoutDto) {
+    return this.wallet.earlyBuyCheckout(this.uid(req), dto.amountUsd, dto.walletAddress);
+  }
+
+  @Get('early-buy/status')
+  earlyBuyStatus(@Req() req: Request, @Query('order') order?: string) {
+    if (!order) throw new BadRequestException('order query parameter is required.');
+    return this.wallet.earlyBuyPaymentStatus(this.uid(req), order);
   }
 
   @Post('withdrawals')
