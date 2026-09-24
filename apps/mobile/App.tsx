@@ -14,6 +14,7 @@ import {
 import WebView, { type WebViewNavigation } from 'react-native-webview';
 
 const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://crickx-3d806.web.app';
+const START_URL = WEB_URL.replace(/\/$/, '') + '/matches';
 const ALLOWED_HOST = 'crickx-3d806.web.app';
 
 const TABS = [
@@ -45,7 +46,7 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
-  const [currentUrl, setCurrentUrl] = useState(WEB_URL);
+  const [currentUrl, setCurrentUrl] = useState(START_URL);
   const [activeTab, setActiveTab] = useState<string | null>('/matches');
   const initialLoadComplete = useRef(false);
 
@@ -103,7 +104,7 @@ export default function App() {
             onPress={() => {
               setFailed(null);
               setLoading(true);
-              setCurrentUrl(WEB_URL);
+              setCurrentUrl(START_URL);
               setActiveTab('/matches');
               webViewRef.current?.reload();
             }}
@@ -148,7 +149,7 @@ export default function App() {
         <View style={styles.webContainer}>
           <WebView
             ref={webViewRef}
-            source={{ uri: WEB_URL }}
+            source={{ uri: START_URL }}
             style={styles.web}
             originWhitelist={['http://*', 'https://*', 'metamask:*', '*://*/*']}
             javaScriptEnabled
