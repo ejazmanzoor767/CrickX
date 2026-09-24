@@ -1,4 +1,5 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { verifyMessage, getAddress, type Address } from 'viem';
 import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
@@ -10,13 +11,66 @@ import { T20_RULES, T10_RULES, ODI_RULES } from '../scoring/scoring.rules';
 const SIGNATURE_WINDOW_SECONDS = 300;
 
 @Injectable()
-export class ContestService {
+export class ContestService implements OnModuleInit {
+  private readonly logger = new Logger(ContestService.name);
+  private chainProvisionQueue: Promise<void> = Promise.resolve();
+
   constructor(
     private readonly prisma: FirestoreService,
     private readonly sportmonks: SportmonksDataService,
     private readonly onchain: OnchainContestService,
     private readonly subscriptions: SubscriptionService,
   ) {}
+
+  onModuleInit() {
+    void this.provisionUpcomingChainContests();
+  }
+
+  @Cron('*/30 * * * * *')
+  private async scheduledChainProvisioning() {
+    await this.provisionUpcomingChainContests();
+  }
+
+  private provisionUpcomingChainContests() {
+    const run = async () => {
+      try {
+        const now = Date.now();
+        const horizon = now + 7 * 24 * 60 * 60 * 1000;
+        const contests = await this.prisma.contest.findMany({ where: { status: 'UPCOMING' }, orderBy: { createdAt: 'asc' } });
+
+        for (const contest of contests.slice(0, 100)) {
+          const chainId = Number((contest as any).chainContestId);
+          const startMs = new Date((contest as any).lineupLockAt).getTime();
+          if (Number.isFinite(chainId) && chainId > 0) continue;
+          if (!Number.isFinite(startMs) || startMs <= now || startMs > horizon) continue;
+
+          const expectedDeadline = Math.floor(startMs / 1000);
+          try {
+            const created = await this.onchain.createContest(expectedDeadline);
+            const latest = await this.prisma.contest.findUnique({ where: { id: contest.id } });
+            if (latest && !Number((latest as any).chainContestId)) {
+              await this.prisma.contest.update({
+                where: { id: contest.id },
+                data: { chainContestId: created.chainContestId },
+              });
+            }
+          } catch (error) {
+            this.logger.warn(
+              `Unable to provision chain contest ${contest.id}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        }
+      } catch (error) {
+        this.logger.error(
+          `Scheduled contest provisioning failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    };
+
+    const promise = this.chainProvisionQueue.then(run, run);
+    this.chainProvisionQueue = promise.then(() => undefined, () => undefined);
+    return promise;
+  }
 
   async create(dto: CreateContestDto) {
     const existingForFixture = await this.prisma.contest.findFirst({ where: { sportmonksFixtureId: dto.sportmonksFixtureId } });
@@ -113,8 +167,8 @@ export class ContestService {
       contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE', entryFee: 0 } });
     }
 
-    // Firestore is the source of truth for the contest pool while entries are open.
-    // The blockchain is funded only once, when the match starts.
+    // User requests must never be able to trigger owner-wallet blockchain writes.
+    // Chain contests are provisioned by the scheduled backend worker instead.
     let chain: any = null;
     const storedChainContestId = Number((contest as any).chainContestId);
     const expectedJoinDeadline = Math.floor(
@@ -131,22 +185,6 @@ export class ContestService {
         ) {
           chain = candidate;
         }
-      } catch {
-        chain = null;
-      }
-    }
-
-    // During a contract migration, keep the Firestore contest linked to a valid
-    // on-chain contest ID for the same fixture deadline. No participant funding
-    // happens here; the full pool is funded once at match start.
-    if (!chain && Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
-      try {
-        const recreated = await this.onchain.createContest(expectedJoinDeadline);
-        contest = await this.prisma.contest.update({
-          where: { id: contest.id },
-          data: { chainContestId: recreated.chainContestId },
-        });
-        chain = await this.onchain.summary(recreated.chainContestId);
       } catch {
         chain = null;
       }
@@ -219,27 +257,23 @@ export class ContestService {
     const existingPair = await this.prisma.contestEntry.findFirst({ where: { contestId: contest.id, fantasyTeamId: dto.fantasyTeamId } });
     if (existingPair) throw new ForbiddenException('This fantasy team has already joined the contest.');
 
-    let chainContestId = Number((contest as any).chainContestId);
-    let chainExists = false;
-    const expectedJoinDeadline = Math.floor(new Date(liveFixture.starting_at).getTime() / 1000);
-    if (Number.isFinite(chainContestId) && chainContestId > 0) {
-      try {
-        const chainSummary = await this.onchain.summary(chainContestId);
-        chainExists =
-          Boolean(chainSummary.exists) &&
-          Math.abs(Number(chainSummary.joinDeadline) - expectedJoinDeadline) <= 60;
-      } catch {
-        chainExists = false;
-      }
+    const chainContestId = Number((contest as any).chainContestId);
+    if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
+      throw new ServiceUnavailableException('This contest is still being prepared on-chain. Please try again shortly.');
     }
-    if (!chainExists) {
-      try {
-        const created = await this.onchain.createContest(Math.floor(new Date(liveFixture.starting_at).getTime() / 1000));
-        chainContestId = Number(created.chainContestId);
-        contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { chainContestId } });
-      } catch (error) {
-        throw new ServiceUnavailableException(`Unable to initialize the CRX prize-pool contest: ${error instanceof Error ? error.message : String(error)}`);
+
+    try {
+      const chainSummary = await this.onchain.summary(chainContestId);
+      const expectedDeadline = Math.floor(new Date(liveFixture.starting_at).getTime() / 1000);
+      if (
+        !chainSummary.exists ||
+        Math.abs(Number(chainSummary.joinDeadline) - expectedDeadline) > 60
+      ) {
+        throw new ServiceUnavailableException('This contest is not ready on-chain yet. Please try again shortly.');
       }
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
+      throw new ServiceUnavailableException('Unable to verify the contest on-chain right now. Please try again shortly.');
     }
 
     const timestamp = Math.floor(Date.now() / 1000);
