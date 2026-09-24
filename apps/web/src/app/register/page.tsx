@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
+import { api } from '../../lib/api';
 import { FirebaseError } from 'firebase/app';
 import { useAuth } from '../../lib/auth-context';
 
@@ -24,8 +25,14 @@ export default function RegisterPage() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('ref');
+    if (code) setReferralCode(code.toUpperCase());
+  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -33,6 +40,13 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await signUp(email, password, displayName);
+      if (referralCode.trim()) {
+        try {
+          await api.applyReferral(referralCode.trim().toUpperCase());
+        } catch (referralError) {
+          console.warn('Referral code could not be applied:', referralError);
+        }
+      }
       router.push('/matches');
     } catch (err) {
       setError(friendlyError(err));
@@ -54,6 +68,8 @@ export default function RegisterPage() {
           <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <label className="form-label">Password</label>
           <input type="password" placeholder="At least 8 characters" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <label className="form-label">Referral code <span style={{ color: 'var(--muted)', fontWeight: 500 }}>(optional)</span></label>
+          <input placeholder="e.g. CRX1A2B3C4D" value={referralCode} onChange={(e) => setReferralCode(e.target.value.toUpperCase())} maxLength={15} />
           {error && <p className="error-text">{error}</p>}
           <button className="primary-button" type="submit" disabled={loading} style={{ width: '100%', marginTop: 8 }}>
             {loading ? 'Creating account…' : 'Create account'}
