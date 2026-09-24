@@ -14,8 +14,23 @@ const BOWLERS=['shaheen afridi','jasprit bumrah','mohammed siraj','mitchell star
 type Q={id:string;kind:string;title:string;prompt:string;options:{value:string;label:string}[];featuredPlayer?:any;teamId?:number;correctAnswer?:string};
 const arr=(v:any)=>Array.isArray(v)?v:Array.isArray(v?.data)?v.data:[];
 const pname=(p:any)=>String(p?.fullname??p?.player?.fullname??`${p?.firstname??p?.player?.firstname??''} ${p?.lastname??p?.player?.lastname??''}`).trim()||`Player ${Number(p?.player_id??p?.id??0)}`;
-const terminal=(s:any)=>{const x=String(s??'').toLowerCase();return x.includes('finish')||x.includes('aband')||x.includes('cancel');};
-const voided=(s:any)=>{const x=String(s??'').toLowerCase();return x.includes('aband')||x.includes('cancel');};
+const terminal=(s:any)=>{
+ const x=String(s??'').trim().toLowerCase();
+ return x.includes('finish')||x.includes('complete')||x.includes('aband')||x.includes('cancel');
+};
+const voided=(s:any)=>{
+ const x=String(s??'').trim().toLowerCase();
+ return x.includes('aband')||x.includes('cancel');
+};
+const liveNow=(f:any)=>{
+ const status=String(f?.status??'').trim().toLowerCase();
+ if(terminal(status)) return false;
+ const start=new Date(f?.starting_at??'').getTime();
+ const started=Number.isFinite(start)&&start<=Date.now();
+ if(!started) return false;
+ if(['ns','scheduled','not started','upcoming','postponed'].some((value)=>status===value||status.includes(value))) return false;
+ return Number(f?.live)===1||['live','innings break','lunch','tea','stumps'].some((part)=>status.includes(part));
+};
 
 @Injectable()
 export class PredictionService implements OnModuleInit,OnModuleDestroy{
