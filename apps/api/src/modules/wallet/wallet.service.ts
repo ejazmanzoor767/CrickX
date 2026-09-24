@@ -584,12 +584,9 @@ export class WalletService {
         const result = await this.fulfillEarlyBuyPayment(orderId, gatewayTxnRef);
         return { received: true, fulfilled: result };
       } catch (error) {
-        return {
-          received: true,
-          paymentConfirmed: true,
-          fulfillmentFailed: true,
-          message: error instanceof Error ? error.message : 'CRX delivery failed.',
-        };
+        throw new ServiceUnavailableException(
+          error instanceof Error ? error.message : 'CRX delivery failed.',
+        );
       }
     }
 
