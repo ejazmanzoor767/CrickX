@@ -265,6 +265,33 @@ export default function ProfilePage() {
         </div>
       )}
 
+      <div className="card" style={{ marginTop: 16 }}>
+          <div className="section-mini-row">
+            <div>
+              <p className="eyebrow">PLAYER IDENTITY</p>
+              <h2>Profile details</h2>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+            <div>
+              <small style={{ color: 'var(--muted)' }}>DISPLAY NAME</small>
+              <strong style={{ display: 'block', marginTop: 5 }}>{profile.displayName || 'CrickX Player'}</strong>
+            </div>
+            <div>
+              <small style={{ color: 'var(--muted)' }}>STATE / REGION</small>
+              <strong style={{ display: 'block', marginTop: 5 }}>{profile.state || 'Not set'}</strong>
+            </div>
+            <div>
+              <small style={{ color: 'var(--muted)' }}>COUNTRY</small>
+              <strong style={{ display: 'block', marginTop: 5 }}>{profile.country || 'Pakistan'}</strong>
+            </div>
+            <div>
+              <small style={{ color: 'var(--muted)' }}>MEMBER EMAIL</small>
+              <strong className="break-text" style={{ display: 'block', marginTop: 5 }}>{user?.email}</strong>
+            </div>
+          </div>
+      </div>
+
       <div
         className="card"
         style={{
@@ -377,33 +404,6 @@ export default function ProfilePage() {
             <p style={{ margin: '14px 0 0', color: '#8f98aa', fontSize: 12, lineHeight: 1.6 }}>At launch, rewards will be distributed according to the number of valid referrals.</p>
           </div>
         </div>
-      </div>
-
-      <div className="card" style={{ marginTop: 16 }}>
-          <div className="section-mini-row">
-            <div>
-              <p className="eyebrow">PLAYER IDENTITY</p>
-              <h2>Profile details</h2>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
-            <div>
-              <small style={{ color: 'var(--muted)' }}>DISPLAY NAME</small>
-              <strong style={{ display: 'block', marginTop: 5 }}>{profile.displayName || 'CrickX Player'}</strong>
-            </div>
-            <div>
-              <small style={{ color: 'var(--muted)' }}>STATE / REGION</small>
-              <strong style={{ display: 'block', marginTop: 5 }}>{profile.state || 'Not set'}</strong>
-            </div>
-            <div>
-              <small style={{ color: 'var(--muted)' }}>COUNTRY</small>
-              <strong style={{ display: 'block', marginTop: 5 }}>{profile.country || 'Pakistan'}</strong>
-            </div>
-            <div>
-              <small style={{ color: 'var(--muted)' }}>MEMBER EMAIL</small>
-              <strong className="break-text" style={{ display: 'block', marginTop: 5 }}>{user?.email}</strong>
-            </div>
-          </div>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
