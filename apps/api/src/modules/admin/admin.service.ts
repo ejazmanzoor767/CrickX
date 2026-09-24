@@ -77,23 +77,100 @@ export class AdminService {
     const withdrawal = await this.prisma.withdrawal.findUnique({ where: { id: withdrawalId } });
     if (!withdrawal) throw new NotFoundException('Withdrawal not found.');
 
-    if (dto.status === 'REJECTED') {
-      // Refund reserved funds back to the user's wallet on rejection.
-      await this.prisma.wallet.update({
-        where: { userId: withdrawal.userId },
-        data: { depositBalance: { increment: withdrawal.amount } }, // simplification: refund to deposit bucket
+    const current = String(withdrawal.status);
+    if (current === dto.status) return withdrawal;
+    if (current === 'PAID' || current === 'REJECTED' || current === 'FAILED') {
+      throw new BadRequestException('This withdrawal is already finalized and cannot be changed.');
+    }
+
+    const allowed: Record<string, Set<string>> = {
+      REQUESTED: new Set(['UNDER_REVIEW', 'APPROVED', 'REJECTED']),
+      UNDER_REVIEW: new Set(['APPROVED', 'REJECTED']),
+      APPROVED: new Set(['PAID', 'REJECTED']),
+    };
+    if (!allowed[current]?.has(dto.status)) {
+      throw new BadRequestException(`Invalid withdrawal state transition: ${current} -> ${dto.status}.`);
+    }
+
+    if (dto.status !== 'REJECTED') {
+      return this.prisma.withdrawal.update({
+        where: { id: withdrawalId },
+        data: {
+          status: dto.status,
+          payoutReference: dto.payoutReference,
+          reviewedByAdminId: adminId,
+          processedAt: dto.status === 'PAID' ? new Date() : undefined,
+        },
       });
     }
 
-    return this.prisma.withdrawal.update({
-      where: { id: withdrawalId },
-      data: {
-        status: dto.status,
-        rejectionReason: dto.status === 'REJECTED' ? dto.note : undefined,
-        payoutReference: dto.payoutReference,
-        reviewedByAdminId: adminId,
-        processedAt: dto.status === 'PAID' ? new Date() : undefined,
-      },
+    // Rejection must refund the exact buckets that were debited and must be
+    // idempotent. Never refund a finalized withdrawal twice.
+    const debit = await this.prisma.transaction.findFirst({
+      where: { referenceId: withdrawalId, type: 'WITHDRAWAL' },
+    });
+    const bucketDebits = (debit?.metadata as any)?.bucketDebits;
+    const fromDeposit = Number(bucketDebits?.DEPOSIT ?? 0);
+    const fromWinnings = Number(bucketDebits?.WINNINGS ?? 0);
+    const fromBonus = Number(bucketDebits?.BONUS ?? 0);
+    if (![fromDeposit, fromWinnings, fromBonus].every((v) => Number.isFinite(v) && v >= 0) ||
+        Math.abs(fromDeposit + fromWinnings + fromBonus - Number(withdrawal.amount)) > 0.000001) {
+      throw new BadRequestException('Withdrawal ledger metadata is incomplete; manual reconciliation is required.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const latest = await tx.withdrawal.findUnique({ where: { id: withdrawalId } });
+      if (!latest) throw new NotFoundException('Withdrawal not found.');
+      const latestStatus = String(latest.status);
+      if (latestStatus === 'REJECTED') return latest;
+      if (latestStatus === 'PAID' || latestStatus === 'FAILED') {
+        throw new BadRequestException('This withdrawal is already finalized and cannot be changed.');
+      }
+
+      const wallet = await tx.wallet.findUnique({ where: { userId: latest.userId } });
+      if (!wallet) throw new NotFoundException('Wallet not found.');
+
+      const nextDeposit = Number(wallet.depositBalance) + fromDeposit;
+      const nextWinnings = Number(wallet.winningsBalance) + fromWinnings;
+      const nextBonus = Number(wallet.bonusBalance) + fromBonus;
+      const version = Number(wallet.version ?? 0);
+      await tx.wallet.updateMany({
+        where: { userId: latest.userId, version },
+        data: {
+          depositBalance: nextDeposit,
+          winningsBalance: nextWinnings,
+          bonusBalance: nextBonus,
+          version: { increment: 1 },
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          userId: latest.userId,
+          type: 'WITHDRAWAL',
+          status: 'REVERSED',
+          amount: Number(latest.amount),
+          balanceType: 'DEPOSIT',
+          balanceAfter: nextDeposit + nextWinnings + nextBonus,
+          idempotencyKey: `withdrawal-reversal:${withdrawalId}`,
+          referenceType: 'WITHDRAWAL',
+          referenceId: withdrawalId,
+          metadata: {
+            reason: 'ADMIN_REJECTION',
+            bucketRefunds: { DEPOSIT: fromDeposit, WINNINGS: fromWinnings, BONUS: fromBonus },
+          },
+        },
+      });
+
+      return tx.withdrawal.update({
+        where: { id: withdrawalId },
+        data: {
+          status: 'REJECTED',
+          rejectionReason: dto.note,
+          reviewedByAdminId: adminId,
+          processedAt: new Date(),
+        },
+      });
     });
   }
 
