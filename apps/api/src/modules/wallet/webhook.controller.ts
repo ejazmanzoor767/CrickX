@@ -69,6 +69,7 @@ export class OxaPayWalletWebhookController {
       throw new BadRequestException('Invalid webhook JSON.');
     }
 
-    return this.wallet.handleEarlyBuyWebhook(payload);
+    await this.wallet.handleEarlyBuyWebhook(payload);
+    return 'ok';
   }
 }
