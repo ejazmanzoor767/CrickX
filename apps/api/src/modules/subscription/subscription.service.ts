@@ -418,6 +418,9 @@ export class SubscriptionService {
       : undefined;
 
     if (status === 'paid') {
+      if (payment.gatewayTxnRef && gatewayTxnRef && String(payment.gatewayTxnRef) !== gatewayTxnRef) {
+        return { received: true, rejected: true };
+      }
       if (!Number.isFinite(amount) || Math.abs(amount - PRICE_USD) > 0.000001) {
         await this.firestore.subscriptionPayment.update({
           where: { id: payment.id },
