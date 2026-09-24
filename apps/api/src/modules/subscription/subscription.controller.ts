@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Headers, Header, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CreateSubscriptionCheckoutDto } from './dto';
+import { ApplyReferralDto, CreateSubscriptionCheckoutDto } from './dto';
 import { SubscriptionService } from './subscription.service';
 import { OxaPayService } from './oxapay.service';
 
@@ -33,8 +33,8 @@ export class SubscriptionController {
 
   @Post('referral/apply')
   @UseGuards(JwtAuthGuard)
-  applyReferral(@Req() req: Request, @Body() body: { code: string }) {
-    return this.subscriptions.attachReferral(uid(req), body?.code, (req as any).user?.email);
+  applyReferral(@Req() req: Request, @Body() dto: ApplyReferralDto) {
+    return this.subscriptions.attachReferral(uid(req), dto.code, (req as any).user?.email);
   }
 
   @Post('checkout')
