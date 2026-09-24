@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 
@@ -33,6 +33,12 @@ export class FantasyDraftService {
       ? [...new Set(payload.sportmonksPlayerIds.map(Number).filter((id) => Number.isFinite(id)))]
       : [];
 
+    const captainId = payload.captainSportmonksPlayerId ?? null;
+    const viceCaptainId = payload.viceCaptainSportmonksPlayerId ?? null;
+    if (captainId !== null && !playerIds.includes(Number(captainId))) throw new BadRequestException('Captain must be one of the selected players.');
+    if (viceCaptainId !== null && !playerIds.includes(Number(viceCaptainId))) throw new BadRequestException('Vice-captain must be one of the selected players.');
+    if (captainId !== null && viceCaptainId !== null && Number(captainId) === Number(viceCaptainId)) throw new BadRequestException('Captain and vice-captain must be different players.');
+
     const ref = this.firestore.db.collection('fantasyTeamDrafts').doc(this.id(userId, fixtureId));
     const now = new Date();
     const snapshot = await ref.get();
@@ -41,8 +47,8 @@ export class FantasyDraftService {
       sportmonksFixtureId: fixtureId,
       name: String(payload.name ?? 'My CrickX XI').slice(0, 80),
       sportmonksPlayerIds: playerIds.slice(0, 11),
-      captainSportmonksPlayerId: payload.captainSportmonksPlayerId ?? null,
-      viceCaptainSportmonksPlayerId: payload.viceCaptainSportmonksPlayerId ?? null,
+      captainSportmonksPlayerId: captainId,
+      viceCaptainSportmonksPlayerId: viceCaptainId,
       updatedAt: now,
       ...(snapshot.exists ? {} : { createdAt: now }),
     };
