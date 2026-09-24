@@ -15,7 +15,7 @@ import WebView, { type WebViewNavigation } from 'react-native-webview';
 
 const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://crickx-3d806.web.app';
 const START_URL = WEB_URL.replace(/\/$/, '') + '/matches';
-const ALLOWED_HOST = 'crickx-3d806.web.app';
+const ALLOWED_HOSTS = new Set(['crickx-3d806.web.app', 'crickx-3d806.firebaseapp.com']);
 
 const TABS = [
   { path: '/matches', label: 'Matches', icon: '▤' },
@@ -77,18 +77,25 @@ export default function App() {
 
   function handleNavigationRequest(request: WebViewNavigation) {
     const url = request.url;
-    if (
-      /\\.apk(?:$|[?#])/i.test(url) ||
-      url.startsWith('metamask:') ||
-      (!url.startsWith('http://') &&
-        !url.startsWith('https://') &&
-        !url.startsWith('about:blank') &&
-        !url.startsWith('blob:'))
-    ) {
+    if (url.startsWith('about:blank') || url.startsWith('blob:')) return true;
+
+    let host = '';
+    try {
+      host = new URL(url).hostname.toLowerCase();
+    } catch {
+      host = '';
+    }
+
+    if (host && ALLOWED_HOSTS.has(host)) return true;
+
+    // Never render third-party web pages inside the app shell. Open payment
+    // gateways, wallet deep links and downloads in the system/browser instead.
+    if (/^https?:\/\//i.test(url) || /\\.apk(?:$|[?#])/i.test(url) || url.includes(':')) {
       void Linking.openURL(url).catch(() => undefined);
       return false;
     }
-    return true;
+
+    return false;
   }
 
   if (failed) {
@@ -117,9 +124,9 @@ export default function App() {
     );
   }
 
-  const isCrickXPage =
-    currentUrl.startsWith('https://' + ALLOWED_HOST) ||
-    currentUrl.startsWith('http://' + ALLOWED_HOST);
+  let currentHost = '';
+  try { currentHost = new URL(currentUrl).hostname.toLowerCase(); } catch { currentHost = ''; }
+  const isCrickXPage = ALLOWED_HOSTS.has(currentHost);
   const screenTitle = titleForTab(activeTab);
 
   return (
@@ -151,11 +158,12 @@ export default function App() {
             ref={webViewRef}
             source={{ uri: START_URL }}
             style={styles.web}
-            originWhitelist={['http://*', 'https://*', 'metamask:*', '*://*/*']}
+            originWhitelist={['https://*', 'about:blank', 'blob:*']}
             javaScriptEnabled
             domStorageEnabled
-            databaseEnabled
-            thirdPartyCookiesEnabled
+            databaseEnabled={false}
+            thirdPartyCookiesEnabled={false}
+            mixedContentMode="never"
             sharedCookiesEnabled
             setSupportMultipleWindows={false}
             allowsBackForwardNavigationGestures
