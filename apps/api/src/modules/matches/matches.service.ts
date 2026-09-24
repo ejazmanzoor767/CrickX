@@ -5,14 +5,30 @@ import { SportmonksFixture } from '../sportmonks/sportmonks.types';
 
 function sportmonksDate(value: Date) { return value.toISOString().slice(0, 10); }
 function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE' | 'COMPLETED' {
-  const status = String(fixture.status ?? '').toLowerCase();
+  const status = String(fixture.status ?? '').trim().toLowerCase();
   const startingAt = fixture.starting_at ? new Date(fixture.starting_at).getTime() : NaN;
-  const started = !Number.isFinite(startingAt) || startingAt <= Date.now();
-  // Sportmonks can expose a live-looking status shortly before the scheduled
-  // start. Keep the product lifecycle in UPCOMING until the official start
-  // time so those fixtures do not jump directly into Live/Fantasy Live.
-  if (started && (fixture.live === 1 || ['live', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => status.includes(part)))) return 'LIVE';
-  if (status.includes('finish') || status.includes('aband') || status.includes('cancel')) return 'COMPLETED';
+  const started = Number.isFinite(startingAt) && startingAt <= Date.now();
+
+  // Resolve terminal states before live flags. Sportmonks can keep the live
+  // field populated on feeds such as /livescores after a fixture has ended.
+  if (status.includes('finish') || status.includes('complete') || status.includes('aband') || status.includes('cancel')) {
+    return 'COMPLETED';
+  }
+
+  // A fixture with no valid start time must never be promoted to LIVE just
+  // because a provider flag/status is present.
+  if (!started) return 'UPCOMING';
+
+  // Explicit not-started/scheduled states are never live, even when a stale
+  // provider flag is present.
+  if (['ns', 'scheduled', 'not started', 'upcoming', 'postponed'].some((value) => status === value || status.includes(value))) {
+    return 'UPCOMING';
+  }
+
+  if (fixture.live === 1 || ['live', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => status.includes(part))) {
+    return 'LIVE';
+  }
+
   return 'UPCOMING';
 }
 function normalize(fixture: SportmonksFixture) {
@@ -92,8 +108,39 @@ export class MatchesService {
   }
   async listLeagues() { return this.sportmonks.listLeagues(); }
   async listToday() {
-    const result = await this.sportmonks.listTodayFixtures();
-    return { ...result, data: Array.isArray(result.data) ? result.data.map(normalize) : [] };
+    // /today is a schedule feed, not a live feed. The Sportmonks /livescores
+    // endpoint can contain started/completed fixtures from the current day,
+    // which must not be used as the source for "today's scheduled matches".
+    const now = new Date();
+    const start = new Date(now);
+    start.setUTCHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
+
+    const fixtures: SportmonksFixture[] = [];
+    let page = 1;
+    let totalPages = 1;
+
+    do {
+      const envelope = await this.sportmonks.listFixtures({
+        startsBetween: { start: sportmonksDate(start), end: sportmonksDate(end) },
+        page,
+        include: 'localteam,visitorteam,venue,league,season,stage,tosswon,lineup,runs,scoreboards',
+      });
+      fixtures.push(...(Array.isArray(envelope.data) ? envelope.data : []));
+      totalPages = Math.max(1, Number(envelope.meta?.pagination?.total_pages ?? page));
+      page += 1;
+    } while (page <= totalPages);
+
+    const data = fixtures
+      .filter((fixture) => {
+        const timestamp = new Date(fixture.starting_at).getTime();
+        return Number.isFinite(timestamp) && timestamp >= start.getTime() && timestamp < end.getTime();
+      })
+      .sort((a, b) => new Date(a.starting_at).getTime() - new Date(b.starting_at).getTime())
+      .map(normalize);
+
+    return { data, meta: { pagination: { total: data.length, count: data.length, per_page: data.length, current_page: 1, total_pages: 1 } } };
   }
   async listLive() {
     const result = await this.sportmonks.listLiveFixtures();
