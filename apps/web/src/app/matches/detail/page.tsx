@@ -124,7 +124,7 @@ function MatchDetailContent() {
   const selectedRunRate = selectedBalls > 0 ? (selectedTotal / selectedBalls) * 6 : null;
   const selectedRunsFromBat = Math.max(selectedTotal - teamExtras, 0);
 
-  return <section className="app-page" style={{ maxWidth: 1040, margin: '0 auto', paddingBottom: 32 }}>
+  return <section className="app-page match-detail-page" style={{ maxWidth: 1040, margin: '0 auto', paddingBottom: 32 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 10 }}>
       <Link href="/matches" className="back-link">← Match centre</Link>
       {refreshing && <span className="match-meta">Updating…</span>}
