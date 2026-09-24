@@ -158,7 +158,7 @@ export default function App() {
             ref={webViewRef}
             source={{ uri: START_URL }}
             style={styles.web}
-            originWhitelist={['https://*', 'about:blank', 'blob:*']}
+            originWhitelist={['https://*', 'about:blank']}
             javaScriptEnabled
             domStorageEnabled
             databaseEnabled={false}
@@ -195,7 +195,7 @@ export default function App() {
               const nextUrl = state.url || WEB_URL;
               setCurrentUrl(nextUrl);
               setCanGoBack(state.canGoBack);
-              if (nextUrl.includes(ALLOWED_HOST)) {
+              if (ALLOWED_HOSTS.has(new URL(nextUrl).hostname.toLowerCase())) {
                 const nextTab = tabForUrl(nextUrl);
                 if (nextTab) setActiveTab(nextTab);
               }
