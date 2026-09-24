@@ -44,3 +44,30 @@ export class RazorpayWebhookController {
     return { received: true };
   }
 }
+
+
+@Controller('wallet/early-buy/webhook')
+export class OxaPayWalletWebhookController {
+  constructor(
+    private readonly wallet: WalletService,
+    private readonly oxapay: import('../subscription/oxapay.service').OxaPayService,
+  ) {}
+
+  @Post()
+  async handle(@Req() req: Request, @Headers('hmac') signature: string) {
+    const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody;
+    if (!rawBody) throw new BadRequestException('Raw webhook body is unavailable.');
+    if (!this.oxapay.verifyWebhook(rawBody, signature)) {
+      throw new BadRequestException('Invalid OxaPay webhook signature.');
+    }
+
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody.toString('utf8'));
+    } catch {
+      throw new BadRequestException('Invalid webhook JSON.');
+    }
+
+    return this.wallet.handleEarlyBuyWebhook(payload);
+  }
+}
