@@ -119,6 +119,9 @@ export const api = {
       { cache: 'no-store' },
     ),
 
+  referralInfo: () => apiFetch('/subscription/referral'),
+  applyReferral: (code: string) => apiFetch('/subscription/referral/apply', { method: 'POST', body: JSON.stringify({ code }) }),
+
   profile: () => apiFetch('/profile'),
   updateProfile: (payload: unknown) => apiFetch('/profile', { method: 'PUT', body: JSON.stringify(payload) }),
 };
