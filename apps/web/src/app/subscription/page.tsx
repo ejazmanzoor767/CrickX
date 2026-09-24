@@ -56,7 +56,7 @@ export default function SubscriptionPage() {
       <div>
         <p className="eyebrow">CRICKX MEMBERSHIP</p>
         <h1 className="section-title">Weekly Subscription</h1>
-        <p className="section-subtitle">Pay 50 PKR for 7 days of access to CrickX fantasy features.</p>
+        <p className="section-subtitle">Pay $0.18 for 7 days of access to CrickX fantasy features.</p>
       </div>
       <Link className="secondary-button" href="/profile">Profile</Link>
     </div>
@@ -67,7 +67,7 @@ export default function SubscriptionPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
         <div>
           <p className="eyebrow">WEEKLY PLAN</p>
-          <h2 style={{ fontSize: 34, margin: '6px 0' }}>50 PKR <span style={{ fontSize: 16, color: 'var(--muted)', fontWeight: 600 }}>/ 7 days</span></h2>
+          <h2 style={{ fontSize: 34, margin: '6px 0' }}>$0.18 <span style={{ fontSize: 16, color: 'var(--muted)', fontWeight: 600 }}>/ 7 days</span></h2>
           <p className="section-subtitle" style={{ maxWidth: 620 }}>An active subscription lets you create and manage fantasy teams and join eligible contests. Contest entry itself is free; prizes are funded by CrickX.</p>
         </div>
         <div style={{ minWidth: 170, padding: 16, borderRadius: 16, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(0,0,0,.14)' }}>
@@ -86,10 +86,10 @@ export default function SubscriptionPage() {
       ) : (
         <div style={{ marginTop: 20 }}>
           <p className="section-subtitle" style={{ maxWidth: 650 }}>
-            You will be redirected to OxaPay's secure checkout to complete your 50 PKR weekly subscription payment.
+            You will be redirected to OxaPay's secure checkout to complete your $0.18 weekly subscription payment.
           </p>
           <button className="primary-button full" type="button" disabled={paying} onClick={subscribe} style={{ marginTop: 16 }}>
-            {paying ? 'Opening secure checkout…' : 'Subscribe for 50 PKR'}
+            {paying ? 'Opening secure checkout…' : 'Subscribe for $0.18'}
           </button>
         </div>
       )}
