@@ -430,7 +430,7 @@ export class SubscriptionService {
         return { received: true, rejected: true };
       }
 
-      if (currency !== 'PKR') {
+      if (currency !== 'USD') {
         await this.firestore.subscriptionPayment.update({
           where: { id: payment.id },
           data: { status: 'FAILED', gatewayTxnRef, failureReason: 'OxaPay webhook currency mismatch' },
