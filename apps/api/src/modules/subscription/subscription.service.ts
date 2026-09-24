@@ -349,7 +349,7 @@ export class SubscriptionService {
           (gatewayStatus === 'paid' || gatewayStatus === 'manual_accept') &&
           Number.isFinite(gatewayAmount) &&
           Math.abs(gatewayAmount - PRICE_USD) <= 0.000001 &&
-          gatewayCurrency === 'PKR'
+          gatewayCurrency === 'USD'
         ) {
           const now = new Date();
           const expiresAt = new Date(now.getTime() + DURATION_MS);
