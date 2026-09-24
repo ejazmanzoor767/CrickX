@@ -1,9 +1,9 @@
-import { IsOptional, IsString, IsInt } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class UpdateProfileDto {
-  @IsOptional() @IsString() displayName?: string;
-  @IsOptional() @IsString() avatarUrl?: string;
-  @IsOptional() @IsString() state?: string;
-  @IsOptional() @IsString() country?: string;
-  @IsOptional() @IsInt() favoriteTeamSportmonksId?: number;
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(80) displayName?: string;
+  @IsOptional() @IsString() @MaxLength(120) avatarUrl?: string;
+  @IsOptional() @IsString() @MaxLength(120) state?: string;
+  @IsOptional() @IsString() @MaxLength(2) country?: string;
+  @IsOptional() favoriteTeamSportmonksId?: number;
 }
