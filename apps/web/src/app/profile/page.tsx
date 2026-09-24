@@ -172,26 +172,6 @@ export default function ProfilePage() {
     }
   }
 
-  async function shareReferralLink() {
-    const link = referralLink();
-    if (!link) return;
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: 'Join me on CrickX',
-          text: 'Join CrickX using my referral link.',
-          url: link,
-        });
-      } else {
-        await copyReferralLink();
-      }
-    } catch (error) {
-      if ((error as DOMException)?.name !== 'AbortError') {
-        setReferralError('Unable to share the referral link.');
-      }
-    }
-  }
-
   async function handleLogout() {
     await logout();
     router.push('/');
@@ -340,15 +320,6 @@ export default function ProfilePage() {
                 </button>
               </div>
             </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className="primary-button" type="button" onClick={() => void shareReferralLink()} disabled={!referral?.code} style={{ padding: '10px 16px' }}>
-              ↗ Share Referral Link
-            </button>
-            <button className="secondary-button" type="button" onClick={() => void copyReferralLink()} disabled={!referral?.code} style={{ padding: '10px 16px' }}>
-              {referralCopied === 'link' ? 'Link Copied ✓' : 'Copy Full Link'}
-            </button>
           </div>
 
           <div style={{ padding: '14px 15px', borderRadius: 15, background: 'rgba(155,255,71,.055)', border: '1px solid rgba(155,255,71,.10)' }}>
