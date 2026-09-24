@@ -195,7 +195,14 @@ export class WalletService {
     return this.prisma.transaction.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize });
   }
 
+  private demoWalletEnabled() {
+    return String(this.config.get<string>('WALLET_DEMO_MODE', 'false')).toLowerCase() === 'true';
+  }
+
   async initiateDeposit(userId: string, amount: number, gateway: string) {
+    if (!this.demoWalletEnabled()) {
+      throw new ServiceUnavailableException('Manual wallet deposits are disabled. Use the supported payment flow.');
+    }
     if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('Enter a positive CrickX Token amount.');
     if (amount > 1000000) throw new BadRequestException('Demo deposit amount is too large.');
 
@@ -497,8 +504,12 @@ export class WalletService {
     const gatewayCurrency = String(gateway?.currency || '').toUpperCase();
     const expectedAmount = Number(purchase.amountUsd);
 
+    const gatewayTrackId = String(gateway?.track_id ?? gateway?.trackId ?? '');
     if ((status !== 'paid' && status !== 'manual_accept') || !Number.isFinite(gatewayAmount)) {
       return { ...purchase, orderId };
+    }
+    if (purchase.gatewayTxnRef && gatewayTrackId && String(purchase.gatewayTxnRef) !== gatewayTrackId) {
+      throw new BadRequestException('OxaPay payment reference mismatch.');
     }
     if (Math.abs(gatewayAmount - expectedAmount) > 0.000001 || gatewayCurrency !== 'USD') {
       await purchaseRef.set({
@@ -615,6 +626,9 @@ export class WalletService {
   }
 
   async requestWithdrawal(userId: string, amount: number, bankAccountLast4: string) {
+    if (!this.demoWalletEnabled()) {
+      throw new ServiceUnavailableException('Demo withdrawals are disabled until a verified payout flow is enabled.');
+    }
     if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('Enter a positive CrickX Token amount.');
 
     const withdrawalId = randomUUID();
