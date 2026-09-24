@@ -1,5 +1,5 @@
 import { FirestoreService } from '../src/common/firestore.service';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 async function main() {
   const db = new FirestoreService();
