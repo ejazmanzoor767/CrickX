@@ -318,7 +318,7 @@ export default function ProfilePage() {
         {referralError && <div style={{ margin: '14px 24px 0' }}><p className="error-text">{referralError}</p></div>}
 
         <div style={{ padding: 24, display: 'grid', gap: 18 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
             <div style={{ padding: 15, borderRadius: 16, background: 'rgba(255,255,255,.028)', border: '1px solid rgba(255,255,255,.065)' }}>
               <span style={{ display: 'block', color: '#8f98aa', fontSize: 10, fontWeight: 900, letterSpacing: '.12em' }}>YOUR CODE</span>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 }}>
