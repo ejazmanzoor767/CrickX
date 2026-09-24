@@ -56,7 +56,19 @@ export class AdminService {
 
   // --- KYC review ---
   async listPendingKyc() {
-    return this.prisma.kycRecord.findMany({ where: { status: 'PENDING' }, include: { user: { select: { email: true } } } });
+    return this.prisma.kycRecord.findMany({
+      where: { status: 'PENDING' },
+      select: {
+        id: true,
+        userId: true,
+        documentType: true,
+        status: true,
+        rejectionReason: true,
+        submittedAt: true,
+        reviewedAt: true,
+        user: { select: { email: true } },
+      },
+    });
   }
 
   async reviewKyc(adminId: string, kycId: string, dto: ReviewKycDto) {
