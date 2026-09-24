@@ -56,7 +56,7 @@ export default function FantasyHomePage() {
 
   const teamByFixture=useMemo(()=>{ const map=new Map<number,any>(); for(const t of teams){const id=Number(t.sportmonksFixtureId);if(!map.has(id))map.set(id,t);} return map; },[teams]);
 
-  return <section className="app-page">
+  return <section className="app-page fantasy-home-page">
     <div className="page-intro"><div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Fantasy matches</h1><p className="section-subtitle">Upcoming, live and recent completed matches stay here so you can create a team, open Predictions, or review your previous predictions from the same match card.</p></div><div className="page-actions"><Link className="secondary-button" href="/matches">Match centre</Link></div></div>
     {error&&<div className="card"><p className="error-text">{error}</p></div>}
     {loading ? <div className="card skeleton-card">Loading fantasy matches…</div> : matches.length===0 ? <div className="card empty-state"><strong>No active fantasy matches found.</strong><span>Matches without a saved team leave Fantasy when they go live. Saved teams remain until completion.</span></div> : <div className="match-list">{matches.map((m:any)=>{
