@@ -39,7 +39,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: .
-        run: npm install --workspaces --include-workspace-root
+        run: npm ci --workspaces --include-workspace-root
 
       - name: Configure Node resolution
         shell: bash
@@ -84,13 +84,35 @@ jobs:
           print("Android splash resources verified.")
           PY
 
-      - name: Stabilize generated Gradle configuration
+      - name: Configure release signing
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
         shell: bash
         run: |
+          set -euo pipefail
+          if [[ -z "${ANDROID_RELEASE_KEYSTORE_BASE64:-}" ]]; then
+            echo "Missing required GitHub secret: ANDROID_RELEASE_KEYSTORE_BASE64"
+            exit 1
+          fi
+          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/crickx-release.keystore
+          chmod 600 android/app/crickx-release.keystore
+          test -s android/app/crickx-release.keystore
+
+      - name: Stabilize generated Gradle configuration
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANDROID_KEYSTORE_PASSWORD:-}" || -z "${ANDROID_KEY_ALIAS:-}" || -z "${ANDROID_KEY_PASSWORD:-}" ]]; then
+            echo "Missing one or more Android signing secrets: ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD"
+            exit 1
+          fi
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
-          import re
 
           def resolve(name):
               return subprocess.check_output(
@@ -119,7 +141,6 @@ jobs:
 
           lines = p.read_text().splitlines()
           found = set()
-
           for i, line in enumerate(lines):
               stripped = line.strip()
               for key, replacement in replacements.items():
@@ -128,38 +149,39 @@ jobs:
                       lines[i] = indent + replacement
                       found.add(key)
                       break
-
           missing = set(replacements) - found
           if missing:
               raise SystemExit("Missing generated Expo Gradle settings: " + ", ".join(sorted(missing)))
 
           s = "\n".join(lines) + "\n"
+          signing_anchor = "    signingConfigs {"
+          if signing_anchor not in s:
+              signing_anchor = "        signingConfigs {"
+          if signing_anchor not in s:
+              raise SystemExit("Could not find Android signingConfigs block")
 
-          release = re.search(r"(?ms)(^\s*release\s*\{)(.*?)(^\s*\})", s)
-          if not release:
-              raise SystemExit("Could not find Android release build type")
+          signing_block = """
+        crickxRelease {
+            storeFile file("crickx-release.keystore")
+            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias System.getenv("ANDROID_KEY_ALIAS")
+            keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+        }
+"""
+          s = s.replace(signing_anchor, signing_anchor + signing_block, 1)
 
-          body = release.group(2)
-          if "signingConfig signingConfigs." not in body:
-              start, end = release.span(2)
-              indent = re.match(r"\s*", release.group(1)).group(0) + "    "
-              s = (
-                  s[:start]
-                  + "\n"
-                  + indent
-                  + "signingConfig signingConfigs.debug"
-                  + s[start:end]
-                  + s[end:]
-              )
+          occurrences = [i for i in range(len(s)) if s.startswith("signingConfig signingConfigs.debug", i)]
+          if not occurrences:
+              raise SystemExit("Could not find generated release signing configuration")
+          idx = occurrences[-1]
+          s = s[:idx] + "signingConfig signingConfigs.crickxRelease" + s[idx + len("signingConfig signingConfigs.debug"):]
 
           p.write_text(s)
-
-          print("Android Gradle configuration stabilized.")
+          print("Android release signing configured with the persistent CrickX keystore.")
           print("React Native:", rn_dir)
           print("Codegen:", codegen_dir)
           print("Expo CLI:", expo_cli)
           PY
-
       - name: Verify Android project
         shell: bash
         run: |
@@ -171,6 +193,9 @@ jobs:
       - name: Assemble APK
         env:
           NODE_ENV: production
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           EXPO_PUBLIC_API_BASE_URL: https://crickx-api.onrender.com/api/v1
           EXPO_PUBLIC_WEB_URL: https://crickx-3d806.web.app
           EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
