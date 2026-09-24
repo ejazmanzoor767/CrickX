@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -33,7 +35,11 @@ import { HealthController } from './health.controller';
     AdminModule,
   ],
   controllers: [HealthController],
-  providers: [FirestoreService, JwtAuthGuard],
+  providers: [
+    FirestoreService,
+    JwtAuthGuard,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
   exports: [FirestoreService, JwtAuthGuard],
 })
 export class AppModule {}
