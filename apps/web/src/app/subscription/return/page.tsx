@@ -71,7 +71,7 @@ function SubscriptionReturnContent() {
         </>
       ) : isActive ? (
         <>
-          <p className="section-subtitle">Your 50 PKR payment was confirmed and your weekly access is now active.</p>
+          <p className="section-subtitle">Your $0.18 payment was confirmed and your weekly access is now active.</p>
           <p style={{ marginTop: 14 }}>Expires: <strong>{new Date(result.expiresAt).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' })}</strong></p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap', marginTop: 20 }}>
             <Link className="primary-button" href="/fantasy-home">Open Fantasy</Link>
