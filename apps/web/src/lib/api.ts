@@ -119,6 +119,14 @@ export const api = {
       { cache: 'no-store' },
     ),
 
+  earlyBuyCheckout: (amountUsd: number, walletAddress: string) =>
+    apiFetch('/wallet/early-buy/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ amountUsd, walletAddress }),
+    }),
+  earlyBuyPaymentStatus: (orderId: string) =>
+    apiFetch('/wallet/early-buy/status?order=' + encodeURIComponent(orderId) + '&_=' + Date.now(), { cache: 'no-store' }),
+
   referralInfo: () => apiFetch('/subscription/referral'),
   applyReferral: (code: string) => apiFetch('/subscription/referral/apply', { method: 'POST', body: JSON.stringify({ code }) }),
 
