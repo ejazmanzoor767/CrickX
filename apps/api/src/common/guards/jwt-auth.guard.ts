@@ -81,7 +81,22 @@ export class JwtAuthGuard implements CanActivate {
         const byEmail = await users.where('email', '==', email).limit(1).get();
         if (!byEmail.empty) {
           const existing = byEmail.docs[0];
-          await existing.ref.set({ firebaseUid: decoded.uid, emailVerifiedAt: decoded.email_verified ? new Date() : null, lastLoginAt: new Date() }, { merge: true });
+          const existingData = existing.data() as { firebaseUid?: string; emailVerifiedAt?: unknown };
+          // Never claim an existing account solely because the Firebase token
+          // contains the same email. Email-linking is only allowed for a
+          // previously verified account and a verified Firebase identity.
+          if (
+            !decoded.email_verified ||
+            existingData.firebaseUid ||
+            !existingData.emailVerifiedAt
+          ) {
+            throw new UnauthorizedException('Please use the original sign-in method for this account.');
+          }
+          await existing.ref.set({
+            firebaseUid: decoded.uid,
+            emailVerifiedAt: new Date(),
+            lastLoginAt: new Date(),
+          }, { merge: true });
           userSnap = await existing.ref.get();
         } else {
           const now = new Date();
@@ -94,11 +109,28 @@ export class JwtAuthGuard implements CanActivate {
             emailVerifiedAt: decoded.email_verified ? now : null,
             createdAt: now,
             updatedAt: now,
-            lastLoginAt: now,
+            lastLoginAt: new Date(),
           });
           const profileId = randomUUID();
-          await db.collection('profiles').doc(profileId).set({ id: profileId, userId: decoded.uid, displayName: decoded.name || email.split('@')[0] || 'Player', country: 'IN', createdAt: now, updatedAt: now });
-          await db.collection('wallets').doc(decoded.uid).set({ id: decoded.uid, userId: decoded.uid, depositBalance: 0, winningsBalance: 0, bonusBalance: 0, currency: 'INR', version: 0, createdAt: now, updatedAt: now });
+          await db.collection('profiles').doc(profileId).set({
+            id: profileId,
+            userId: decoded.uid,
+            displayName: decoded.name || email.split('@')[0] || 'Player',
+            country: 'PK',
+            createdAt: now,
+            updatedAt: now,
+          });
+          await db.collection('wallets').doc(decoded.uid).set({
+            id: decoded.uid,
+            userId: decoded.uid,
+            depositBalance: 0,
+            winningsBalance: 0,
+            bonusBalance: 0,
+            currency: 'CRX',
+            version: 0,
+            createdAt: now,
+            updatedAt: now,
+          });
           userSnap = await uidRef.get();
         }
       }
