@@ -257,7 +257,7 @@ model Withdrawal {
 
 
 // ---------------------------------------------------------------------------
-// Weekly subscriptions and RapidGateway PKR payments
+// Weekly subscriptions and OxaPay USD payments
 // ---------------------------------------------------------------------------
 
 enum SubscriptionStatus {
@@ -279,7 +279,7 @@ model Subscription {
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan        String             // WEEKLY
   amount      Decimal            @db.Decimal(10, 2)
-  currency    String             @default("PKR")
+  currency    String             @default("USD")
   status      SubscriptionStatus @default(PENDING)
   basketId    String             @unique
   startedAt   DateTime?
