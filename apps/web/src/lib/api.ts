@@ -90,6 +90,10 @@ export const api = {
   liveMatchDetail: (fixtureId: number) => apiFetch(`/matches/${fixtureId}/live`),
   fixtureSquads: (fixtureId: number) => apiFetch(`/matches/${fixtureId}/squad`),
 
+  predictionsForFixture: (fixtureId: number) => apiFetch(`/predictions/${fixtureId}`),
+  myPredictionsForFixture: (fixtureId: number) => apiFetch(`/predictions/${fixtureId}/mine`),
+  submitPredictions: (fixtureId: number, payload: unknown) => apiFetch(`/predictions/${fixtureId}/submit`, { method: 'POST', body: JSON.stringify(payload) }),
+
   contestsForFixture: (fixtureId: number) => apiFetch(`/fantasy/contests/fixture/${fixtureId}`),
   contestLeaderboard: (contestId: string) => apiFetch(`/fantasy/contests/${contestId}/leaderboard`),
   myFantasyTeams: () => apiFetch('/fantasy/teams'),

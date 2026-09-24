@@ -43,10 +43,15 @@ function MatchCard({ fixture, live, completed, fantasyFixture, teamSaved }: { fi
         {completed && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/leaderboard?fixtureId=${fixture.id}`}>Leaderboard</Link>}
         {completed && hasSavedTeam && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={viewTeamHref}>View Team</Link>}
         {completed && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/matches/detail?fixtureId=${fixture.id}`}>Stats</Link>}
+        {completed && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/predictions?fixtureId=${fixture.id}`}>View Predictions</Link>}
         {!live && !completed && <span style={{color:'#98a0b3',fontSize:13}}>{hasSavedTeam ? 'Your team is saved' : 'Fantasy opens before match start'}</span>}
       </div>
-      {live && <Link className="primary-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/matches/detail?fixtureId=${fixture.id}`}>Scorecard →</Link>}
-      {!completed && !live && <Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${fixture.id}`}>{hasSavedTeam ? 'View / Edit Team' : 'Create Team'}</Link>}
+      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+        {!completed && !live && <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${fixture.id}`}>Predictions</Link>}
+        {live && <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${fixture.id}`}>Predictions</Link>}
+        {live && <Link className="primary-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/matches/detail?fixtureId=${fixture.id}`}>Scorecard →</Link>}
+        {!completed && !live && <Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${fixture.id}`}>{hasSavedTeam ? 'View / Edit Team' : 'Create Team'}</Link>}
+      </div>
     </div>
   </article>;
 }

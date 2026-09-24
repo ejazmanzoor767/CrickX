@@ -36,13 +36,13 @@ export default function FantasyHomePage() {
           if(Number.isFinite(id) && !byId.has(id)) byId.set(id,raw);
         }
         const eligible=Array.from(byId.values()).filter((m:any)=>{
-          const id=Number(m?.id);
-          if(isCompleted(m)) return false;
-          if(isLive(m)) return savedIds.has(id);
+          if(isCompleted(m)) return true;
+          if(isLive(m)) return true;
           return new Date(m.starting_at).getTime() > Date.now();
         }).sort((a:any,b:any)=>{
-          const liveA=isLive(a),liveB=isLive(b);
-          if(liveA!==liveB) return liveA?-1:1;
+          const rank=(m:any)=>isLive(m)?0:isCompleted(m)?2:1;
+          const rankDiff=rank(a)-rank(b);
+          if(rankDiff!==0) return rankDiff;
           return new Date(a.starting_at).getTime()-new Date(b.starting_at).getTime();
         });
         setMatches(eligible); setTeams(savedTeams); setError('');
@@ -57,7 +57,7 @@ export default function FantasyHomePage() {
   const teamByFixture=useMemo(()=>{ const map=new Map<number,any>(); for(const t of teams){const id=Number(t.sportmonksFixtureId);if(!map.has(id))map.set(id,t);} return map; },[teams]);
 
   return <section className="app-page">
-    <div className="page-intro"><div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Fantasy matches</h1><p className="section-subtitle">Upcoming matches appear here before play. A saved team remains here while the match is live, then moves to Completed after the match finishes.</p></div><div className="page-actions"><Link className="secondary-button" href="/matches">Match centre</Link></div></div>
+    <div className="page-intro"><div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Fantasy matches</h1><p className="section-subtitle">Upcoming, live and recent completed matches stay here so you can create a team, open Predictions, or review your previous predictions from the same match card.</p></div><div className="page-actions"><Link className="secondary-button" href="/matches">Match centre</Link></div></div>
     {error&&<div className="card"><p className="error-text">{error}</p></div>}
     {loading ? <div className="card skeleton-card">Loading fantasy matches…</div> : matches.length===0 ? <div className="card empty-state"><strong>No active fantasy matches found.</strong><span>Matches without a saved team leave Fantasy when they go live. Saved teams remain until completion.</span></div> : <div className="match-list">{matches.map((m:any)=>{
       const live=isLive(m),team=teamByFixture.get(Number(m.id));
@@ -68,9 +68,13 @@ export default function FantasyHomePage() {
         {live&&<div className="result-note">Match is live. Your saved team is view-only.</div>}
         <div className="match-footer"><div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
           {team&&<Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/fantasy/view?fixtureId=${m.id}`}>View Team</Link>}
+          {isCompleted(m)&&<Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/predictions?fixtureId=${m.id}`}>View Predictions</Link>}
         </div>
-        {!live&&<Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${m.id}`}>{team?'Edit Team':'Create Team'}</Link>}
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+        {!isCompleted(m)&&!live&&<Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${m.id}`}>{team?'Edit Team':'Create Team'}</Link>}
+        {!isCompleted(m)&&<Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${m.id}`}>Predictions</Link>}
         {live&&<Link className="primary-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/leaderboard?fixtureId=${m.id}`}>Leaderboard</Link>}
+        </div>
         </div>
       </article>;
     })}</div>}

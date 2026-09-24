@@ -11,6 +11,7 @@ import { ProfileModule } from './modules/profile/profile.module';
 import { ScoringModule } from './modules/scoring/scoring.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { PredictionModule } from './modules/prediction/prediction.module';
 import { FirestoreService } from './common/firestore.service';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { HealthController } from './health.controller';
@@ -26,6 +27,7 @@ import { HealthController } from './health.controller';
     FantasyModule,
     WalletModule,
     SubscriptionModule,
+    PredictionModule,
     ProfileModule,
     ScoringModule,
     AdminModule,
