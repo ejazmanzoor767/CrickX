@@ -74,3 +74,4 @@ jobs:
           fi
           git commit -m "chore(security): refresh dependency tree"
           git push
+
