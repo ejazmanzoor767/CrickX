@@ -208,7 +208,7 @@ function FantasyBuilder() {
   const countA = teamCounts[teamIdFor(teamA)] ?? 0;
   const countB = teamCounts[teamIdFor(teamB)] ?? 0;
 
-  return <section className="app-page" style={{ paddingBottom: 96 }}>
+  return <section className="app-page fantasy-builder-page" style={{ paddingBottom: 96 }}>
     <div className="page-intro" style={{ alignItems: 'flex-start' }}>
       <div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Build your XI</h1><p className="section-subtitle">Select players from the Sportmonks squad for this match.</p></div>
       <div className="card" style={{ minWidth: 180, padding: 14, textAlign: 'right' }}><span className="eyebrow">CREDITS</span><strong style={{ display: 'block', fontSize: 24, marginTop: 3 }}>{totalCredits.toFixed(1)} / 100</strong><span className="section-subtitle">{remainingCredits.toFixed(1)} remaining</span></div>
