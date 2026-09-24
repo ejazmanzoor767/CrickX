@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -6,7 +6,7 @@ import { Roles } from '../../common/guards/roles.decorator';
 import { FantasyDraftService } from './fantasy-draft.service';
 import { FantasyTeamService } from './fantasy-team.service';
 import { ContestService } from './contest.service';
-import { CreateFantasyTeamDto, CreateContestDto, JoinContestDto, PrepareJoinContestDto } from './dto';
+import { CreateFantasyTeamDto, CreateContestDto, JoinContestDto, PrepareJoinContestDto, SaveFantasyDraftDto } from './dto';
 
 function uid(req: Request) {
   return (req as unknown as { user: { userId: string } }).user.userId;
@@ -27,10 +27,10 @@ export class FantasyTeamController {
   mine(@Req() req: Request) { return this.teams.listMine(uid(req)); }
 
   @Get('draft/:fixtureId')
-  draft(@Req() req: Request, @Param('fixtureId') fixtureId: string) { return this.drafts.get(uid(req), parseInt(fixtureId, 10)); }
+  draft(@Req() req: Request, @Param('fixtureId', ParseIntPipe) fixtureId: number) { return this.drafts.get(uid(req), fixtureId); }
 
   @Put('draft/:fixtureId')
-  saveDraft(@Req() req: Request, @Param('fixtureId') fixtureId: string, @Body() body: any) { return this.drafts.save(uid(req), parseInt(fixtureId, 10), body); }
+  saveDraft(@Req() req: Request, @Param('fixtureId', ParseIntPipe) fixtureId: number, @Body() dto: SaveFantasyDraftDto) { return this.drafts.save(uid(req), fixtureId, dto); }
 
   @Get(':teamId')
   one(@Req() req: Request, @Param('teamId') teamId: string) { return this.teams.getOne(uid(req), teamId); }
