@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post, Put, Req, UseGuards } from '@nestjs/common
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ProfileService } from './profile.service';
-import { UpdateProfileDto } from './dto';
+import { SubmitKycDto, UpdateProfileDto } from './dto';
 
 @Controller('profile')
 @UseGuards(JwtAuthGuard)
@@ -24,8 +24,8 @@ export class ProfileController {
   }
 
   @Post('kyc')
-  submitKyc(@Req() req: Request, @Body() body: { documentType: string; documentNumber: string }) {
-    return this.profile.submitKyc(this.uid(req), body.documentType, body.documentNumber);
+  submitKyc(@Req() req: Request, @Body() dto: SubmitKycDto) {
+    return this.profile.submitKyc(this.uid(req), dto.documentType, dto.documentNumber);
   }
 
   @Get('kyc')
