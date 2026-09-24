@@ -161,7 +161,7 @@ export default function WalletPage() {
 
   if (authLoading) return <section className="app-page"><div className="card skeleton-card">Loading wallet…</div></section>;
 
-  return <section className="app-page" style={{ maxWidth: 980 }}>
+  return <section className="app-page wallet-page" style={{ maxWidth: 980 }}>
     <div className="page-intro">
       <div>
         <p className="eyebrow">CRICKX WEB3</p>
