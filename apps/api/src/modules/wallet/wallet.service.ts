@@ -301,6 +301,25 @@ export class WalletService {
 
   async earlyBuyCheckout(userId: string, amountUsd: number, destinationWallet: string) {
     const normalized = this.normalizeUsdAmount(amountUsd);
+    this.requireEarlyBuyWallet();
+
+    const decimals = Number(await this.publicClient.readContract({
+      address: this.tokenAddress!,
+      abi: CRX_ABI,
+      functionName: 'decimals',
+    }));
+    const requiredTokens = parseUnits(String(normalized.crxAmount), decimals);
+    const deliveryBalance = await this.publicClient.readContract({
+      address: this.tokenAddress!,
+      abi: CRX_ABI,
+      functionName: 'balanceOf',
+      args: [this.ownerAccount!.address],
+    }) as bigint;
+    if (deliveryBalance < requiredTokens) {
+      throw new ServiceUnavailableException(
+        'CRX delivery wallet does not have enough tokens for this purchase. Please try again after inventory is replenished.',
+      );
+    }
     let walletAddress: Address;
     try {
       walletAddress = getAddress(destinationWallet);
