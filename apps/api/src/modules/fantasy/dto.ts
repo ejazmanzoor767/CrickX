@@ -42,3 +42,10 @@ export class JoinContestDto extends PrepareJoinContestDto {
   @IsString() @MinLength(64) @MaxLength(300) walletSignature!: string;
   @IsInt() walletMessageTimestamp!: number;
 }
+
+export class SaveFantasyDraftDto {
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(80) name?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(11) @IsInt({ each: true }) @Min(1, { each: true }) sportmonksPlayerIds?: number[];
+  @IsOptional() @IsInt() @Min(1) captainSportmonksPlayerId?: number | null;
+  @IsOptional() @IsInt() @Min(1) viceCaptainSportmonksPlayerId?: number | null;
+}
