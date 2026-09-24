@@ -24,7 +24,7 @@ const TABS = [
   { path: '/profile', label: 'Profile', icon: '●' },
 ] as const;
 
-const NATIVE_SHELL_CSS = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}.page-shell{padding-bottom:0 !important;min-height:100vh !important;}";
+const NATIVE_SHELL_CSS = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}html.crickx-native-app .page-shell{padding:0 !important;min-height:100vh !important;}";
 
 function tabForUrl(url: string) {
   try {
@@ -161,6 +161,7 @@ export default function App() {
             pullToRefreshEnabled
             injectedJavaScriptBeforeContentLoaded={`
               (function() {
+                document.documentElement.classList.add('crickx-native-app');
                 var style = document.createElement('style');
                 style.id = 'crickx-native-shell';
                 style.innerHTML = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}.page-shell{padding-bottom:0 !important;min-height:100vh !important;}";
@@ -170,6 +171,7 @@ export default function App() {
             `}
             injectedJavaScript={`
               (function() {
+                document.documentElement.classList.add('crickx-native-app');
                 var style = document.getElementById('crickx-native-shell');
                 if (!style) {
                   style = document.createElement('style');
