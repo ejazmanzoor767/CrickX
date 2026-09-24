@@ -25,6 +25,18 @@ export class SubscriptionController {
     return this.subscriptions.status(uid(req));
   }
 
+  @Get('referral')
+  @UseGuards(JwtAuthGuard)
+  referralInfo(@Req() req: Request) {
+    return this.subscriptions.getReferralInfo(uid(req));
+  }
+
+  @Post('referral/apply')
+  @UseGuards(JwtAuthGuard)
+  applyReferral(@Req() req: Request, @Body() body: { code: string }) {
+    return this.subscriptions.attachReferral(uid(req), body?.code, (req as any).user?.email);
+  }
+
   @Post('checkout')
   @UseGuards(JwtAuthGuard)
   checkout(@Req() req: Request, @Body() _dto: CreateSubscriptionCheckoutDto) {
