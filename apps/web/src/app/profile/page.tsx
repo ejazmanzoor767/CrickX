@@ -187,7 +187,7 @@ export default function ProfilePage() {
     .toUpperCase();
 
   return (
-    <section>
+    <section className="profile-page">
       <div className="profile-hero card">
         <div className="avatar-large">
           {profile.avatarUrl ? <img src={profile.avatarUrl} alt="Profile" /> : initials}
