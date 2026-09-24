@@ -55,7 +55,7 @@ export default function ProfilePage() {
   const [referralError, setReferralError] = useState('');
   const [referralCodeInput, setReferralCodeInput] = useState('');
   const [referralApplying, setReferralApplying] = useState(false);
-  const [referralCopied, setReferralCopied] = useState(false);
+  const [referralCopied, setReferralCopied] = useState<'code' | 'link' | ''>('');
   const [editing, setEditing] = useState(false);
   const router = useRouter();
 
@@ -144,15 +144,51 @@ export default function ProfilePage() {
     }
   }
 
-  async function copyReferralLink() {
+  function referralLink() {
+    if (!referral?.code) return '';
+    return window.location.origin + '/register?ref=' + encodeURIComponent(referral.code);
+  }
+
+  async function copyReferralCode() {
     if (!referral?.code) return;
-    const link = `${window.location.origin}/register?ref=${encodeURIComponent(referral.code)}`;
+    try {
+      await navigator.clipboard.writeText(referral.code);
+      setReferralCopied('code');
+      window.setTimeout(() => setReferralCopied(''), 1800);
+    } catch {
+      setReferralError('Unable to copy the referral code.');
+    }
+  }
+
+  async function copyReferralLink() {
+    const link = referralLink();
+    if (!link) return;
     try {
       await navigator.clipboard.writeText(link);
-      setReferralCopied(true);
-      window.setTimeout(() => setReferralCopied(false), 1800);
+      setReferralCopied('link');
+      window.setTimeout(() => setReferralCopied(''), 1800);
     } catch {
-      setReferralError('Unable to copy the referral link. Please copy the code manually.');
+      setReferralError('Unable to copy the referral link.');
+    }
+  }
+
+  async function shareReferralLink() {
+    const link = referralLink();
+    if (!link) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Join me on CrickX',
+          text: 'Join CrickX using my referral link.',
+          url: link,
+        });
+      } else {
+        await copyReferralLink();
+      }
+    } catch (error) {
+      if ((error as DOMException)?.name !== 'AbortError') {
+        setReferralError('Unable to share the referral link.');
+      }
     }
   }
 
@@ -249,60 +285,125 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="section-mini-row">
-          <div>
-            <p className="eyebrow">REFERRALS</p>
-            <h2>Your Referral</h2>
+      <div
+        className="card"
+        style={{
+          marginTop: 16,
+          padding: 0,
+          overflow: 'hidden',
+          background: 'linear-gradient(145deg, rgba(155,255,71,.09), rgba(18,23,34,.98) 38%, rgba(10,13,19,.98))',
+          border: '1px solid rgba(155,255,71,.14)',
+        }}
+      >
+        <div style={{ padding: '24px 24px 18px', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap' }}>
+            <div style={{ maxWidth: 620 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 999, background: 'rgba(155,255,71,.10)', border: '1px solid rgba(155,255,71,.16)' }}>
+                <span style={{ fontSize: 11 }}>✦</span>
+                <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '.14em' }}>REFERRAL PROGRAM</span>
+              </div>
+              <h2 style={{ margin: '12px 0 7px', fontSize: 28 }}>Grow your CrickX network</h2>
+              <p className="section-subtitle" style={{ margin: 0, lineHeight: 1.65 }}>
+                Invite friends with your personal link. A referral becomes <strong style={{ color: '#eef2f7' }}>valid</strong> after the referred user successfully completes a subscription.
+              </p>
+            </div>
+            <div style={{ minWidth: 170, padding: 16, borderRadius: 18, background: 'rgba(0,0,0,.18)', border: '1px solid rgba(255,255,255,.07)' }}>
+              <span style={{ display: 'block', color: '#9aa3b5', fontSize: 10, fontWeight: 900, letterSpacing: '.13em' }}>VALID REFERRALS</span>
+              <strong style={{ display: 'block', marginTop: 5, fontSize: 30, lineHeight: 1 }}>{Number(referral?.validReferrals ?? 0)}</strong>
+              <span style={{ display: 'block', marginTop: 7, color: '#9aa3b5', fontSize: 12 }}>of {Number(referral?.totalReferrals ?? 0)} total</span>
+            </div>
           </div>
-          <span className="demo-pill">{Number(referral?.validReferrals ?? 0)} valid</span>
         </div>
 
-        {referralError && <p className="error-text">{referralError}</p>}
+        {referralError && <div style={{ margin: '14px 24px 0' }}><p className="error-text">{referralError}</p></div>}
 
-        <div style={{ display: 'grid', gap: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center' }}>
-            <div>
-              <small style={{ color: 'var(--muted)' }}>YOUR REFERRAL CODE</small>
-              <strong className="break-text" style={{ display: 'block', marginTop: 5, fontSize: 18 }}>{referral?.code ?? 'Loading…'}</strong>
+        <div style={{ padding: 24, display: 'grid', gap: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+            <div style={{ padding: 15, borderRadius: 16, background: 'rgba(255,255,255,.028)', border: '1px solid rgba(255,255,255,.065)' }}>
+              <span style={{ display: 'block', color: '#8f98aa', fontSize: 10, fontWeight: 900, letterSpacing: '.12em' }}>YOUR CODE</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 }}>
+                <strong style={{ fontSize: 20, letterSpacing: '.05em', wordBreak: 'break-all' }}>{referral?.code ?? 'Loading…'}</strong>
+                <button className="secondary-button" type="button" onClick={() => void copyReferralCode()} disabled={!referral?.code} style={{ padding: '8px 11px', flexShrink: 0 }}>
+                  {referralCopied === 'code' ? 'Copied ✓' : 'Copy'}
+                </button>
+              </div>
             </div>
-            <button className="secondary-button" type="button" onClick={() => void copyReferralLink()} disabled={!referral?.code}>
-              {referralCopied ? 'Copied ✓' : 'Copy Link'}
+
+            <div style={{ padding: 15, borderRadius: 16, background: 'rgba(255,255,255,.028)', border: '1px solid rgba(255,255,255,.065)' }}>
+              <span style={{ display: 'block', color: '#8f98aa', fontSize: 10, fontWeight: 900, letterSpacing: '.12em' }}>REFERRAL LINK</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 }}>
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#dce2eb', fontSize: 13 }}>
+                  {referral?.code ? referralLink() : 'Generating your referral link…'}
+                </span>
+                <button className="primary-button" type="button" onClick={() => void copyReferralLink()} disabled={!referral?.code} style={{ padding: '8px 11px', flexShrink: 0 }}>
+                  {referralCopied === 'link' ? 'Copied ✓' : 'Copy Link'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button className="primary-button" type="button" onClick={() => void shareReferralLink()} disabled={!referral?.code} style={{ padding: '10px 16px' }}>
+              ↗ Share Referral Link
+            </button>
+            <button className="secondary-button" type="button" onClick={() => void copyReferralLink()} disabled={!referral?.code} style={{ padding: '10px 16px' }}>
+              {referralCopied === 'link' ? 'Link Copied ✓' : 'Copy Full Link'}
             </button>
           </div>
 
-          <p style={{ color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>
-            Refer a friend by sharing your referral link. A referral becomes valid when that friend completes a subscription.
-            At launch, rewards will be distributed according to the number of valid referrals.
-          </p>
+          <div style={{ padding: '14px 15px', borderRadius: 15, background: 'rgba(155,255,71,.055)', border: '1px solid rgba(155,255,71,.10)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
+              <span style={{ width: 28, height: 28, borderRadius: 9, display: 'inline-grid', placeItems: 'center', background: 'rgba(155,255,71,.12)', flexShrink: 0 }}>✓</span>
+              <div>
+                <strong style={{ display: 'block', fontSize: 14 }}>How valid referrals work</strong>
+                <p style={{ margin: '5px 0 0', color: '#9aa3b5', fontSize: 13, lineHeight: 1.6 }}>
+                  Your friend can register through your link or apply your code. They are counted as a valid referral only after their subscription is successfully confirmed.
+                </p>
+              </div>
+            </div>
+          </div>
 
           {referral?.totalReferrals > 0 ? (
             <div>
-              <small style={{ color: 'var(--muted)' }}>YOUR REFERRALS</small>
-              <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <span className="eyebrow">YOUR NETWORK</span>
+                  <strong style={{ display: 'block', marginTop: 3, fontSize: 16 }}>Referral activity</strong>
+                </div>
+                <span className="section-subtitle">{Number(referral?.validReferrals ?? 0)} valid</span>
+              </div>
+
+              <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
                 {(referral.referrals ?? []).map((row: any) => (
-                  <div key={row.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)' }}>
+                  <div key={row.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)' }}>
                     <div style={{ minWidth: 0 }}>
-                      <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.email || row.userId}</strong>
-                      <small style={{ color: 'var(--muted)' }}>{row.status === 'VALID' ? 'Valid referral' : 'Waiting for subscription'}</small>
+                      <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{row.email || row.userId}</strong>
+                      <small style={{ display: 'block', marginTop: 3, color: '#8f98aa' }}>{row.status === 'VALID' ? 'Subscription confirmed' : 'Waiting for subscription'}</small>
                     </div>
-                    <span className={row.status === 'VALID' ? 'badge-live' : 'demo-pill'}>{row.status === 'VALID' ? 'VALID' : 'PENDING'}</span>
+                    <span className={row.status === 'VALID' ? 'badge-live' : 'demo-pill'} style={{ flexShrink: 0 }}>{row.status === 'VALID' ? 'VALID' : 'PENDING'}</span>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            <p className="section-subtitle" style={{ margin: 0 }}>No referrals yet. Share your link to invite a friend.</p>
+            <div style={{ padding: '16px 15px', borderRadius: 15, border: '1px dashed rgba(255,255,255,.10)', background: 'rgba(255,255,255,.018)' }}>
+              <strong style={{ display: 'block', fontSize: 14 }}>No referrals yet</strong>
+              <span className="section-subtitle" style={{ display: 'block', marginTop: 5 }}>Share your referral link above to invite your first friend.</span>
+            </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end', marginTop: 4 }}>
-            <div>
-              <label className="form-label">Have a referral code?</label>
-              <input value={referralCodeInput} onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())} placeholder="CRXXXXXXXXX" maxLength={15} />
+          <div style={{ paddingTop: 4 }}>
+            <span className="eyebrow">HAVE A REFERRAL CODE?</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end', marginTop: 8 }}>
+              <input value={referralCodeInput} onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())} placeholder="Enter a friend's CrickX code" maxLength={15} />
+              <button className="secondary-button" type="button" onClick={() => void applyReferralCode()} disabled={referralApplying} style={{ minHeight: 44 }}>
+                {referralApplying ? 'Applying…' : 'Apply Code'}
+              </button>
             </div>
-            <button className="primary-button" type="button" onClick={() => void applyReferralCode()} disabled={referralApplying}>
-              {referralApplying ? 'Applying…' : 'Apply'}
-            </button>
+          </div>
+
+          <div style={{ paddingTop: 2, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+            <p style={{ margin: '14px 0 0', color: '#8f98aa', fontSize: 12, lineHeight: 1.6 }}>At launch, rewards will be distributed according to the number of valid referrals.</p>
           </div>
         </div>
       </div>
