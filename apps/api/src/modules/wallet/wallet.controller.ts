@@ -20,7 +20,9 @@ export class WalletController {
 
   @Get('transactions')
   transactions(@Req() req: Request, @Query('page') page?: string) {
-    return this.wallet.listTransactions(this.uid(req), page ? parseInt(page, 10) : 1);
+    const raw = page ? Number.parseInt(page, 10) : 1;
+    const value = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 100) : 1;
+    return this.wallet.listTransactions(this.uid(req), value);
   }
 
   @Post('deposits')
