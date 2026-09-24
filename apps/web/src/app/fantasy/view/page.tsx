@@ -257,7 +257,7 @@ function SavedTeamView() {
   if (loading) return <section className="app-page"><div className="card skeleton-card">Loading your saved XI…</div></section>;
   if (error || !team) return <section className="app-page"><div className="card empty-state"><strong>{error || 'Team not found.'}</strong><Link className="primary-button" href="/matches">Back to matches</Link></div></section>;
 
-  return <section className="app-page" style={{ paddingBottom: 28 }}>
+  return <section className="app-page saved-team-page" style={{ paddingBottom: 28 }}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}><Link href="/matches" aria-label="Back to matches" style={{ width: 38, height: 38, borderRadius: 12, display: 'grid', placeItems: 'center', border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.035)', color: 'inherit', fontSize: 22, lineHeight: 1 }}>‹</Link><div style={{ minWidth: 0 }}><p className="eyebrow" style={{ marginBottom: 2 }}>CRICKX FANTASY</p><h1 className="section-title" style={{ margin: 0 }}>Fantasy Team</h1></div></div>
       <Link className="secondary-button" href={`/fantasy?fixtureId=${fixtureId}`} style={{ padding: '9px 13px', fontSize: 12, flexShrink: 0 }}>Edit Team</Link>
