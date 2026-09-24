@@ -12,10 +12,16 @@ import { FirestoreService } from '../../common/firestore.service';
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get('JWT_ACCESS_SECRET'),
-        signOptions: { expiresIn: config.get('JWT_ACCESS_TTL', '15m') },
-      }),
+      useFactory: (config: ConfigService) => {
+        const secret = String(config.get<string>('JWT_ACCESS_SECRET') || '').trim();
+        if (secret.length < 32 || /change_me|replace_me|default/i.test(secret)) {
+          throw new Error('JWT_ACCESS_SECRET must be a unique secret of at least 32 characters.');
+        }
+        return {
+          secret,
+          signOptions: { expiresIn: config.get('JWT_ACCESS_TTL', '15m') },
+        };
+      },
     }),
   ],
   providers: [AuthService, JwtStrategy, FirestoreService],
