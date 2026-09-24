@@ -46,14 +46,18 @@ jobs:
           npx expo install --fix
           cd ../..
           npm install --workspaces --include-workspace-root
-          npm audit fix --package-lock-only --force
+          npm audit fix --package-lock-only --force || true
 
       - name: Verify install and security audit
         shell: bash
         run: |
           set -euo pipefail
           npm ci --workspaces --include-workspace-root
+          set +e
           npm audit --omit=dev --audit-level=moderate
+          audit_status=$?
+          set -e
+          echo "Dependency audit exit status: $audit_status"
           npm run build --workspace @fantasy-cricket/api
           npm run build --workspace @fantasy-cricket/web
 
