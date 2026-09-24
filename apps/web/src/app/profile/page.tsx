@@ -51,6 +51,11 @@ export default function ProfilePage() {
   const [photoSaved, setPhotoSaved] = useState(false);
   const [error, setError] = useState('');
   const [photoError, setPhotoError] = useState('');
+  const [referral, setReferral] = useState<any>(null);
+  const [referralError, setReferralError] = useState('');
+  const [referralCodeInput, setReferralCodeInput] = useState('');
+  const [referralApplying, setReferralApplying] = useState(false);
+  const [referralCopied, setReferralCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const router = useRouter();
 
@@ -60,9 +65,10 @@ export default function ProfilePage() {
       router.push('/login');
       return;
     }
-    api.profile()
-      .then((p: any) => {
+    Promise.all([api.profile(), api.referralInfo()])
+      .then(([p, r]: any[]) => {
         setProfile(p);
+        setReferral(r);
         setDisplayName(p.displayName ?? user.displayName ?? '');
         setState(p.state ?? '');
         setCountry(p.country ?? 'Pakistan');
@@ -117,6 +123,37 @@ export default function ProfilePage() {
     setError('');
     setPhotoError('');
     setEditing(false);
+  }
+
+  async function applyReferralCode() {
+    const code = referralCodeInput.trim().toUpperCase();
+    if (!code) {
+      setReferralError('Enter a referral code.');
+      return;
+    }
+    setReferralApplying(true);
+    setReferralError('');
+    try {
+      await api.applyReferral(code);
+      setReferralCodeInput('');
+      setReferral(await api.referralInfo());
+    } catch (err) {
+      setReferralError(err instanceof Error ? err.message : 'Unable to apply referral code.');
+    } finally {
+      setReferralApplying(false);
+    }
+  }
+
+  async function copyReferralLink() {
+    if (!referral?.code) return;
+    const link = `${window.location.origin}/register?ref=${encodeURIComponent(referral.code)}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setReferralCopied(true);
+      window.setTimeout(() => setReferralCopied(false), 1800);
+    } catch {
+      setReferralError('Unable to copy the referral link. Please copy the code manually.');
+    }
   }
 
   async function handleLogout() {
@@ -211,6 +248,64 @@ export default function ProfilePage() {
           </form>
         </div>
       )}
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="section-mini-row">
+          <div>
+            <p className="eyebrow">REFERRALS</p>
+            <h2>Your Referral</h2>
+          </div>
+          <span className="demo-pill">{Number(referral?.validReferrals ?? 0)} valid</span>
+        </div>
+
+        {referralError && <p className="error-text">{referralError}</p>}
+
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center' }}>
+            <div>
+              <small style={{ color: 'var(--muted)' }}>YOUR REFERRAL CODE</small>
+              <strong className="break-text" style={{ display: 'block', marginTop: 5, fontSize: 18 }}>{referral?.code ?? 'Loading…'}</strong>
+            </div>
+            <button className="secondary-button" type="button" onClick={() => void copyReferralLink()} disabled={!referral?.code}>
+              {referralCopied ? 'Copied ✓' : 'Copy Link'}
+            </button>
+          </div>
+
+          <p style={{ color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>
+            Refer a friend by sharing your referral link. A referral becomes valid when that friend completes a subscription.
+            At launch, rewards will be distributed according to the number of valid referrals.
+          </p>
+
+          {referral?.totalReferrals > 0 ? (
+            <div>
+              <small style={{ color: 'var(--muted)' }}>YOUR REFERRALS</small>
+              <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+                {(referral.referrals ?? []).map((row: any) => (
+                  <div key={row.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.email || row.userId}</strong>
+                      <small style={{ color: 'var(--muted)' }}>{row.status === 'VALID' ? 'Valid referral' : 'Waiting for subscription'}</small>
+                    </div>
+                    <span className={row.status === 'VALID' ? 'badge-live' : 'demo-pill'}>{row.status === 'VALID' ? 'VALID' : 'PENDING'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="section-subtitle" style={{ margin: 0 }}>No referrals yet. Share your link to invite a friend.</p>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end', marginTop: 4 }}>
+            <div>
+              <label className="form-label">Have a referral code?</label>
+              <input value={referralCodeInput} onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())} placeholder="CRXXXXXXXXX" maxLength={15} />
+            </div>
+            <button className="primary-button" type="button" onClick={() => void applyReferralCode()} disabled={referralApplying}>
+              {referralApplying ? 'Applying…' : 'Apply'}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="card" style={{ marginTop: 16 }}>
           <div className="section-mini-row">
