@@ -33,10 +33,7 @@ function MatchCard({ fixture, live, completed, fantasyFixture, teamSaved }: { fi
       <div className="team-away"><small>{fixture.visitorteam?.code ?? 'AWAY'}</small><strong>{fixture.visitorteam?.name ?? 'TBD'}</strong>{fixture.visitorteam?.image_path && <img src={fixture.visitorteam.image_path} alt="" style={{width:28,height:28,objectFit:'contain',marginTop:6}} />}</div>
     </div>
     {live && runs.length > 0 && <div className="live-score-strip">{(runs as any[]).slice(-2).map((r, i) => <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:18,padding:'11px 0'}}><span style={{fontWeight:800,color:'#cbd2df'}}>{r.team_id === fixture.localteam_id ? (fixture.localteam?.name ?? 'Home') : (fixture.visitorteam?.name ?? 'Away')}</span><strong style={{whiteSpace:'nowrap',fontSize:18}}>{scoreText(r)}</strong></div>)}</div>}
-    {!live && !completed && <div style={{marginTop:16,padding:14,borderRadius:16,background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.07)'}}>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:10}}>{upcomingDetails.map((detail) => <div key={detail.label} style={{minWidth:0}}><span style={{display:'block',fontSize:10,letterSpacing:'.12em',fontWeight:900,color:'#98a0b3',marginBottom:4}}>{detail.label}</span><strong style={{display:'block',fontSize:14,color:'#eef2f7',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{detail.value}</strong></div>)}</div>
-      <div style={{display:'flex',alignItems:'center',gap:9,marginTop:13,paddingTop:11,borderTop:'1px solid rgba(255,255,255,.06)'}}><span style={{fontSize:12,color:'#98a0b3'}}>VENUE</span><strong style={{fontSize:14,color:'#d9dee8'}}>{fixture.venue?.name ?? 'Venue unavailable'}</strong></div>
-    </div>}
+    
     {completed && hasSavedTeam && <div className="result-note">{fixture.note ?? 'Match completed'} · Your fantasy team saved</div>}
     <div className="match-footer match-centre-footer">
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
