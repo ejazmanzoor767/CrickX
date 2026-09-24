@@ -518,26 +518,7 @@ export class WalletService {
   async earlyBuyPaymentStatus(userId: string, orderId: string) {
     const purchaseRef = this.prisma.db.collection('tokenPurchases').doc(orderId);
     const snap = await purchaseRef.get();
-    if (!snap.exists) throw new NotFoundException('Token purchase not found.');
-
-    const purchase = snap.data() as any;
-    if (String(purchase.userId) !== userId) throw new ForbiddenException('Token purchase does not belong to this account.');
-
-    if (
-      purchase.status !== 'COMPLETED' &&
-      purchase.gatewayTxnRef &&
-      ['INITIATED', 'FULFILLMENT_FAILED'].includes(String(purchase.status)) &&
-      Date.now() - new Date(purchase.createdAt).getTime() >= 5000
-    ) {
-      try {
-        const gateway = await this.oxapay.getPaymentInfo(String(purchase.gatewayTxnRef));
-        return await this.confirmEarlyBuyFromGateway(userId, orderId, gateway);
-      } catch (error) {
-        if (error instanceof BadRequestException || error instanceof ForbiddenException || error instanceof NotFoundException) {
-          throw error;
-        }
-      }
-    }
+    // A paid gateway transaction that only failed during on-chain delivery should retry\n    // the CRX transfer directly. Re-querying OxaPay on every frontend poll adds latency.\n    if (purchase.status === 'FULFILLMENT_FAILED' && purchase.gatewayTxnRef) {\n      try {\n        return await this.fulfillEarlyBuyPayment(orderId, String(purchase.gatewayTxnRef));\n      } catch (error) {\n        if (error instanceof BadRequestException || error instanceof ForbiddenException || error instanceof NotFoundException) {\n          throw error;\n        }\n      }\n    }\n\n    if (\n      purchase.status === 'INITIATED' &&\n      purchase.gatewayTxnRef &&\n      Date.now() - new Date(purchase.createdAt).getTime() >= 5000\n    ) {\n      try {\n        const gateway = await this.oxapay.getPaymentInfo(String(purchase.gatewayTxnRef));\n        return await this.confirmEarlyBuyFromGateway(userId, orderId, gateway);\n      } catch (error) {\n        if (error instanceof BadRequestException || error instanceof ForbiddenException || error instanceof NotFoundException) {\n          throw error;\n        }\n      }\n    }
 
     return { ...purchase, orderId };
   }
