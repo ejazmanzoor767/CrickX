@@ -16,3 +16,9 @@ export class RequestWithdrawalDto {
   @IsNumber() @Min(1) amount!: number;
   @IsString() bankAccountLast4!: string;
 }
+
+
+export class EarlyBuyCheckoutDto {
+  @IsNumber() @Min(1) amountUsd!: number;
+  @IsString() walletAddress!: string;
+}
