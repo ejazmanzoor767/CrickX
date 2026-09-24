@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 module.exports = {
-  typescript: { ignoreBuildErrors: true },
+  // Never ship a static build while TypeScript errors are being ignored.
+  typescript: { ignoreBuildErrors: false },
   reactStrictMode: true,
+  poweredByHeader: false,
   output: 'export',
   trailingSlash: true,
 };
-
