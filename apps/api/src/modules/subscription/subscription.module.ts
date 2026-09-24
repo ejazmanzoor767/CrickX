@@ -7,6 +7,6 @@ import { FirestoreService } from '../../common/firestore.service';
 @Module({
   providers: [SubscriptionService, OxaPayService, FirestoreService],
   controllers: [SubscriptionController],
-  exports: [SubscriptionService],
+  exports: [SubscriptionService, OxaPayService],
 })
 export class SubscriptionModule {}
