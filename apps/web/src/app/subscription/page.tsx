@@ -51,7 +51,7 @@ export default function SubscriptionPage() {
   const active = Boolean(status?.active);
   const expires = status?.expiresAt ? new Date(status.expiresAt).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' }) : null;
 
-  return <section className="app-page" style={{ maxWidth: 860, paddingBottom: 96 }}>
+  return <section className="app-page subscription-page" style={{ maxWidth: 860, paddingBottom: 96 }}>
     <div className="page-intro">
       <div>
         <p className="eyebrow">CRICKX MEMBERSHIP</p>
