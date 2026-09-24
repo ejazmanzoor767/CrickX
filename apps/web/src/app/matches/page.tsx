@@ -9,11 +9,11 @@ const asList = (result: any) => Array.isArray(result) ? result : (result?.data ?
 const formatTime = (value: string) => new Date(value).toLocaleString('en-PK', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const formatDate = (value: string) => new Date(value).toLocaleDateString('en-PK', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
 const formatClock = (value: string) => new Date(value).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
-const hasStarted = (fixture: any) => { const start = new Date(fixture?.starting_at ?? '').getTime(); return !Number.isFinite(start) || start <= Date.now(); };
+const hasStarted = (fixture: any) => { const start = new Date(fixture?.starting_at ?? '').getTime(); return Number.isFinite(start) && start <= Date.now(); };
 const statusText = (fixture: any, live = false) => live ? 'LIVE' : (fixture.applicationState ?? fixture.status ?? 'UPCOMING');
 const scoreText = (r: any) => `${r?.score ?? 0}/${r?.wickets ?? 0} (${r?.overs ?? 0} ov)`;
-const isLiveFixture = (fixture: any) => hasStarted(fixture) && (Number(fixture?.live) === 1 || ['live', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part)) || String(fixture?.applicationState ?? '').toUpperCase() === 'LIVE');
 const isCompletedFixture = (fixture: any) => String(fixture?.applicationState ?? '').toUpperCase() === 'COMPLETED' || ['finished', 'complete', 'completed', 'cancelled', 'canceled', 'abandoned'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part));
+const isLiveFixture = (fixture: any) => !isCompletedFixture(fixture) && hasStarted(fixture) && (Number(fixture?.live) === 1 || ['live', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part)) || String(fixture?.applicationState ?? '').toUpperCase() === 'LIVE');
 
 function MatchCard({ fixture, live, completed, fantasyFixture, teamSaved }: { fixture: any; live?: boolean; completed?: boolean; fantasyFixture?: boolean; teamSaved?: boolean }) {
   const runs = fixture.runs ?? fixture.scoreboards ?? [];
