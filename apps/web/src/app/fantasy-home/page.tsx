@@ -9,9 +9,9 @@ const list = (x:any) => Array.isArray(x) ? x : (x?.data ?? []);
 const fmtTime = (v:string) => new Date(v).toLocaleString('en-PK',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 const fmtDate = (v:string) => new Date(v).toLocaleDateString('en-PK',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
 const fmtClock = (v:string) => new Date(v).toLocaleTimeString('en-PK',{hour:'2-digit',minute:'2-digit'});
-const hasStarted = (m:any) => { const start = new Date(m?.starting_at ?? '').getTime(); return !Number.isFinite(start) || start <= Date.now(); };
-const isLive = (m:any) => hasStarted(m) && (Number(m?.live)===1 || ['live','innings break','lunch','tea','stumps'].some((part)=>String(m?.status??'').toLowerCase().includes(part)) || String(m?.applicationState??'').toUpperCase()==='LIVE');
+const hasStarted = (m:any) => { const start = new Date(m?.starting_at ?? '').getTime(); return Number.isFinite(start) && start <= Date.now(); };
 const isCompleted = (m:any) => String(m?.applicationState??'').toUpperCase()==='COMPLETED' || ['finished','complete','completed','cancelled','canceled','abandoned'].some((part)=>String(m?.status??'').toLowerCase().includes(part));
+const isLive = (m:any) => !isCompleted(m) && hasStarted(m) && (Number(m?.live)===1 || ['live','innings break','lunch','tea','stumps'].some((part)=>String(m?.status??'').toLowerCase().includes(part)) || String(m?.applicationState??'').toUpperCase()==='LIVE');
 
 export default function FantasyHomePage() {
   const { user } = useAuth();
