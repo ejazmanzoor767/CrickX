@@ -8,6 +8,9 @@ export type OxaPayCheckoutInput = {
   orderId: string;
   returnUrl: string;
   customerEmail?: string;
+  callbackUrl?: string;
+  description?: string;
+  thanksMessage?: string;
 };
 
 @Injectable()
@@ -42,7 +45,7 @@ export class OxaPayService {
           amount: input.amount,
           currency: 'USD',
           lifetime: 60,
-          callback_url: (() => {
+          callback_url: input.callbackUrl || (() => {
             const configured = this.config.get<string>('OXAPAY_CALLBACK_URL', '').trim().replace(/^["']|["']$/g, '');
             const apiBase = this.config.get<string>('CRICKX_API_URL', 'https://crickx-api.onrender.com').trim().replace(/^["']|["']$/g, '').replace(/\/$/, '');
             return configured || `${apiBase}/api/v1/subscription/webhook`;
@@ -50,8 +53,8 @@ export class OxaPayService {
           return_url: input.returnUrl,
           ...(input.customerEmail ? { email: input.customerEmail } : {}),
           order_id: input.orderId,
-          thanks_message: 'Thank you for subscribing to CrickX.',
-          description: 'CrickX weekly subscription — $0.18 for 7 days.',
+          thanks_message: input.thanksMessage || 'Thank you for subscribing to CrickX.',
+          description: input.description || 'CrickX weekly subscription — $0.18 for 7 days.',
           sandbox: this.sandbox,
         },
         {
