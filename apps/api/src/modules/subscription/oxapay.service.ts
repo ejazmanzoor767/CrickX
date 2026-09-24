@@ -40,7 +40,7 @@ export class OxaPayService {
         `${this.baseUrl}/v1/payment/invoice`,
         {
           amount: input.amount,
-          currency: 'PKR',
+          currency: 'USD',
           lifetime: 60,
           callback_url: (() => {
             const configured = this.config.get<string>('OXAPAY_CALLBACK_URL', '').trim().replace(/^["']|["']$/g, '');
@@ -51,7 +51,7 @@ export class OxaPayService {
           ...(input.customerEmail ? { email: input.customerEmail } : {}),
           order_id: input.orderId,
           thanks_message: 'Thank you for subscribing to CrickX.',
-          description: 'CrickX weekly subscription — 50 PKR for 7 days.',
+          description: 'CrickX weekly subscription — $0.18 for 7 days.',
           sandbox: this.sandbox,
         },
         {
