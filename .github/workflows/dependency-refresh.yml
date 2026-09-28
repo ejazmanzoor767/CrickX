@@ -17,6 +17,7 @@ permissions:
 
 # Serialized refresh from the latest main commit prevents stale lockfile pushes.
 # The workflow always starts from the current main branch so its generated lockfile cannot overwrite newer commits.
+# It also re-runs the application build checks after dependency resolution so this workflow remains a release-readiness check.
 
 concurrency:
   group: security-dependency-refresh
