@@ -6,7 +6,7 @@ import { Card, EmptyState, ErrorBox, Header, PrimaryButton, Stat, styles } from 
 
 const normalize = (value: any) => Array.isArray(value) ? value : value?.data ?? [];
 
-const isTerminal = (item: any) => String(item?.applicationState ?? '').toUpperCase() === 'COMPLETED' || item?.draw_noresult === true || /finished|finish|complete|cancelled|canceled|abandoned|no result|no-result|washout/i.test(String(item?.status ?? ''));
+const isTerminal = (item: any) => { const start = new Date(item?.starting_at ?? '').getTime(); const status = String(item?.status ?? '').toLowerCase(); const stale = Number.isFinite(start) && Date.now() - start >= 6 * 60 * 60 * 1000 && /^(ns|scheduled|not started|upcoming)$/.test(status); return String(item?.applicationState ?? '').toUpperCase() === 'COMPLETED' || item?.draw_noresult === true || stale || /finished|finish|complete|cancelled|canceled|abandoned|no result|no-result|washout/i.test(status); };
 
 function MatchCard({ item, navigation }: any) {
   const live = !isTerminal(item) && (String(item?.applicationState ?? '').toUpperCase() === 'LIVE' || Boolean(item?.live) || /live|innings break|lunch|tea|stumps/i.test(String(item?.status ?? '')));

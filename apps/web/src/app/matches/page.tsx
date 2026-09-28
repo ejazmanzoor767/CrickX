@@ -12,7 +12,9 @@ const formatClock = (value: string) => new Date(value).toLocaleTimeString('en-PK
 const hasStarted = (fixture: any) => { const start = new Date(fixture?.starting_at ?? '').getTime(); return Number.isFinite(start) && start <= Date.now(); };
 const statusText = (fixture: any, live = false) => live ? 'LIVE' : (fixture.applicationState ?? fixture.status ?? 'UPCOMING');
 const scoreText = (r: any) => `${r?.score ?? 0}/${r?.wickets ?? 0} (${r?.overs ?? 0} ov)`;
-const isCompletedFixture = (fixture: any) => String(fixture?.applicationState ?? '').toUpperCase() === 'COMPLETED' || fixture?.draw_noresult === true || ['finished', 'finish', 'complete', 'completed', 'cancelled', 'canceled', 'abandoned', 'no result', 'no-result', 'washout'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part));
+const isVoidFixture = (fixture: any) => fixture?.draw_noresult === true || ['abandoned', 'cancelled', 'canceled', 'no result', 'no-result', 'washout'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part));
+const isStaleNotStarted = (fixture: any) => { const start = new Date(fixture?.starting_at ?? '').getTime(); const status = String(fixture?.status ?? '').toLowerCase(); return Number.isFinite(start) && Date.now() - start >= 6 * 60 * 60 * 1000 && ['ns','scheduled','not started','upcoming'].some((value) => status === value || status.includes(value)); };
+const isCompletedFixture = (fixture: any) => String(fixture?.applicationState ?? '').toUpperCase() === 'COMPLETED' || isVoidFixture(fixture) || isStaleNotStarted(fixture);
 const isLiveFixture = (fixture: any) => !isCompletedFixture(fixture) && hasStarted(fixture) && (Number(fixture?.live) === 1 || ['live', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part)) || String(fixture?.applicationState ?? '').toUpperCase() === 'LIVE');
 
 function MatchCard({ fixture, live, completed, fantasyFixture, teamSaved }: { fixture: any; live?: boolean; completed?: boolean; fantasyFixture?: boolean; teamSaved?: boolean }) {
@@ -63,7 +65,7 @@ export default function MatchesPage() {
     if (spinner) setLoading(true); else setRefreshing(true);
     try {
       const [liveResult, todayResult, upcomingResult, completedResult, entriesResult, teamsResult] = await Promise.all([
-        api.liveMatches(), api.todayMatches(), api.upcomingMatches(4), api.completedMatches(14), user ? api.myEntries() : Promise.resolve([]), user ? api.myFantasyTeams() : Promise.resolve([]),
+        api.liveMatches(), api.todayMatches(), api.upcomingMatches(4), api.completedMatches(14), user ? api.myEntries().catch(() => []) : Promise.resolve([]), user ? api.myFantasyTeams().catch(() => []) : Promise.resolve([]),
       ]);
       const liveFeed = asList(liveResult);
       const todayFeed = asList(todayResult);
@@ -82,10 +84,10 @@ export default function MatchesPage() {
       }
       const today = Array.from(todayById.values());
       const upcomingFeed = asList(upcomingResult);
-      setTodayScheduled(today.filter((f: any) => !isLiveFixture(f) && !isCompletedFixture(f) && new Date(f.starting_at).getTime() >= Date.now()));
-      setLive(today.filter((f: any) => isLiveFixture(f) && !isCompletedFixture(f)));
+      setTodayScheduled(today.filter((f: any) => !isVoidFixture(f) && !isLiveFixture(f) && !isCompletedFixture(f) && new Date(f.starting_at).getTime() >= Date.now()));
+      setLive(today.filter((f: any) => !isVoidFixture(f) && isLiveFixture(f) && !isCompletedFixture(f)));
       setUpcoming(upcomingFeed.filter((f: any) => !isLiveFixture(f) && !isCompletedFixture(f) && new Date(f.starting_at).getTime() > Date.now()));
-      setCompleted(asList(completedResult)); setMyEntries(asList(entriesResult)); setMyTeams(asList(teamsResult)); setError('');
+      setCompleted(asList(completedResult).filter((f: any) => !isVoidFixture(f) && !isStaleNotStarted(f))); setMyEntries(asList(entriesResult)); setMyTeams(asList(teamsResult)); setError('');
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to load matches.'); }
     finally { setLoading(false); setRefreshing(false); }
   }
