@@ -25,7 +25,7 @@ const TABS = [
   { path: '/profile', label: 'Profile', icon: '●' },
 ] as const;
 
-const NATIVE_SHELL_CSS = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}html.crickx-native-app .page-shell{padding:0 !important;min-height:100vh !important;}";
+const NATIVE_SHELL_CSS = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}html.crickx-native-app .page-shell{padding:0 10px !important;min-height:100vh !important;}html.crickx-native-app .card{box-shadow:none !important;}";
 
 function tabForUrl(url: string) {
   try {
@@ -173,7 +173,7 @@ export default function App() {
                 document.documentElement.classList.add('crickx-native-app');
                 var style = document.createElement('style');
                 style.id = 'crickx-native-shell';
-                style.innerHTML = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}.page-shell{padding-bottom:0 !important;min-height:100vh !important;}";
+                style.innerHTML = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}.page-shell{padding:0 10px !important;min-height:100vh !important;}";
                 document.documentElement.appendChild(style);
               })();
               true;
@@ -185,7 +185,7 @@ export default function App() {
                 if (!style) {
                   style = document.createElement('style');
                   style.id = 'crickx-native-shell';
-                  style.innerHTML = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}.page-shell{padding-bottom:0 !important;min-height:100vh !important;}";
+                  style.innerHTML = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}.page-shell{padding:0 10px !important;min-height:100vh !important;}";
                   document.documentElement.appendChild(style);
                 }
               })();
@@ -278,20 +278,34 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#080b10' },
   appShell: { flex: 1, backgroundColor: '#080b10' },
   topBar: {
-    minHeight: 66,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    minHeight: 68,
+    paddingHorizontal: 15,
+    paddingTop: 9,
+    paddingBottom: 9,
     backgroundColor: '#0b0f16',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,.07)',
+    borderBottomColor: 'rgba(255,255,255,.075)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
-  topBarLeft: { flexDirection: 'row', alignItems: 'center' },
-  logo: { width: 40, height: 40, borderRadius: 12, marginRight: 11 },
-  brand: { color: '#9bf34a', fontWeight: '900', letterSpacing: 2.8, fontSize: 12 },
-  sectionTitle: { color: '#f3f6fb', fontWeight: '800', fontSize: 17, marginTop: 1 },
+  topBarLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
+  logo: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    marginRight: 11,
+    backgroundColor: '#121822',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,.08)',
+  },
+  brand: { color: '#9bf34a', fontWeight: '900', letterSpacing: 2.8, fontSize: 11 },
+  sectionTitle: { color: '#f3f6fb', fontWeight: '900', fontSize: 17, marginTop: 1 },
   refreshButton: {
     width: 42,
     height: 42,
@@ -300,33 +314,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#131923',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,.08)',
+    borderColor: 'rgba(255,255,255,.09)',
+    marginLeft: 12,
   },
   refreshIcon: { color: '#dfe7ef', fontSize: 25, lineHeight: 27, fontWeight: '700' },
   webContainer: { flex: 1, backgroundColor: '#080b10' },
   web: { flex: 1, backgroundColor: '#080b10' },
   bottomBar: {
-    minHeight: 72,
-    paddingHorizontal: 6,
+    minHeight: 76,
+    paddingHorizontal: 7,
     paddingTop: 7,
     paddingBottom: 8,
     flexDirection: 'row',
     backgroundColor: '#0b0f16',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,.08)',
+    shadowColor: '#000',
+    shadowOpacity: 0.30,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: -8 },
+    elevation: 10,
   },
   tab: {
     flex: 1,
-    minHeight: 58,
+    minHeight: 60,
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 2,
+    position: 'relative',
   },
-  tabActive: { backgroundColor: 'rgba(155,243,74,.11)' },
-  tabIcon: { color: '#7f8999', fontSize: 19, lineHeight: 22, fontWeight: '800' },
+  tabActive: { backgroundColor: 'rgba(155,243,74,.10)' },
+  tabIcon: { color: '#7f8999', fontSize: 19, lineHeight: 22, fontWeight: '900' },
   tabIconActive: { color: '#9bf34a' },
-  tabLabel: { color: '#7f8999', fontSize: 10.5, fontWeight: '700', marginTop: 4 },
+  tabLabel: { color: '#7f8999', fontSize: 10.5, fontWeight: '800', marginTop: 4 },
   tabLabelActive: { color: '#9bf34a' },
   loading: {
     ...StyleSheet.absoluteFillObject,
@@ -334,7 +355,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingLogo: { width: 76, height: 76, borderRadius: 22 },
+  loadingLogo: { width: 78, height: 78, borderRadius: 22 },
   loadingBrand: { color: '#9bf34a', fontWeight: '900', letterSpacing: 4, fontSize: 14, marginTop: 12 },
   loadingText: { color: '#96a0b3', fontSize: 13, marginTop: 8 },
   errorShell: {
@@ -344,8 +365,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     backgroundColor: '#080b10',
   },
-  errorLogo: { width: 78, height: 78, borderRadius: 23 },
-  title: { color: '#f4f7fb', fontSize: 27, fontWeight: '900', marginTop: 17, textAlign: 'center' },
+  errorLogo: { width: 82, height: 82, borderRadius: 24 },
+  title: { color: '#f4f7fb', fontSize: 27, fontWeight: '900', marginTop: 17, textAlign: 'center', letterSpacing: -0.4 },
   message: { color: '#96a0b3', fontSize: 14, lineHeight: 21, marginTop: 10, textAlign: 'center' },
   primaryButton: {
     backgroundColor: '#9bf34a',
