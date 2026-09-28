@@ -16,6 +16,7 @@ permissions:
   contents: write
 
 # Serialized refresh from the latest main commit prevents stale lockfile pushes.
+# The workflow always starts from the current main branch so its generated lockfile cannot overwrite newer commits.
 
 concurrency:
   group: security-dependency-refresh
