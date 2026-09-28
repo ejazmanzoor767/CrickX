@@ -28,8 +28,9 @@ const liveNow=(f:any)=>{
  const start=new Date(f?.starting_at??'').getTime();
  const started=Number.isFinite(start)&&start<=Date.now();
  if(!started) return false;
+ if(Number(f?.live)===1) return true;
  if(['ns','scheduled','not started','upcoming','postponed'].some((value)=>status===value||status.includes(value))) return false;
- return Number(f?.live)===1||['live','innings break','lunch','tea','stumps'].some((part)=>status.includes(part));
+ return ['live','innings break','lunch','tea','stumps'].some((part)=>status.includes(part));
 };
 
 @Injectable()

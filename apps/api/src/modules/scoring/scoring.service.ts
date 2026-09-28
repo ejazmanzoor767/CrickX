@@ -30,15 +30,17 @@ function isActuallyLive(
 
   if (!started || isFinished(value, live)) return false;
 
-  // Never trust a stale provider live flag when the provider explicitly says
-  // the fixture is not started/scheduled/upcoming/postponed.
+  // Once the official start time has passed, Sportmonks' live=1 is a
+  // positive live signal even if its status text still says NS.
+  if (live === 1) return true;
+
   if (['ns', 'scheduled', 'not started', 'upcoming', 'postponed'].some((state) => (
     value === state || value.includes(state)
   ))) {
     return false;
   }
 
-  return live === 1 || [
+  return [
     'live',
     'in progress',
     'innings break',
