@@ -30,8 +30,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --include=dev --no-audit --no-fund
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=moderate
+      - name: Audit all dependencies
+        run: npm audit --audit-level=moderate
 
   codeql:
     name: CodeQL
