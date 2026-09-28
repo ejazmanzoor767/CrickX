@@ -39,7 +39,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install --package-lock-only --workspaces --include-workspace-root --ignore-scripts --no-audit --no-fund
+          npm install --workspaces --include-workspace-root --no-audit --no-fund
           cd apps/mobile
           npx expo install --fix --npm
           cd ../..
