@@ -20,12 +20,12 @@ const ALLOWED_HOSTS = new Set(['crickx-3d806.web.app', 'crickx-3d806.firebaseapp
 const TABS = [
   { path: '/matches', label: 'Matches', icon: '▤' },
   { path: '/fantasy-home', label: 'Fantasy', icon: '✦' },
-  { path: '/wallet', label: 'Wallet', icon: '▣' },
-  { path: '/subscription', label: 'Subscribe', icon: '+' },
-  { path: '/profile', label: 'Profile', icon: '●' },
+  { path: '/wallet', label: 'Wallet', icon: '◆' },
+  { path: '/subscription', label: 'Subscribe', icon: '＋' },
+  { path: '/profile', label: 'Profile', icon: '◎' },
 ] as const;
 
-const NATIVE_SHELL_CSS = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}html.crickx-native-app .page-shell{padding:0 10px !important;min-height:100vh !important;}html.crickx-native-app .card{box-shadow:none !important;}";
+const NATIVE_SHELL_CSS = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}html.crickx-native-app .page-shell,html.crickx-native-app .app-page,html.crickx-native-app .profile-page{padding:0 10px !important;min-height:100vh !important;}html.crickx-native-app .card{box-shadow:none !important;transform:none !important;}";
 
 function tabForUrl(url: string) {
   try {
@@ -239,6 +239,8 @@ export default function App() {
             }}
             cacheEnabled
             androidLayerType="hardware"
+            textZoom={100}
+            overScrollMode="never"
           />
 
           {loading && (
@@ -283,8 +285,8 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#080b10' },
   appShell: { flex: 1, backgroundColor: '#080b10' },
   topBar: {
-    minHeight: 68,
-    paddingHorizontal: 15,
+    minHeight: 62,
+    paddingHorizontal: 13,
     paddingTop: 9,
     paddingBottom: 9,
     backgroundColor: '#0b0f16',
@@ -301,20 +303,20 @@ const styles = StyleSheet.create({
   },
   topBarLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
   logo: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     marginRight: 11,
     backgroundColor: '#121822',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,.08)',
   },
   brand: { color: '#9bf34a', fontWeight: '900', letterSpacing: 2.8, fontSize: 11 },
-  sectionTitle: { color: '#f3f6fb', fontWeight: '900', fontSize: 17, marginTop: 1 },
+  sectionTitle: { color: '#f3f6fb', fontWeight: '900', fontSize: 16, marginTop: 1, letterSpacing: 0.05 },
   refreshButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#131923',
@@ -326,12 +328,12 @@ const styles = StyleSheet.create({
   webContainer: { flex: 1, backgroundColor: '#080b10' },
   web: { flex: 1, backgroundColor: '#080b10' },
   bottomBar: {
-    minHeight: 76,
+    minHeight: 72,
     paddingHorizontal: 7,
     paddingTop: 7,
     paddingBottom: 8,
     flexDirection: 'row',
-    backgroundColor: '#0b0f16',
+    backgroundColor: '#0a0e15',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,.08)',
     shadowColor: '#000',
@@ -342,17 +344,17 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    minHeight: 60,
-    borderRadius: 15,
+    minHeight: 58,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 2,
     position: 'relative',
   },
-  tabActive: { backgroundColor: 'rgba(155,243,74,.10)' },
-  tabIcon: { color: '#7f8999', fontSize: 19, lineHeight: 22, fontWeight: '900' },
+  tabActive: { backgroundColor: 'rgba(155,243,74,.10)', borderWidth: 1, borderColor: 'rgba(155,243,74,.08)' },
+  tabIcon: { color: '#7f8999', fontSize: 18, lineHeight: 21, fontWeight: '900' },
   tabIconActive: { color: '#9bf34a' },
-  tabLabel: { color: '#7f8999', fontSize: 10.5, fontWeight: '800', marginTop: 4 },
+  tabLabel: { color: '#7f8999', fontSize: 10, fontWeight: '800', marginTop: 4, letterSpacing: 0.1 },
   tabLabelActive: { color: '#9bf34a' },
   loading: {
     ...StyleSheet.absoluteFill,
