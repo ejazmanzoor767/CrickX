@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-interface IERC20Minimal {
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address to, uint256 amount) external returns (bool);
-}
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract CRXContestPool {
-    IERC20Minimal public immutable crxToken;
+contract CRXContestPool is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+    IERC20 public immutable crxToken;
     address public fundingWallet;
-    address public owner;
     uint256 public constant POOL_PER_PARTICIPANT = 10 ether;
 
     enum Stage { Open, Ranked, Distributed, Cancelled }
@@ -43,28 +43,13 @@ contract CRXContestPool {
     event FundingWalletUpdated(address indexed newWallet);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "only owner");
-        _;
-    }
-
-    modifier nonReentrant() {
-        _;
-    }
-
-    constructor(address crxTokenAddress, address fundingWallet_) {
+    constructor(address crxTokenAddress, address fundingWallet_)
+        Ownable(msg.sender)
+    {
         require(crxTokenAddress != address(0), "CRX token required");
         require(fundingWallet_ != address(0), "funding wallet required");
-        owner = msg.sender;
-        crxToken = IERC20Minimal(crxTokenAddress);
+        crxToken = IERC20(crxTokenAddress);
         fundingWallet = fundingWallet_;
-        emit OwnershipTransferred(address(0), msg.sender);
-    }
-
-    function transferOwnership(address newOwner) external onlyOwner {
-        require(newOwner != address(0), "zero owner");
-        owner = newOwner;
-        emit OwnershipTransferred(msg.sender, newOwner);
     }
 
     function setFundingWallet(address newWallet) external onlyOwner {
@@ -103,6 +88,7 @@ contract CRXContestPool {
         require(block.timestamp >= c.joinDeadline, "match has not started");
         require(!c.fundingComplete, "contest already funded");
         require(participantCount_ > 0, "no participants");
+        require(participantCount_ <= 1_000_000, "participant count too large");
         require(totalPool_ == participantCount_ * POOL_PER_PARTICIPANT, "pool amount mismatch");
         require(availableFunding() >= totalPool_, "pool balance is insufficient");
 
@@ -131,6 +117,7 @@ contract CRXContestPool {
             address participant = ranking[i];
             require(participant != address(0), "zero participant");
             require(!c.isRanked[participant], "duplicate participant");
+            c.isParticipant[participant] = true;
             c.isRanked[participant] = true;
             c.ranking.push(participant);
         }
@@ -168,7 +155,7 @@ contract CRXContestPool {
             c.distributedCount += 1;
 
             if (amount > 0) {
-                require(crxToken.transfer(c.ranking[i], amount), "prize transfer failed");
+                require(crxToken.safeTransfer(c.ranking[i], amount), "prize transfer failed");
             }
             emit PrizePaid(contestId, i + 1, c.ranking[i], amount);
         }
@@ -193,7 +180,7 @@ contract CRXContestPool {
 
         if (refund > 0) {
             totalEscrowed -= refund;
-            require(crxToken.transfer(fundingWallet, refund), "refund failed");
+            require(crxToken.safeTransfer(fundingWallet, refund), "refund failed");
         }
 
         emit ContestCancelled(contestId, refund);
@@ -202,7 +189,7 @@ contract CRXContestPool {
     function recoverExcess(address to, uint256 amount) external onlyOwner nonReentrant {
         require(to != address(0), "zero address");
         require(amount <= availableFunding(), "amount exceeds excess");
-        require(crxToken.transfer(to, amount), "transfer failed");
+        require(crxToken.safeTransfer(to, amount), "transfer failed");
     }
 
     function hasEntered(uint256 contestId, address participant) external view returns (bool) {
