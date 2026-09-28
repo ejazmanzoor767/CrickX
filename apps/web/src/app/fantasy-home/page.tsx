@@ -7,8 +7,6 @@ import { useAuth } from '../../lib/auth-context';
 
 const list = (x:any) => Array.isArray(x) ? x : (x?.data ?? []);
 const fmtTime = (v:string) => new Date(v).toLocaleString('en-PK',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-const fmtDate = (v:string) => new Date(v).toLocaleDateString('en-PK',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
-const fmtClock = (v:string) => new Date(v).toLocaleTimeString('en-PK',{hour:'2-digit',minute:'2-digit'});
 const hasStarted = (m:any) => { const start = new Date(m?.starting_at ?? '').getTime(); return Number.isFinite(start) && start <= Date.now(); };
 const isCompleted = (m:any) => String(m?.applicationState??'').toUpperCase()==='COMPLETED' || ['finished','complete','completed','cancelled','canceled','abandoned'].some((part)=>String(m?.status??'').toLowerCase().includes(part));
 const isLive = (m:any) => !isCompleted(m) && hasStarted(m) && (Number(m?.live)===1 || ['live','innings break','lunch','tea','stumps'].some((part)=>String(m?.status??'').toLowerCase().includes(part)) || String(m?.applicationState??'').toUpperCase()==='LIVE');
@@ -24,27 +22,34 @@ export default function FantasyHomePage() {
     let active=true;
     async function refresh(){
       try{
-        const [today,upcoming,completed,mine]=await Promise.all([
-          api.todayMatches(), api.upcomingMatches(4), api.completedMatches(14), user ? api.myFantasyTeams() : Promise.resolve([]),
+        const [today,upcoming,mine]=await Promise.all([
+          api.todayMatches(), api.upcomingMatches(4), user ? api.myFantasyTeams() : Promise.resolve([]),
         ]);
         if(!active)return;
         const savedTeams=list(mine);
-        const savedIds=new Set(savedTeams.map((t:any)=>Number(t?.sportmonksFixtureId)).filter(Number.isFinite));
         const byId=new Map<number,any>();
-        for(const raw of [...list(today),...list(upcoming),...list(completed)]){
+        for(const raw of [...list(today),...list(upcoming)]){
           const id=Number(raw?.id);
           if(Number.isFinite(id) && !byId.has(id)) byId.set(id,raw);
         }
-        const eligible=Array.from(byId.values()).filter((m:any)=>{
-          if(isCompleted(m)) return true;
-          if(isLive(m)) return true;
-          return new Date(m.starting_at).getTime() > Date.now();
-        }).sort((a:any,b:any)=>{
-          const rank=(m:any)=>isLive(m)?0:isCompleted(m)?2:1;
-          const rankDiff=rank(a)-rank(b);
-          if(rankDiff!==0) return rankDiff;
-          return new Date(a.starting_at).getTime()-new Date(b.starting_at).getTime();
-        });
+
+        // Fantasy only exposes matches that are still actionable:
+        // upcoming matches or matches that are already live. Completed,
+        // cancelled, abandoned and other terminal fixtures are excluded.
+        const eligible=Array.from(byId.values())
+          .filter((m:any)=>{
+            if(isCompleted(m)) return false;
+            if(isLive(m)) return true;
+            const start = new Date(m?.starting_at ?? '').getTime();
+            return Number.isFinite(start) && start > Date.now();
+          })
+          .sort((a:any,b:any)=>{
+            const rank=(m:any)=>isLive(m)?0:1;
+            const rankDiff=rank(a)-rank(b);
+            if(rankDiff!==0) return rankDiff;
+            return new Date(a.starting_at).getTime()-new Date(b.starting_at).getTime();
+          });
+
         setMatches(eligible); setTeams(savedTeams); setError('');
       }catch(e){ if(active)setError(e instanceof Error?e.message:'Unable to load fantasy matches.'); }
       finally{ if(active)setLoading(false); }
@@ -57,9 +62,9 @@ export default function FantasyHomePage() {
   const teamByFixture=useMemo(()=>{ const map=new Map<number,any>(); for(const t of teams){const id=Number(t.sportmonksFixtureId);if(!map.has(id))map.set(id,t);} return map; },[teams]);
 
   return <section className="app-page fantasy-home-page">
-    <div className="page-intro"><div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Fantasy matches</h1><p className="section-subtitle">Upcoming, live and recent completed matches stay here so you can create a team, open Predictions, or review your previous predictions from the same match card.</p></div><div className="page-actions"><Link className="secondary-button" href="/matches">Match centre</Link></div></div>
+    <div className="page-intro"><div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Fantasy matches</h1><p className="section-subtitle">Upcoming and live matches are shown here so you can create a team, open Predictions, or manage a saved team before the match finishes.</p></div><div className="page-actions"><Link className="secondary-button" href="/matches">Match centre</Link></div></div>
     {error&&<div className="card"><p className="error-text">{error}</p></div>}
-    {loading ? <div className="card skeleton-card">Loading fantasy matches…</div> : matches.length===0 ? <div className="card empty-state"><strong>No active fantasy matches found.</strong><span>Matches without a saved team leave Fantasy when they go live. Saved teams remain until completion.</span></div> : <div className="match-list">{matches.map((m:any)=>{
+    {loading ? <div className="card skeleton-card">Loading fantasy matches…</div> : matches.length===0 ? <div className="card empty-state"><strong>No active fantasy matches found.</strong><span>Completed matches are not listed in Fantasy. Open Match Centre to view completed results.</span></div> : <div className="match-list">{matches.map((m:any)=>{
       const live=isLive(m),team=teamByFixture.get(Number(m.id));
       return <article className={`card match-list-card ${live?'match-live-card':''}`} key={m.id}>
         <div className="match-topline"><span className="match-meta">{m.league?.name??m.type??'CRICKET'} · {live?'LIVE':'UPCOMING'}</span><span className={live?'badge-live':'match-date'}>{live?'● LIVE':fmtTime(m.starting_at)}</span></div>
@@ -68,11 +73,10 @@ export default function FantasyHomePage() {
         {live&&<div className="result-note">Match is live. Your saved team is view-only.</div>}
         <div className="match-footer"><div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
           {team&&<Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/fantasy/view?fixtureId=${m.id}`}>View Team</Link>}
-          {isCompleted(m)&&<Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/predictions?fixtureId=${m.id}`}>View Predictions</Link>}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
-        {!isCompleted(m)&&!live&&<Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${m.id}`}>{team?'Edit Team':'Create Team'}</Link>}
-        {!isCompleted(m)&&<Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${m.id}`}>Predictions</Link>}
+        {!live&&<Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${m.id}`}>{team?'Edit Team':'Create Team'}</Link>}
+        <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${m.id}`}>Predictions</Link>
         {live&&<Link className="primary-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/leaderboard?fixtureId=${m.id}`}>Leaderboard</Link>}
         </div>
         </div>
