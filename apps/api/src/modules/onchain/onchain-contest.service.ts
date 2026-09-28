@@ -51,6 +51,7 @@ export class OnchainContestService {
   private readonly walletClient;
   private readonly ownerAccount;
   private readonly prizeBatchSize: number;
+  private readonly fundingGasLimit: bigint;
   private readonly logger = new Logger(OnchainContestService.name);
   private fundingQueue: Promise<void> = Promise.resolve();
 
@@ -61,6 +62,7 @@ export class OnchainContestService {
     this.poolAddress = pool ? getAddress(pool) : null;
     this.tokenAddress = token ? getAddress(token) : null;
     this.prizeBatchSize = Math.max(1, Number(this.config.get<string>('CRX_PRIZE_DISTRIBUTION_BATCH_SIZE', '50')) || 50);
+    this.fundingGasLimit = BigInt(Math.max(100_000, Number(this.config.get<string>('CRX_CONTEST_FUNDING_GAS_LIMIT', '250000')) || 250_000));
     const fallbackRpcUrl = this.config.get<string>('POLYGON_RPC_FALLBACK_URL') || 'https://polygon-bor-rpc.publicnode.com';
     const rpcUrls = [...new Set([this.rpcUrl, fallbackRpcUrl].map((url) => String(url).trim()).filter(Boolean))];
     const makeTransport = () => fallback(rpcUrls.map((url) => http(url, { timeout: 15_000, retryCount: 2 })));
@@ -261,6 +263,7 @@ export class OnchainContestService {
           abi: POOL_ABI,
           functionName: 'fundContest',
           args: [id, BigInt(participantCount), totalPool],
+          gas: this.fundingGasLimit,
         });
         await this.publicClient.waitForTransactionReceipt({ hash: registrationTxHash });
       } catch (error) {
