@@ -76,12 +76,13 @@ jobs:
 
           rn_dir = pkg_dir("react-native/package.json")
           codegen_dir = pkg_dir("@react-native/codegen/package.json")
+          hermes_compiler_dir = pkg_dir("hermes-compiler/package.json")
           expo_cli = resolve("@expo/cli")
 
           replacements = {
               "entryFile =": 'entryFile = file(projectRoot + "/index.js")',
               "reactNativeDir =": f'reactNativeDir = file("{rn_dir}")',
-              "hermesCommand =": f'hermesCommand = file("{rn_dir}/sdks/hermesc/%OS-BIN%/hermesc").getAbsolutePath()',
+              "hermesCommand =": f'hermesCommand = file("{hermes_compiler_dir}/hermesc/%OS-BIN%/hermesc").getAbsolutePath()',
               "codegenDir =": f'codegenDir = file("{codegen_dir}")',
               "cliFile =": f'cliFile = file("{expo_cli}")',
           }
@@ -208,13 +209,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          hermes_root="$GITHUB_WORKSPACE/node_modules/react-native/sdks/hermesc"
+          hermes_root="$GITHUB_WORKSPACE/node_modules/hermes-compiler/hermesc"
           test -d "$hermes_root"
           find "$hermes_root" -type f -name hermesc -exec chmod 755 {} +
           hermes="$hermes_root/linux64-bin/hermesc"
           test -f "$hermes"
           test -x "$hermes"
-          "$hermes" --help >/dev/null
+          file "$hermes"
+          "$hermes" --version >/dev/null
 
       - name: Build release APK
         working-directory: apps/mobile
