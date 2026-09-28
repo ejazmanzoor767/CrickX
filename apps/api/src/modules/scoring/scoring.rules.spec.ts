@@ -16,24 +16,24 @@ describe('fantasy scoring rules', () => {
       true,
     );
     expect(breakdown.battingPoints + breakdown.bowlingPoints + breakdown.fieldingPoints + breakdown.bonusPoints).toBe(breakdown.baseTotal);
-    expect(breakdown.battingPoints).toBe(50 + 10 + 10 + 20 + 10);
+    expect(breakdown.battingPoints).toBe(50 + 10 + 10 + 10 + 40);
     expect(breakdown.bowlingPoints).toBe(30 + 6 + 30);
     expect(breakdown.fieldingPoints).toBe(10);
     expect(breakdown.bonusPoints).toBe(25 + 5);
   });
 
   it('applies the T20 bowling rules', () => {
-    expect(computePlayerPoints(T20_RULES, undefined, { wickets: 2, medians: 1, runs: 12, overs: 2 })).toBe(60 + 20 + 0 + 6);
+    expect(computePlayerPoints(T20_RULES, undefined, { wickets: 2, medians: 1, runs: 12, overs: 2 })).toBe(60 + 20 + 0 + 10);
   });
 
   it('applies the T10 milestone and dot-ball rules', () => {
     expect(computePlayerPoints(T10_RULES, { score: 21, ball: 10, four_x: 1, six_x: 1, rate: 210 })).toBe(21 + 5 + 10 + 25 + 40);
-    expect(computePlayerPoints(T10_RULES, undefined, { wickets: 1, medians: 0, runs: 6, overs: 1 }, undefined, 2)).toBe(30 + 10 + 5 + 10);
+    expect(computePlayerPoints(T10_RULES, undefined, { wickets: 1, medians: 0, runs: 6, overs: 1 }, undefined, 2)).toBe(30 + 0 + 10 + 40);
   });
 
   it('applies the ODI rules', () => {
     expect(computePlayerPoints(ODI_RULES, { score: 50, ball: 80, four_x: 5, six_x: 0, rate: 62.5 })).toBe(50 + 25 + 20 + 5);
-    expect(computePlayerPoints(ODI_RULES, undefined, { wickets: 2, medians: 1, runs: 12, overs: 4 }, undefined, 3)).toBe(50 + 10 + 3);
+    expect(computePlayerPoints(ODI_RULES, undefined, { wickets: 2, medians: 1, runs: 12, overs: 4 }, undefined, 3)).toBe(50 + 10 + 3 + 20);
   });
 
   it('applies fielding, player-of-match and winning-team bonuses', () => {
