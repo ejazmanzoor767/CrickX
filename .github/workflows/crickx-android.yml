@@ -109,8 +109,6 @@ jobs:
 
           escaped_store = store.replace("\\", "\\\\").replace('"', '\\"')
 
-          # Replace any generated/empty storeFile declaration so Gradle never
-          # evaluates file("") during project configuration.
           text = re.sub(
               r'(^\s*storeFile\s+file\()([^\n]*)(\)\s*$)',
               lambda m: m.group(1) + '"' + escaped_store + '"' + m.group(3),
@@ -118,7 +116,6 @@ jobs:
               flags=re.MULTILINE,
           )
 
-          # Add a known signing config when Expo generated only the debug config.
           if "crickxRelease {" not in text:
               anchor = "    signingConfigs {"
               if anchor not in text:
@@ -126,18 +123,24 @@ jobs:
               if anchor not in text:
                   raise SystemExit("Could not find signingConfigs block in generated Gradle file")
 
-              block = f'''
-        crickxRelease {{
-            storeFile file("{escaped_store}")
-            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            keyAlias System.getenv("ANDROID_KEY_ALIAS")
-            keyPassword System.getenv("ANDROID_KEY_PASSWORD")
-        }}
-'''
+              block = (
+                  "\n        crickxRelease {\n"
+                  + '            storeFile file("' + escaped_store + '")\n'
+                  + '            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")\n'
+                  + '            keyAlias System.getenv("ANDROID_KEY_ALIAS")\n'
+                  + '            keyPassword System.getenv("ANDROID_KEY_PASSWORD")\n'
+                  + "        }\n"
+              )
               text = text.replace(anchor, anchor + block, 1)
 
-          text = text.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.crickxRelease")
-          text = text.replace("signingConfig signingConfigs.release", "signingConfig signingConfigs.crickxRelease")
+          text = text.replace(
+              "signingConfig signingConfigs.debug",
+              "signingConfig signingConfigs.crickxRelease",
+          )
+          text = text.replace(
+              "signingConfig signingConfigs.release",
+              "signingConfig signingConfigs.crickxRelease",
+          )
 
           path.write_text(text)
           print("Gradle release signing configured:", store)
