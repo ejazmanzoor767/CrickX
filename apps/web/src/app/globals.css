@@ -326,3 +326,115 @@ input:focus,.text-input:focus,select:focus,textarea:focus{
     transition-duration:.001ms !important;
   }
 }
+
+
+/* =========================================================
+   CRICKX ANDROID APP — MOBILE-FIRST FINISH
+   Applied only inside the React Native WebView shell.
+   ========================================================= */
+html.crickx-native-app,
+html.crickx-native-app body{
+  background:#070a0f !important;
+  overscroll-behavior-x:none;
+}
+html.crickx-native-app body{font-size:14px}
+html.crickx-native-app body::before{height:38vh;opacity:.65}
+html.crickx-native-app .page-shell,
+html.crickx-native-app .app-page,
+html.crickx-native-app .profile-page{
+  width:100% !important;
+  max-width:none !important;
+  margin:0 !important;
+  padding:16px 12px 28px !important;
+}
+html.crickx-native-app .page-intro{
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:stretch !important;
+  gap:9px !important;
+  margin-bottom:13px !important;
+}
+html.crickx-native-app .page-intro .section-subtitle{
+  font-size:13px;
+  line-height:1.55;
+  margin-bottom:0 !important;
+}
+html.crickx-native-app .page-actions,
+html.crickx-native-app .match-centre-intro > button{width:100%}
+html.crickx-native-app .page-actions .secondary-button,
+html.crickx-native-app .match-centre-intro > button{width:100%;min-height:44px}
+html.crickx-native-app .section-title{
+  font-size:34px !important;
+  line-height:.94 !important;
+  letter-spacing:-.02em;
+  margin-bottom:7px !important;
+}
+html.crickx-native-app .eyebrow{font-size:9.5px;letter-spacing:.17em;margin-bottom:9px}
+html.crickx-native-app .card{
+  padding:15px !important;
+  margin-bottom:10px !important;
+  border-radius:17px !important;
+  box-shadow:0 10px 28px rgba(0,0,0,.18) !important;
+  transform:none !important;
+}
+html.crickx-native-app .card:hover{transform:none !important}
+html.crickx-native-app .primary-button,
+html.crickx-native-app .secondary-button{
+  min-height:44px;
+  padding:10px 13px;
+  border-radius:12px;
+  font-size:13px;
+  line-height:1.1;
+  text-align:center;
+}
+html.crickx-native-app input,
+html.crickx-native-app .text-input{min-height:48px;border-radius:12px;font-size:14px}
+html.crickx-native-app .match-list{display:grid !important;grid-template-columns:1fr !important;gap:10px !important}
+html.crickx-native-app .match-list-card{min-height:0 !important;padding:14px !important}
+html.crickx-native-app .match-topline{align-items:flex-start;gap:8px}
+html.crickx-native-app .match-meta,
+html.crickx-native-app .match-date{font-size:9.5px;letter-spacing:.07em;line-height:1.3}
+html.crickx-native-app .match-teams{gap:8px !important;margin:17px 0 !important}
+html.crickx-native-app .match-teams small{font-size:8px;margin-bottom:5px}
+html.crickx-native-app .match-teams strong{font-size:23px !important;line-height:.94}
+html.crickx-native-app .vs-badge{width:34px;height:34px;font-size:9px;flex:0 0 auto}
+html.crickx-native-app .match-teams img{width:24px !important;height:24px !important;margin-top:5px !important}
+html.crickx-native-app .match-footer{align-items:stretch;flex-direction:column;gap:9px}
+html.crickx-native-app .match-footer > div{width:100%;justify-content:flex-start !important}
+html.crickx-native-app .match-footer > div:last-child{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px !important}
+html.crickx-native-app .match-footer .primary-button,
+html.crickx-native-app .match-footer .secondary-button{width:100%;min-width:0}
+html.crickx-native-app .match-centre-tabs{position:relative;padding:6px !important}
+html.crickx-native-app .match-centre-tabs button{min-height:44px !important;padding:9px 7px !important;font-size:11px !important}
+html.crickx-native-app .live-score-strip{padding:0 11px !important;border-radius:13px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055)}
+html.crickx-native-app .profile-hero{
+  display:grid !important;
+  grid-template-columns:auto minmax(0,1fr) !important;
+  gap:13px !important;
+  padding:16px !important;
+  align-items:center !important;
+}
+html.crickx-native-app .avatar-large{width:68px !important;height:68px !important;border-radius:20px !important;font-size:29px !important}
+html.crickx-native-app .profile-hero-copy h1{font-size:35px !important;line-height:.92 !important;margin:0 0 5px !important;overflow-wrap:anywhere}
+html.crickx-native-app .profile-hero-copy > p{font-size:11px;margin-bottom:8px;overflow-wrap:anywhere}
+html.crickx-native-app .profile-badges{gap:5px}
+html.crickx-native-app .profile-badges span{padding:5px 7px;font-size:8px}
+html.crickx-native-app .profile-hero > .primary-button{grid-column:1 / -1;width:100%;min-height:43px}
+html.crickx-native-app .profile-page h2{font-size:21px !important;line-height:1.08}
+html.crickx-native-app .profile-page .card div[style*="grid-template-columns"]{grid-template-columns:1fr !important}
+html.crickx-native-app .profile-page .card div[style*="grid-template-columns: auto 1fr"]{grid-template-columns:auto minmax(0,1fr) !important}
+html.crickx-native-app .wallet-page{padding-top:16px !important}
+html.crickx-native-app .wallet-page .panel-grid{grid-template-columns:1fr !important;gap:10px !important}
+html.crickx-native-app .wallet-page .panel-grid .card{margin-bottom:0 !important}
+html.crickx-native-app .wallet-page .card h2{font-size:21px !important}
+html.crickx-native-app .wallet-page [style*="grid-template-columns: repeat(auto-fit"]{grid-template-columns:1fr !important}
+html.crickx-native-app .wallet-page .primary-button[style*="width: 100%"]{min-height:50px}
+html.crickx-native-app .empty-state{padding:22px 16px !important;text-align:center;display:flex;flex-direction:column;align-items:stretch;gap:9px}
+html.crickx-native-app .notice{border-radius:14px !important;font-size:12px !important;line-height:1.45}
+@media (max-width:380px){
+  html.crickx-native-app .page-shell,
+  html.crickx-native-app .app-page,
+  html.crickx-native-app .profile-page{padding-left:10px !important;padding-right:10px !important}
+  html.crickx-native-app .match-teams strong{font-size:21px !important}
+}
+@media (prefers-reduced-motion:reduce){html.crickx-native-app body::before{animation:none !important}}
