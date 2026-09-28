@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createPublicClient, createWalletClient, formatUnits, getAddress, http, parseAbi, parseUnits, type Address, type Hex } from 'viem';
+import { createPublicClient, createWalletClient, fallback, formatUnits, getAddress, http, parseAbi, parseUnits, type Address, type Hex } from 'viem';
 import { polygon } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 
@@ -42,13 +42,16 @@ export class OnchainPredictionService {
     this.poolAddress = pool ? getAddress(pool) : null;
     this.tokenAddress = token ? getAddress(token) : null;
     this.distributionBatchSize = Math.max(1, Number(this.config.get<string>('CRX_PREDICTION_DISTRIBUTION_BATCH_SIZE', '50')) || 50);
-    this.publicClient = createPublicClient({ chain: polygon, transport: http(this.rpcUrl) });
+    const fallbackRpcUrl = this.config.get<string>('POLYGON_RPC_FALLBACK_URL') || 'https://polygon-bor-rpc.publicnode.com';
+    const rpcUrls = [...new Set([this.rpcUrl, fallbackRpcUrl].map((url) => String(url).trim()).filter(Boolean))];
+    const makeTransport = () => fallback(rpcUrls.map((url) => http(url, { timeout: 15_000, retryCount: 2 })));
+    this.publicClient = createPublicClient({ chain: polygon, transport: makeTransport() });
 
     const raw = this.config.get<string>('CRX_CONTEST_OWNER_PRIVATE_KEY')?.trim().replace(/^['"]|['"]$/g, '');
     const key = raw && /^[0-9a-fA-F]{64}$/.test(raw) ? `0x${raw}` : raw;
     if (key && /^0x[0-9a-fA-F]{64}$/.test(key)) {
       this.ownerAccount = privateKeyToAccount(key as Hex);
-      this.walletClient = createWalletClient({ account: this.ownerAccount, chain: polygon, transport: http(this.rpcUrl) });
+      this.walletClient = createWalletClient({ account: this.ownerAccount, chain: polygon, transport: makeTransport() });
     } else {
       this.ownerAccount = null;
       this.walletClient = null;

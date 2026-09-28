@@ -214,7 +214,7 @@ export class ContestService implements OnModuleInit {
   private async assertActiveSubscription(userId: string) {
     const subscription = await this.subscriptions.status(userId);
     if (!subscription.active) {
-      throw new ForbiddenException('An active CrickX weekly subscription is required to join contests. Subscribe for 50 PKR for 7 days.');
+      throw new ForbiddenException('An active CrickX weekly subscription is required to join contests. Subscribe for $0.18 USD for 7 days.');
     }
     return subscription;
   }

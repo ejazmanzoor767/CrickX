@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   createPublicClient,
   createWalletClient,
+  fallback,
   http,
   parseAbi,
   formatUnits,
@@ -50,6 +51,7 @@ export class OnchainContestService {
   private readonly walletClient;
   private readonly ownerAccount;
   private readonly prizeBatchSize: number;
+  private readonly fundingGasLimit: bigint;
   private readonly logger = new Logger(OnchainContestService.name);
   private fundingQueue: Promise<void> = Promise.resolve();
 
@@ -60,14 +62,18 @@ export class OnchainContestService {
     this.poolAddress = pool ? getAddress(pool) : null;
     this.tokenAddress = token ? getAddress(token) : null;
     this.prizeBatchSize = Math.max(1, Number(this.config.get<string>('CRX_PRIZE_DISTRIBUTION_BATCH_SIZE', '50')) || 50);
-    this.publicClient = createPublicClient({ chain: polygon, transport: http(this.rpcUrl) });
+    this.fundingGasLimit = BigInt(Math.max(100_000, Number(this.config.get<string>('CRX_CONTEST_FUNDING_GAS_LIMIT', '250000')) || 250_000));
+    const fallbackRpcUrl = this.config.get<string>('POLYGON_RPC_FALLBACK_URL') || 'https://polygon-bor-rpc.publicnode.com';
+    const rpcUrls = [...new Set([this.rpcUrl, fallbackRpcUrl].map((url) => String(url).trim()).filter(Boolean))];
+    const makeTransport = () => fallback(rpcUrls.map((url) => http(url, { timeout: 15_000, retryCount: 2 })));
+    this.publicClient = createPublicClient({ chain: polygon, transport: makeTransport() });
 
     const rawPrivateKey = this.config.get<string>('CRX_CONTEST_OWNER_PRIVATE_KEY');
     const privateKey = rawPrivateKey?.trim().replace(/^['"]|['"]$/g, '');
     const normalizedPrivateKey = privateKey && /^[0-9a-fA-F]{64}$/.test(privateKey) ? `0x${privateKey}` : privateKey;
     if (normalizedPrivateKey && /^0x[0-9a-fA-F]{64}$/.test(normalizedPrivateKey)) {
       this.ownerAccount = privateKeyToAccount(normalizedPrivateKey as Hex);
-      this.walletClient = createWalletClient({ account: this.ownerAccount, chain: polygon, transport: http(this.rpcUrl) });
+      this.walletClient = createWalletClient({ account: this.ownerAccount, chain: polygon, transport: makeTransport() });
     } else {
       this.ownerAccount = null;
       this.walletClient = null;
@@ -247,15 +253,18 @@ export class OnchainContestService {
 
       let registrationTxHash: Hex;
       try {
-        const simulation = await this.publicClient.simulateContract({
-          account: this.ownerAccount!.address,
+        // Send the contract write directly after the balance/stage checks above.
+        // The previous simulateContract -> writeContract(simulation.request) path
+        // could surface Polygon RPC -32600 "JSON is not a valid request object"
+        // responses even though the contract call itself was valid.
+        registrationTxHash = await this.walletClient!.writeContract({
+          account: this.ownerAccount!,
           address: this.poolAddress!,
           abi: POOL_ABI,
           functionName: 'fundContest',
           args: [id, BigInt(participantCount), totalPool],
+          gas: this.fundingGasLimit,
         });
-
-        registrationTxHash = await this.walletClient!.writeContract(simulation.request);
         await this.publicClient.waitForTransactionReceipt({ hash: registrationTxHash });
       } catch (error) {
         const record = typeof error === "object" && error !== null ? error as Record<string, unknown> : {};

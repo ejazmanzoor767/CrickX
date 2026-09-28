@@ -4,6 +4,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import {
   createPublicClient,
   createWalletClient,
+  fallback,
   getAddress,
   http,
   parseAbi,
@@ -48,7 +49,10 @@ export class WalletService {
     this.rpcUrl = this.config.get<string>('POLYGON_RPC_URL') || 'https://polygon-rpc.com';
     const token = this.config.get<string>('CRX_TOKEN_ADDRESS')?.trim();
     this.tokenAddress = token ? getAddress(token) : null;
-    this.publicClient = createPublicClient({ chain: polygon, transport: http(this.rpcUrl) });
+    const fallbackRpcUrl = this.config.get<string>('POLYGON_RPC_FALLBACK_URL') || 'https://polygon-bor-rpc.publicnode.com';
+    const rpcUrls = [...new Set([this.rpcUrl, fallbackRpcUrl].map((url) => String(url).trim()).filter(Boolean))];
+    const makeTransport = () => fallback(rpcUrls.map((url) => http(url, { timeout: 15_000, retryCount: 2 })));
+    this.publicClient = createPublicClient({ chain: polygon, transport: makeTransport() });
 
     const rawPrivateKey = this.config.get<string>('CRX_CONTEST_OWNER_PRIVATE_KEY');
     const privateKey = rawPrivateKey?.trim().replace(/^['"]|['"]$/g, '');
@@ -58,7 +62,7 @@ export class WalletService {
       this.walletClient = createWalletClient({
         account: this.ownerAccount,
         chain: polygon,
-        transport: http(this.rpcUrl),
+        transport: makeTransport(),
       });
     } else {
       this.ownerAccount = null;
