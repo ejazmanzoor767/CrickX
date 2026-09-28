@@ -36,6 +36,8 @@ services:
         sync: false
       - key: POLYGON_RPC_URL
         sync: false
+      - key: POLYGON_RPC_FALLBACK_URL
+        value: https://polygon-bor-rpc.publicnode.com
       - key: CRX_TOKEN_ADDRESS
         sync: false
       - key: CRX_CONTEST_POOL_ADDRESS
