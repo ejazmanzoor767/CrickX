@@ -12,7 +12,7 @@ const formatClock = (value: string) => new Date(value).toLocaleTimeString('en-PK
 const hasStarted = (fixture: any) => { const start = new Date(fixture?.starting_at ?? '').getTime(); return Number.isFinite(start) && start <= Date.now(); };
 const statusText = (fixture: any, live = false) => live ? 'LIVE' : (fixture.applicationState ?? fixture.status ?? 'UPCOMING');
 const scoreText = (r: any) => `${r?.score ?? 0}/${r?.wickets ?? 0} (${r?.overs ?? 0} ov)`;
-const isCompletedFixture = (fixture: any) => String(fixture?.applicationState ?? '').toUpperCase() === 'COMPLETED' || ['finished', 'complete', 'completed', 'cancelled', 'canceled', 'abandoned'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part));
+const isCompletedFixture = (fixture: any) => String(fixture?.applicationState ?? '').toUpperCase() === 'COMPLETED' || fixture?.draw_noresult === true || ['finished', 'finish', 'complete', 'completed', 'cancelled', 'canceled', 'abandoned', 'no result', 'no-result', 'washout'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part));
 const isLiveFixture = (fixture: any) => !isCompletedFixture(fixture) && hasStarted(fixture) && (Number(fixture?.live) === 1 || ['live', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part)) || String(fixture?.applicationState ?? '').toUpperCase() === 'LIVE');
 
 function MatchCard({ fixture, live, completed, fantasyFixture, teamSaved }: { fixture: any; live?: boolean; completed?: boolean; fantasyFixture?: boolean; teamSaved?: boolean }) {
