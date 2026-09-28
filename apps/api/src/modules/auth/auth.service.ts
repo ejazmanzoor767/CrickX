@@ -98,6 +98,9 @@ export class AuthService {
     if (!record || record.revokedAt || record.expiresAt < new Date()) {
       throw new UnauthorizedException('Refresh token invalid or expired.');
     }
+    if (record.user?.status === 'SUSPENDED' || record.user?.status === 'BANNED') {
+      throw new UnauthorizedException(`Account is ${String(record.user.status).toLowerCase()}.`);
+    }
 
     await this.prisma.refreshToken.update({ where: { id: record.id }, data: { revokedAt: new Date() } });
 
