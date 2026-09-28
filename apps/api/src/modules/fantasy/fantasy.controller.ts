@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -47,10 +48,12 @@ export class ContestController {
   create(@Body() dto: CreateContestDto) { return this.contests.create(dto); }
 
   @Get('fixture/:fixtureId')
-  forFixture(@Param('fixtureId') fixtureId: string) { return this.contests.listForFixture(parseInt(fixtureId, 10)); }
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  forFixture(@Param('fixtureId', ParseIntPipe) fixtureId: number) { return this.contests.listForFixture(fixtureId); }
 
   @Get('fixture/:fixtureId/active')
-  active(@Param('fixtureId') fixtureId: string) { return this.contests.active(parseInt(fixtureId, 10)); }
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  active(@Param('fixtureId', ParseIntPipe) fixtureId: number) { return this.contests.active(fixtureId); }
 
   @Post('prepare')
   prepare(@Req() req: Request, @Body() dto: PrepareJoinContestDto) { return this.contests.prepareJoin(uid(req), dto); }
@@ -62,5 +65,6 @@ export class ContestController {
   myEntries(@Req() req: Request) { return this.contests.myEntries(uid(req)); }
 
   @Get(':contestId/leaderboard')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   leaderboard(@Param('contestId') contestId: string) { return this.contests.leaderboard(contestId); }
 }
