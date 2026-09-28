@@ -47,6 +47,59 @@ jobs:
           test -f android/app/build.gradle
           chmod +x android/gradlew
 
+      - name: Stabilize generated React Native Gradle paths
+        working-directory: apps/mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          def resolve(name):
+              return subprocess.check_output(
+                  ["node", "-p", f"require.resolve('{name}')"],
+                  text=True,
+              ).strip()
+
+          def pkg_dir(name):
+              return str(Path(resolve(name)).parent)
+
+          p = Path("android/app/build.gradle")
+          if not p.exists():
+              raise SystemExit("Generated android/app/build.gradle not found")
+
+          rn_dir = pkg_dir("react-native/package.json")
+          codegen_dir = pkg_dir("@react-native/codegen/package.json")
+          expo_cli = resolve("@expo/cli")
+
+          replacements = {
+              "entryFile =": 'entryFile = file(projectRoot + "/index.js")',
+              "reactNativeDir =": f'reactNativeDir = file("{rn_dir}")',
+              "hermesCommand =": f'hermesCommand = file("{rn_dir}/sdks/hermesc/%OS-BIN%/hermesc").getAbsolutePath()',
+              "codegenDir =": f'codegenDir = file("{codegen_dir}")',
+              "cliFile =": f'cliFile = file("{expo_cli}")',
+          }
+
+          lines = p.read_text().splitlines()
+          found = set()
+          for i, line in enumerate(lines):
+              stripped = line.strip()
+              for key, replacement in replacements.items():
+                  if stripped.startswith(key):
+                      indent = line[: len(line) - len(line.lstrip())]
+                      lines[i] = indent + replacement
+                      found.add(key)
+                      break
+
+          missing = set(replacements) - found
+          if missing:
+              raise SystemExit("Missing generated Expo Gradle settings: " + ", ".join(sorted(missing)))
+
+          p.write_text("\n".join(lines) + "\n")
+          print("React Native Gradle paths stabilized.")
+          PY
+
       - name: Configure CI or production signing
         working-directory: apps/mobile
         env:
