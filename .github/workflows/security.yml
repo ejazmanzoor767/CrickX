@@ -9,6 +9,10 @@ on:
     - cron: "17 2 * * 1"
   workflow_dispatch:
 
+concurrency:
+  group: crickx-security
+  cancel-in-progress: true
+
 permissions:
   contents: read
   security-events: write
