@@ -35,7 +35,7 @@ contract CRXPredictionPool is Ownable, ReentrancyGuard {
     function availableFunding() public view returns(uint256){uint256 b=crxToken.balanceOf(address(this));return b>totalEscrowed?b-totalEscrowed:0;}
     function createPrediction(uint256 lockAt_) external onlyOwner returns(uint256 id){require(lockAt_>0,"invalid lock time");id=nextPredictionId++;Prediction storage p=predictions[id];p.lockAt=lockAt_;p.stage=Stage.Open;predictionExists[id]=true;}
     function fundPrediction(uint256 id,uint256 count,uint256 totalPool) external onlyOwner nonReentrant{
-        Prediction storage p=predictions[id];require(predictionExists[id],"prediction not found");require(p.stage==Stage.Open,"prediction not open");require(block.timestamp>=p.lockAt,"match has not started");require(!p.fundingComplete,"already funded");require(count>0,"no participants");require(totalPool==count*POOL_PER_ENTRY,"pool amount mismatch");require(availableFunding()>=totalPool,"pool balance insufficient");
+        Prediction storage p=predictions[id];require(predictionExists[id],"prediction not found");require(p.stage==Stage.Open,"prediction not open");require(block.timestamp>=p.lockAt,"match has not started");require(!p.fundingComplete,"already funded");require(count>0,"no participants");require(count<=1_000_000,"participant count too large");require(totalPool==count*POOL_PER_ENTRY,"pool amount mismatch");require(availableFunding()>=totalPool,"pool balance insufficient");
         p.participantCount=count;p.totalPool=totalPool;p.fundingComplete=true;p.stage=Stage.Funded;totalEscrowed+=totalPool;
     }
     function finalizePayouts(uint256 id,address[] calldata winners,uint256[] calldata amounts) external onlyOwner nonReentrant{
