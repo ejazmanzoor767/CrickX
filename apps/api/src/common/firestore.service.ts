@@ -178,5 +178,17 @@ export class FirestoreService implements OnModuleInit, OnModuleDestroy {
   async upsert(model: string, args: any) { const where = this.expandWhere(args.where); const existing = (await this.findRows(model, { where }))[0] ?? null; if (existing) return this.update(model, { where: { id: existing.id }, data: args.update }); const createData = { ...(args.create ?? {}), ...(model === 'cachedFixture' ? { id: String(args.create?.sportmonksFixtureId) } : {}), ...(model === 'cachedPlayer' ? { id: String(args.create?.sportmonksPlayerId) } : {}) }; return this.create(model, { data: createData }); }
   async $transaction<T>(arg: ((tx: this) => Promise<T>) | Array<Promise<T>>): Promise<T | T[]> { if (Array.isArray(arg)) return Promise.all(arg); const active = this.transactionContext.getStore(); if (active) return arg(this); return this.db.runTransaction((t) => this.transactionContext.run(t, () => arg(this))); }
   async rawDelete(model: string, id: string) { const r = this.ref(model, id); const tx = this.transactionContext.getStore(); if (tx) tx.delete(r); else await r.delete(); }
+  async transactionGet(collectionName: string, id: string) {
+    const tx = this.transactionContext.getStore();
+    if (!tx) throw new Error('transactionGet must be called inside FirestoreService.$transaction().');
+    return tx.get(this.db.collection(collectionName).doc(id));
+  }
+
+  async transactionSet(collectionName: string, id: string, data: Record<string, unknown>, merge = true) {
+    const tx = this.transactionContext.getStore();
+    if (!tx) throw new Error('transactionSet must be called inside FirestoreService.$transaction().');
+    tx.set(this.db.collection(collectionName).doc(id), unwrap(data) as any, { merge });
+  }
+
   private async hydrate(model: string, row: any, include?: any, select?: any): Promise<any> { let out = decorateRecord(model, unwrap(row) as any); if (model === 'user' && include?.profile) out.profile = await this.findUnique('profile', { where: { userId: row.id } }); if (model === 'refreshToken' && include?.user) out.user = await this.findUnique('user', { where: { id: row.userId } }); if (model === 'fantasyTeam' && include?.players) out.players = await this.findMany('fantasyTeamPlayer', { where: { fantasyTeamId: row.id }, orderBy: { id: 'asc' } }); if (model === 'contestEntry') { if (include?.contest) out.contest = await this.findUnique('contest', { where: { id: row.contestId }, include: include.contest === true ? undefined : include.contest.include }); if (include?.fantasyTeam) out.fantasyTeam = await this.findUnique('fantasyTeam', { where: { id: row.fantasyTeamId }, include: include.fantasyTeam === true ? undefined : include.fantasyTeam.include }); } if (model === 'contest' && include?.entries) out.entries = await this.findMany('contestEntry', { where: { contestId: row.id }, include: include.entries === true ? undefined : include.entries.include }); if (model === 'kycRecord' && include?.user) out.user = await this.findUnique('user', { where: { id: row.userId }, include: include.user === true ? undefined : include.user.include, select: include.user?.select }); if (select) out = Object.fromEntries(Object.entries(out).filter(([key]) => select[key])); return out; }
 }
