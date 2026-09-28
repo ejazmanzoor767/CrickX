@@ -60,7 +60,7 @@ describe('WalletService.mutateBalance', () => {
 
   it('rejects on optimistic-lock version mismatch (concurrent update)', async () => {
     const { prisma, wallet } = buildPrismaMock({ depositBalance: 100, version: 0 });
-    const service = new WalletService(prisma as any, {} as any);
+    const service = new WalletService(prisma as any, {} as any, {} as any, {} as any);
 
     // Simulate a concurrent writer bumping the version between read and write.
     prisma.wallet.findUnique.mockResolvedValueOnce({ ...wallet, version: 0 });
@@ -73,7 +73,7 @@ describe('WalletService.mutateBalance', () => {
 
   it('correctly applies a credit and returns the resulting transaction record', async () => {
     const { prisma, wallet } = buildPrismaMock({ depositBalance: 0, version: 0 });
-    const service = new WalletService(prisma as any, {} as any);
+    const service = new WalletService(prisma as any, {} as any, {} as any, {} as any);
 
     const tx = await service.mutateBalance({
       userId: 'u1', bucket: 'DEPOSIT', delta: 250, type: 'DEPOSIT', idempotencyKey: 'dep-3',
