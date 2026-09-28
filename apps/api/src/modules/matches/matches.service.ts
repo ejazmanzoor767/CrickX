@@ -4,6 +4,7 @@ import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { SportmonksFixture } from '../sportmonks/sportmonks.types';
 
 function sportmonksDate(value: Date) { return value.toISOString().slice(0, 10); }
+const STALE_NOT_STARTED_MS = 6 * 60 * 60 * 1000;
 export function isTerminalFixture(fixture: Partial<SportmonksFixture>): boolean {
   const status = String(fixture.status ?? '').trim().toLowerCase();
   return [
@@ -21,9 +22,18 @@ export function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE
   // populated on /livescores after a match is abandoned/cancelled/finished.
   if (isTerminalFixture(fixture)) return 'COMPLETED';
 
-  // Sportmonks' explicit live flag is authoritative. Do not let a stale or
-  // timezone-shifted starting_at timestamp suppress a match that the provider
-  // is actively publishing in its live feed.
+  const staleNotStarted =
+    started &&
+    (Date.now() - startingAt) >= STALE_NOT_STARTED_MS &&
+    ['ns', 'scheduled', 'not started', 'upcoming'].some((value) => status === value || status.includes(value));
+
+  // An old NS/scheduled fixture is considered terminal/stale when the provider
+  // has failed to transition it for many hours. This prevents abandoned or
+  // dropped fixtures from reappearing forever in Live/Fantasy.
+  if (staleNotStarted) return 'COMPLETED';
+
+  // Sportmonks' explicit live flag is authoritative for current fixtures. Do
+  // not let a small starting_at/timezone drift suppress an actual live match.
   if (fixture.live === 1) return 'LIVE';
 
   // A fixture with no valid start time cannot be promoted by a weak status-only
