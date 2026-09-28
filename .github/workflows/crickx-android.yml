@@ -13,14 +13,12 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: crickx-android
-  cancel-in-progress: true
-
 jobs:
   build-apk:
-    name: Build signed Android APK
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
 
     steps:
       - name: Checkout
@@ -39,27 +37,27 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install workspace dependencies
+      - name: Install dependencies
+        working-directory: .
         run: npm ci --workspaces --include-workspace-root --no-audit --no-fund
 
       - name: Configure Node resolution
-        run: echo "NODE_PATH=$GITHUB_WORKSPACE/node_modules:$GITHUB_WORKSPACE/apps/mobile/node_modules" >> "$GITHUB_ENV"
+        shell: bash
+        run: |
+          echo "NODE_PATH=$GITHUB_WORKSPACE/node_modules:$GITHUB_WORKSPACE/apps/mobile/node_modules" >> "$GITHUB_ENV"
 
-      - name: Generate Android project
-        working-directory: apps/mobile
+      - name: Generate clean Android project
         env:
           CI: "1"
         run: npx expo prebuild --clean --platform android --no-install
 
       - name: Ensure Android splash resources
-        working-directory: apps/mobile
         shell: bash
         run: |
-          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-
           color = "#0B0D12"
+
           for folder in [
               Path("android/app/src/main/res/values"),
               Path("android/app/src/main/res/values-night"),
@@ -67,16 +65,12 @@ jobs:
               folder.mkdir(parents=True, exist_ok=True)
               p = folder / "colors.xml"
               if p.exists():
-                  text = p.read_text()
-                  if 'name="splashscreen_background"' not in text:
-                      p.write_text(text.replace(
-                          "</resources>",
-                          f'    <color name="splashscreen_background">{color}</color>\n</resources>'
-                      ))
+                  s = p.read_text()
+                  if 'name="splashscreen_background"' not in s:
+                      s = s.replace("</resources>", f'    <color name="splashscreen_background">{color}</color>\n</resources>')
+                      p.write_text(s)
               else:
-                  p.write_text(
-                      f'<resources>\n    <color name="splashscreen_background">{color}</color>\n</resources>\n'
-                  )
+                  p.write_text(f'<resources>\n    <color name="splashscreen_background">{color}</color>\n</resources>\n')
 
           splash = Path("android/app/src/main/res/drawable/splashscreen.xml")
           if not splash.exists():
@@ -86,36 +80,36 @@ jobs:
                   '    <item android:drawable="@color/splashscreen_background"/>\n'
                   '</layer-list>\n'
               )
+
+          print("Android splash resources verified.")
           PY
 
       - name: Configure release signing
-        working-directory: apps/mobile
         env:
-          ANDROID_RELEASE_KEYSTORE_BASE64: "${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}"
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${ANDROID_RELEASE_KEYSTORE_BASE64:-}" || {
+          if [[ -z "${ANDROID_RELEASE_KEYSTORE_BASE64:-}" ]]; then
             echo "Missing required GitHub secret: ANDROID_RELEASE_KEYSTORE_BASE64"
             exit 1
-          }
+          fi
           printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/crickx-release.keystore
           chmod 600 android/app/crickx-release.keystore
           test -s android/app/crickx-release.keystore
 
       - name: Stabilize generated Gradle configuration
-        working-directory: apps/mobile
         env:
-          ANDROID_KEYSTORE_PASSWORD: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
-          ANDROID_KEY_ALIAS: "${{ secrets.ANDROID_KEY_ALIAS }}"
-          ANDROID_KEY_PASSWORD: "${{ secrets.ANDROID_KEY_PASSWORD }}"
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${ANDROID_KEYSTORE_PASSWORD:-}"
-          test -n "${ANDROID_KEY_ALIAS:-}"
-          test -n "${ANDROID_KEY_PASSWORD:-}"
-
+          if [[ -z "${ANDROID_KEYSTORE_PASSWORD:-}" || -z "${ANDROID_KEY_ALIAS:-}" || -z "${ANDROID_KEY_PASSWORD:-}" ]]; then
+            echo "Missing one or more Android signing secrets: ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD"
+            exit 1
+          fi
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
@@ -155,19 +149,15 @@ jobs:
                       lines[i] = indent + replacement
                       found.add(key)
                       break
-
           missing = set(replacements) - found
           if missing:
-              raise SystemExit(
-                  "Missing generated Expo Gradle settings: "
-                  + ", ".join(sorted(missing))
-              )
+              raise SystemExit("Missing generated Expo Gradle settings: " + ", ".join(sorted(missing)))
 
-          text = "\n".join(lines) + "\n"
-          anchor = "    signingConfigs {"
-          if anchor not in text:
-              anchor = "        signingConfigs {"
-          if anchor not in text:
+          s = "\n".join(lines) + "\n"
+          signing_anchor = "    signingConfigs {"
+          if signing_anchor not in s:
+              signing_anchor = "        signingConfigs {"
+          if signing_anchor not in s:
               raise SystemExit("Could not find Android signingConfigs block")
 
           signing_block = """
@@ -178,50 +168,64 @@ jobs:
             keyPassword System.getenv("ANDROID_KEY_PASSWORD")
         }
 """
-          text = text.replace(anchor, anchor + signing_block, 1)
+          s = s.replace(signing_anchor, signing_anchor + signing_block, 1)
 
-          token = "signingConfig signingConfigs.debug"
-          positions = [i for i in range(len(text)) if text.startswith(token, i)]
-          if not positions:
+          occurrences = [i for i in range(len(s)) if s.startswith("signingConfig signingConfigs.debug", i)]
+          if not occurrences:
               raise SystemExit("Could not find generated release signing configuration")
+          idx = occurrences[-1]
+          s = s[:idx] + "signingConfig signingConfigs.crickxRelease" + s[idx + len("signingConfig signingConfigs.debug"):]
 
-          idx = positions[-1]
-          text = text[:idx] + "signingConfig signingConfigs.crickxRelease" + text[idx + len(token):]
-          p.write_text(text)
+          p.write_text(s)
+          print("Android release signing configured with the persistent CrickX keystore.")
+          print("React Native:", rn_dir)
+          print("Codegen:", codegen_dir)
+          print("Expo CLI:", expo_cli)
           PY
 
-      - name: Verify generated Android project
-        working-directory: apps/mobile
+      - name: Verify Android project
+        shell: bash
         run: |
+          test -f android/settings.gradle || test -f android/settings.gradle.kts
           test -f android/app/build.gradle
           test -f android/gradlew
           grep -n -E "entryFile =|reactNativeDir =|hermesCommand =|codegenDir =|cliFile =" android/app/build.gradle
 
-      - name: Assemble release APK
-        working-directory: apps/mobile
+      - name: Assemble APK
         env:
           NODE_ENV: production
-          ANDROID_KEYSTORE_PASSWORD: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
-          ANDROID_KEY_ALIAS: "${{ secrets.ANDROID_KEY_ALIAS }}"
-          ANDROID_KEY_PASSWORD: "${{ secrets.ANDROID_KEY_PASSWORD }}"
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           EXPO_PUBLIC_API_BASE_URL: https://crickx-api.onrender.com/api/v1
           EXPO_PUBLIC_WEB_URL: https://crickx-3d806.web.app
-          EXPO_PUBLIC_FIREBASE_API_KEY: "${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}"
+          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx5g
+        shell: bash
         run: |
           chmod +x android/gradlew
           cd android
           ./gradlew assembleRelease --no-daemon --stacktrace
 
+      - name: Rename APK
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk dist/CrickX.apk
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: CrickX-Android-APK
-          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          path: apps/mobile/dist/CrickX.apk
           retention-days: 30
 
       - name: Publish GitHub release
         env:
-          GH_TOKEN: "${{ github.token }}"
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          gh release create "mobile-v1.0-$GITHUB_RUN_NUMBER"             "apps/mobile/android/app/build/outputs/apk/release/app-release.apk"             --repo "$GITHUB_REPOSITORY"             --title "CrickX Android v1.0-$GITHUB_RUN_NUMBER"             --notes "Installable CrickX Android APK built from main."
+          gh release create "mobile-v1.0-$GITHUB_RUN_NUMBER" "dist/CrickX.apk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "CrickX Android v1.0-$GITHUB_RUN_NUMBER" \
+            --notes "Installable CrickX Android APK built from main."
