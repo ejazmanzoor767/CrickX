@@ -35,7 +35,10 @@ describe('FantasyTeamService.createTeam', () => {
           Promise.resolve(where.sportmonksPlayerId.in.map((id: number) => ({ sportmonksPlayerId: id, credits: creditValue }))),
         ),
       },
-      fantasyTeam: { create: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ id: 'team1', ...data })) },
+      fantasyTeam: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ id: 'team1', ...data })),
+      },
     };
     return { sportmonks, prisma };
   }
