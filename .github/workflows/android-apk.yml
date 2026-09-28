@@ -39,7 +39,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: .
-        run: npm ci --workspaces --include-workspace-root
+        run: npm install --workspaces --include-workspace-root --no-audit --no-fund
 
       - name: Configure Node resolution
         shell: bash
