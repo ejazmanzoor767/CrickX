@@ -60,10 +60,9 @@ export class LeaderboardService {
   }
 
   async rebuildGlobal() {
-    const [matchSnap, previousSnap, profiles] = await Promise.all([
+    const [matchSnap, previousSnap] = await Promise.all([
       this.firestore.db.collection(this.matchScores).get(),
       this.firestore.db.collection(this.users).get(),
-      this.profileMap(),
     ]);
 
     const aggregate = new Map<string, {
@@ -106,6 +105,7 @@ export class LeaderboardService {
       .map(([userId, value]) => ({ userId, ...value }))
       .sort((a, b) => b.totalPoints - a.totalPoints || b.lastPoints - a.lastPoints || a.userId.localeCompare(b.userId));
 
+    const profiles = await this.profilesForUserIds(rows.map((row) => String(row.userId)));
     const previousRanks = new Map(
       previousSnap.docs.map((doc) => [doc.id, Number(doc.data().rank) || 0]),
     );
