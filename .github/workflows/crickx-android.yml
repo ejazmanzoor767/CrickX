@@ -204,6 +204,18 @@ jobs:
           print("Gradle release signing configured:", store)
           PY
 
+      - name: Ensure Hermes compiler is executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          hermes_root="$GITHUB_WORKSPACE/node_modules/react-native/sdks/hermesc"
+          test -d "$hermes_root"
+          find "$hermes_root" -type f -name hermesc -exec chmod 755 {} +
+          hermes="$hermes_root/linux64-bin/hermesc"
+          test -f "$hermes"
+          test -x "$hermes"
+          "$hermes" --help >/dev/null
+
       - name: Build release APK
         working-directory: apps/mobile
         env:
