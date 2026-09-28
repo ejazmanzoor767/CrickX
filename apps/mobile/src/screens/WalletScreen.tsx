@@ -19,6 +19,7 @@ export default function WalletScreen() {
         <Text style={{ color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 6 }}>Your external wallet</Text>
         <Text style={{ color: colors.muted, lineHeight: 19, marginTop: 6 }}>CRX stays in your external Polygon wallet. Use the full CrickX wallet screen for balance, transfers and MetaMask actions.</Text>
         <View style={{ marginTop: 14 }}><PrimaryButton title="Open CRX Wallet" onPress={() => Linking.openURL(`${WEB_URL}/wallet`)} /></View>
+        <View style={{ marginTop: 10 }}><SecondaryButton title="Buy CRX" onPress={() => Linking.openURL(`${WEB_URL}/wallet?buy=1`)} /></View>
       </Card>
 
       <Card>
