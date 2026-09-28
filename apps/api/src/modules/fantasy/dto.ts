@@ -33,8 +33,8 @@ export class CreateContestDto {
 }
 
 export class PrepareJoinContestDto {
-  @IsString() @Min(1) @MaxLength(120) contestId!: string;
-  @IsString() @Min(1) @MaxLength(160) fantasyTeamId!: string;
+  @IsString() @MinLength(1) @MaxLength(120) contestId!: string;
+  @IsString() @MinLength(1) @MaxLength(160) fantasyTeamId!: string;
 }
 
 export class JoinContestDto extends PrepareJoinContestDto {

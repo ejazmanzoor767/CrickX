@@ -74,7 +74,7 @@ function ContestContent() {
       const latestSubscription: any = await api.subscription();
       setSubscription(latestSubscription);
       if (!latestSubscription?.active) {
-        throw new Error('An active 50 PKR weekly subscription is required to join this contest.');
+        throw new Error('An active CrickX weekly subscription is required to join this contest.');
       }
 
       const prepared: any = await api.prepareContestJoin(contest.id, teamId);
@@ -150,8 +150,8 @@ function ContestContent() {
         <p className="section-subtitle" style={{ margin: 0 }}>Subscription active until <strong>{expires}</strong>. Contest entry is free.</p>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
-          <div><h2 style={{ margin: 0 }}>Subscription required</h2><p className="section-subtitle" style={{ margin: '5px 0 0' }}>Pay 50 PKR for 7 days to access contest joining and other subscriber features.</p></div>
-          <Link className="primary-button" href="/subscription">Subscribe for 50 PKR</Link>
+          <div><h2 style={{ margin: 0 }}>Subscription required</h2><p className="section-subtitle" style={{ margin: '5px 0 0' }}>Pay $0.18 USD for 7 days to access contest joining and other subscriber features.</p></div>
+          <Link className="primary-button" href="/subscription">Subscribe for $0.18</Link>
         </div>
       )}
     </div>
