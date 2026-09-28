@@ -13,9 +13,39 @@ function isFinished(status: string | null | undefined, live: 0 | 1) {
 
   return (
     value.includes('finish') ||
+    value.includes('complete') ||
     value.includes('aband') ||
     value.includes('cancel')
   );
+}
+
+function isActuallyLive(
+  status: string | null | undefined,
+  startingAt: string | Date | null | undefined,
+  live: 0 | 1,
+) {
+  const value = String(status ?? '').trim().toLowerCase();
+  const startMs = new Date(startingAt ?? '').getTime();
+  const started = Number.isFinite(startMs) && startMs <= Date.now();
+
+  if (!started || isFinished(value, live)) return false;
+
+  // Never trust a stale provider live flag when the provider explicitly says
+  // the fixture is not started/scheduled/upcoming/postponed.
+  if (['ns', 'scheduled', 'not started', 'upcoming', 'postponed'].some((state) => (
+    value === state || value.includes(state)
+  ))) {
+    return false;
+  }
+
+  return live === 1 || [
+    'live',
+    'in progress',
+    'innings break',
+    'lunch',
+    'tea',
+    'stumps',
+  ].some((state) => value.includes(state));
 }
 
 @Injectable()
@@ -289,11 +319,12 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     const bowling = fixture.bowling ?? [];
     const balls = fixture.balls ?? [];
     const final = isFinished(fixture.status, fixture.live);
+    const actuallyLive = isActuallyLive(fixture.status, fixture.starting_at, fixture.live);
     this.logger.log(
-      'Fixture ' + fixtureId + ' scoring check: status=' + String(fixture.status ?? '') + ', live=' + fixture.live + ', final=' + final,
+      'Fixture ' + fixtureId + ' scoring check: status=' + String(fixture.status ?? '') + ', providerLive=' + fixture.live + ', live=' + actuallyLive + ', final=' + final,
     );
 
-    if (fixture.live === 1 || final) await this.fundStartedContestPrizePools(fixtureId);
+    if (actuallyLive || final) await this.fundStartedContestPrizePools(fixtureId);
 
     const fantasyTeams = await this.prisma.fantasyTeam.findMany({
       where: { sportmonksFixtureId: fixtureId },
@@ -302,7 +333,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
     // Once play starts, lock every saved team so the frontend switches to View Team
     // and the backend cannot accept late edits.
-    if (fixture.live === 1 || final) {
+    if (actuallyLive || final) {
       for (const team of fantasyTeams) {
         if (!team.isLocked) {
           await this.prisma.fantasyTeam.update({ where: { id: team.id }, data: { isLocked: true } });
@@ -399,7 +430,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       const ranked = await this.prisma.contestEntry.findMany({ where: { contestId: contest.id }, orderBy: { totalPoints: 'desc' } });
       await this.prisma.$transaction(ranked.map((entry, index) => this.prisma.contestEntry.update({ where: { id: entry.id }, data: { rank: index + 1 } })));
 
-      if (!final && fixture.live === 1 && contest.status === 'UPCOMING') {
+      if (!final && actuallyLive && contest.status === 'UPCOMING') {
         await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE' } });
       }
       await this.prisma.leaderboardSnapshot.create({
