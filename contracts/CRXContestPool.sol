@@ -34,14 +34,13 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
     mapping(uint256 => bool) public contestExists;
 
     event ContestCreated(uint256 indexed contestId, uint256 joinDeadline);
-    event ParticipantFunded(uint256 indexed contestId, address indexed participant, uint256 participantCount, uint256 totalPool);
+
     event ContestFunded(uint256 indexed contestId, uint256 participantCount, uint256 totalPool);
     event RankingFinalized(uint256 indexed contestId, uint256 participantCount);
     event PrizePaid(uint256 indexed contestId, uint256 indexed rank, address indexed winner, uint256 amount);
     event ContestDistributed(uint256 indexed contestId, uint256 totalPool);
     event ContestCancelled(uint256 indexed contestId, uint256 refundedAmount);
     event FundingWalletUpdated(address indexed newWallet);
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     constructor(address crxTokenAddress, address fundingWallet_)
         Ownable(msg.sender)
@@ -155,7 +154,7 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
             c.distributedCount += 1;
 
             if (amount > 0) {
-                require(crxToken.safeTransfer(c.ranking[i], amount), "prize transfer failed");
+                crxToken.safeTransfer(c.ranking[i], amount);
             }
             emit PrizePaid(contestId, i + 1, c.ranking[i], amount);
         }
@@ -180,7 +179,7 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
 
         if (refund > 0) {
             totalEscrowed -= refund;
-            require(crxToken.safeTransfer(fundingWallet, refund), "refund failed");
+            crxToken.safeTransfer(fundingWallet, refund);
         }
 
         emit ContestCancelled(contestId, refund);
@@ -189,7 +188,7 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
     function recoverExcess(address to, uint256 amount) external onlyOwner nonReentrant {
         require(to != address(0), "zero address");
         require(amount <= availableFunding(), "amount exceeds excess");
-        require(crxToken.safeTransfer(to, amount), "transfer failed");
+        crxToken.safeTransfer(to, amount);
     }
 
     function hasEntered(uint256 contestId, address participant) external view returns (bool) {
