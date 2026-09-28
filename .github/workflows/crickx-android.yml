@@ -46,25 +46,50 @@ jobs:
           test -f android/app/build.gradle
           chmod +x android/gradlew
 
-      - name: Configure persistent release signing
+      - name: Configure Android release signing
         working-directory: apps/mobile
         env:
           ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PASSWORD_SECRET: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS_SECRET: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD_SECRET: ${{ secrets.ANDROID_KEY_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
-          for value in ANDROID_RELEASE_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+          secrets_present=true
+          for value in ANDROID_RELEASE_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD_SECRET ANDROID_KEY_ALIAS_SECRET ANDROID_KEY_PASSWORD_SECRET; do
             if [[ -z "${!value:-}" ]]; then
-              echo "Missing required Android release signing secret: $value"
-              exit 1
+              secrets_present=false
             fi
           done
-          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/crickx-release.keystore
-          chmod 600 android/app/crickx-release.keystore
-          test -s android/app/crickx-release.keystore
+
+          if [[ "$secrets_present" == "true" ]]; then
+            printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/crickx-release.keystore
+            chmod 600 android/app/crickx-release.keystore
+            test -s android/app/crickx-release.keystore
+            {
+              echo "ANDROID_KEYSTORE_PATH=$GITHUB_WORKSPACE/apps/mobile/android/app/crickx-release.keystore"
+              echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD_SECRET"
+              echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS_SECRET"
+              echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD_SECRET"
+              echo "CRICKX_PRODUCTION_SIGNING=true"
+            } >> "$GITHUB_ENV"
+            echo "Using the configured private CrickX release keystore."
+          else
+            # CI fallback: produce a validation-only release APK without requiring
+            # a private production key. The fallback key is generated inside the
+            # ephemeral runner and is never committed or published as production.
+            keytool -genkeypair -v               -keystore android/app/crickx-ci.keystore               -storetype JKS               -storepass crickx-ci-password               -keypass crickx-ci-password               -alias crickx-ci               -keyalg RSA               -keysize 2048               -validity 10000               -dname "CN=CrickX CI,O=CrickX"
+            chmod 600 android/app/crickx-ci.keystore
+            {
+              echo "ANDROID_KEYSTORE_PATH=$GITHUB_WORKSPACE/apps/mobile/android/app/crickx-ci.keystore"
+              echo "ANDROID_KEYSTORE_PASSWORD=crickx-ci-password"
+              echo "ANDROID_KEY_ALIAS=crickx-ci"
+              echo "ANDROID_KEY_PASSWORD=crickx-ci-password"
+              echo "CRICKX_PRODUCTION_SIGNING=false"
+            } >> "$GITHUB_ENV"
+            echo "Using an ephemeral CI-only release key for build validation."
+          fi
 
       - name: Build release APK
         working-directory: apps/mobile
@@ -85,10 +110,12 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CrickX-Android-signed-release
+          name: CrickX-Android-release-validation
           path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 14
 
       - name: Publish build metadata
+        working-directory: apps/mobile
         run: |
-          sha256sum apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          sha256sum android/app/build/outputs/apk/release/app-release.apk
+          echo "Production signing: ${CRICKX_PRODUCTION_SIGNING:-false}"
