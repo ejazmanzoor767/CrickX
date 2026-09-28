@@ -19,9 +19,25 @@ export class LeaderboardService {
     return `${userId}_${fixtureId}`;
   }
 
-  private async profileMap() {
-    const snap = await this.firestore.db.collection('profiles').get();
-    return new Map(snap.docs.map((doc) => [String(doc.data().userId), doc.data()]));
+  private safeLimit(limit: number) {
+    return Math.max(1, Math.min(Number.isFinite(Number(limit)) ? Number(limit) : 100, 100));
+  }
+
+  private async profilesForUserIds(userIds: string[]) {
+    const result = new Map<string, Record<string, any>>();
+    const unique = [...new Set(userIds.map(String).filter(Boolean))];
+    for (let i = 0; i < unique.length; i += 30) {
+      const chunk = unique.slice(i, i + 30);
+      if (!chunk.length) continue;
+      const snap = await this.firestore.db.collection('profiles')
+        .where('userId', 'in', chunk)
+        .get();
+      for (const doc of snap.docs) {
+        const row = doc.data() as Record<string, any>;
+        result.set(String(row.userId), row);
+      }
+    }
+    return result;
   }
 
   async recordFixtureScores(scores: MatchScore[]) {
@@ -123,11 +139,21 @@ export class LeaderboardService {
   }
 
   async global(limit = 100) {
-    const snap = await this.firestore.db.collection(this.users).get();
-    return snap.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }))
-      .sort((a: any, b: any) => Number(a.rank) - Number(b.rank))
-      .slice(0, Math.max(1, Math.min(limit, 200)));
+    const safeLimit = this.safeLimit(limit);
+    const snap = await this.firestore.db.collection(this.users)
+      .orderBy('rank', 'asc')
+      .limit(safeLimit)
+      .get();
+    const rows = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const profiles = await this.profilesForUserIds(rows.map((row: any) => String(row.userId)));
+    return rows.map((row: any) => {
+      const profile = profiles.get(String(row.userId));
+      return {
+        ...row,
+        displayName: profile?.displayName ?? row.displayName ?? 'CrickX Player',
+        avatarUrl: profile?.avatarUrl ?? row.avatarUrl ?? null,
+      };
+    });
   }
 
   async me(userId: string) {
@@ -136,19 +162,19 @@ export class LeaderboardService {
   }
 
   async fixture(fixtureId: number, limit = 100) {
-    const [scoreSnap, teamRows, profiles] = await Promise.all([
-      this.firestore.db.collection(this.matchScores).where('fixtureId', '==', fixtureId).get(),
-      this.firestore.findMany('fantasyTeam', {
-        where: { sportmonksFixtureId: fixtureId },
-        select: { id: true, userId: true, sportmonksFixtureId: true },
-      }),
-      this.profileMap(),
+    const safeLimit = this.safeLimit(limit);
+    const [scoreSnap, teamSnap] = await Promise.all([
+      this.firestore.db.collection(this.matchScores)
+        .where('fixtureId', '==', fixtureId)
+        .orderBy('points', 'desc')
+        .limit(safeLimit)
+        .get(),
+      this.firestore.db.collection('fantasyTeams')
+        .where('sportmonksFixtureId', '==', fixtureId)
+        .limit(safeLimit)
+        .get(),
     ]);
 
-    // A fixture leaderboard must contain every user who created a fantasy team
-    // for this match, even when the scoring job has not written a score row yet.
-    // This prevents users from disappearing from the leaderboard between
-    // lineup announcement, match start, and the next scoring cycle.
     const scoresByUser = new Map<string, Record<string, any>>();
     for (const doc of scoreSnap.docs) {
       const row = doc.data() as Record<string, any>;
@@ -156,9 +182,9 @@ export class LeaderboardService {
     }
 
     const users = new Map<string, any>();
-    for (const team of teamRows) {
+    for (const doc of teamSnap.docs) {
+      const team = doc.data() as Record<string, any>;
       const userId = String(team.userId);
-      const profile = profiles.get(userId) as Record<string, any> | undefined;
       const score = scoresByUser.get(userId);
       users.set(userId, {
         id: this.matchScoreId(userId, fixtureId),
@@ -166,55 +192,60 @@ export class LeaderboardService {
         fixtureId,
         format: score?.format ?? null,
         points: Number(score?.points) || 0,
-        displayName: profile?.displayName ?? 'CrickX Player',
-        avatarUrl: profile?.avatarUrl ?? null,
         hasScore: Boolean(score),
       });
     }
 
-    // Preserve score rows for users whose fantasy team record may have been
-    // removed later, so historical leaderboard data is not silently lost.
     for (const [userId, score] of scoresByUser.entries()) {
       if (users.has(userId)) continue;
-      const profile = profiles.get(userId) as Record<string, any> | undefined;
       users.set(userId, {
         id: this.matchScoreId(userId, fixtureId),
         userId,
         fixtureId,
         format: score.format ?? null,
         points: Number(score.points) || 0,
-        displayName: profile?.displayName ?? 'CrickX Player',
-        avatarUrl: profile?.avatarUrl ?? null,
         hasScore: true,
       });
     }
 
-    return [...users.values()]
-      .sort((a, b) => Number(b.points) - Number(a.points) || String(a.displayName).localeCompare(String(b.displayName)))
-      .slice(0, Math.max(1, Math.min(limit, 200)))
-      .map((row, index) => ({ ...row, rank: index + 1 }));
+    const rows = [...users.values()]
+      .sort((a, b) => Number(b.points) - Number(a.points) || String(a.userId).localeCompare(String(b.userId)))
+      .slice(0, safeLimit);
+
+    const profiles = await this.profilesForUserIds(rows.map((row) => String(row.userId)));
+    return rows.map((row, index) => {
+      const profile = profiles.get(String(row.userId));
+      return {
+        ...row,
+        displayName: profile?.displayName ?? 'CrickX Player',
+        avatarUrl: profile?.avatarUrl ?? null,
+        rank: index + 1,
+      };
+    });
   }
 
   async contest(contestId: string, limit = 100) {
-    const entries = await this.firestore.findMany('contestEntry', {
-      where: { contestId },
-      orderBy: { totalPoints: 'desc' },
+    const safeLimit = this.safeLimit(limit);
+    const snap = await this.firestore.db.collection('contestEntries')
+      .where('contestId', '==', contestId)
+      .orderBy('totalPoints', 'desc')
+      .limit(safeLimit)
+      .get();
+    const rows = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+    const profiles = await this.profilesForUserIds(rows.map((row: any) => String(row.userId)));
+    return rows.map((entry: any, index) => {
+      const profile = profiles.get(String(entry.userId));
+      return {
+        id: entry.id,
+        userId: entry.userId,
+        fantasyTeamId: entry.fantasyTeamId,
+        points: Number(entry.totalPoints) || 0,
+        rank: Number(entry.rank) || index + 1,
+        prizeWon: Number(entry.prizeWon) || 0,
+        displayName: profile?.displayName ?? 'CrickX Player',
+        avatarUrl: profile?.avatarUrl ?? null,
+      };
     });
-    const profiles = await this.profileMap();
-    return entries
-      .slice(0, Math.max(1, Math.min(limit, 200)))
-      .map((entry: any, index) => {
-        const profile = profiles.get(String(entry.userId)) as Record<string, any> | undefined;
-        return {
-          id: entry.id,
-          userId: entry.userId,
-          fantasyTeamId: entry.fantasyTeamId,
-          points: Number(entry.totalPoints) || 0,
-          rank: Number(entry.rank) || index + 1,
-          prizeWon: Number(entry.prizeWon) || 0,
-          displayName: profile?.displayName ?? 'CrickX Player',
-          avatarUrl: profile?.avatarUrl ?? null,
-        };
-      });
   }
+
 }
