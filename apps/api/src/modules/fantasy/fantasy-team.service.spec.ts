@@ -56,7 +56,7 @@ describe('FantasyTeamService.createTeam', () => {
       viceCaptainSportmonksPlayerId: 101,
     });
 
-    expect(result.id).toBe('team1');
+    expect(result.id).toBe('team_user1_555');
   });
 
   it('rejects a squad that is not exactly 11 unique players', async () => {
