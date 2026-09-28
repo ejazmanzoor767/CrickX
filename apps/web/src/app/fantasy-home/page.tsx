@@ -8,7 +8,9 @@ import { useAuth } from '../../lib/auth-context';
 const list = (x:any) => Array.isArray(x) ? x : (x?.data ?? []);
 const fmtTime = (v:string) => new Date(v).toLocaleString('en-PK',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 const hasStarted = (m:any) => { const start = new Date(m?.starting_at ?? '').getTime(); return Number.isFinite(start) && start <= Date.now(); };
-const isCompleted = (m:any) => String(m?.applicationState??'').toUpperCase()==='COMPLETED' || m?.draw_noresult === true || ['finished','finish','complete','completed','cancelled','canceled','abandoned','no result','no-result','washout'].some((part)=>String(m?.status??'').toLowerCase().includes(part));
+const isVoid = (m:any) => m?.draw_noresult === true || ['abandoned','cancelled','canceled','no result','no-result','washout'].some((part)=>String(m?.status??'').toLowerCase().includes(part));
+const isStaleNotStarted = (m:any) => { const start = new Date(m?.starting_at ?? '').getTime(); const status = String(m?.status ?? '').toLowerCase(); return Number.isFinite(start) && Date.now() - start >= 6 * 60 * 60 * 1000 && ['ns','scheduled','not started','upcoming'].some((value) => status === value || status.includes(value)); };
+const isCompleted = (m:any) => String(m?.applicationState??'').toUpperCase()==='COMPLETED' || isVoid(m) || isStaleNotStarted(m);
 const isLive = (m:any) => !isCompleted(m) && hasStarted(m) && (Number(m?.live)===1 || ['live','innings break','lunch','tea','stumps'].some((part)=>String(m?.status??'').toLowerCase().includes(part)) || String(m?.applicationState??'').toUpperCase()==='LIVE');
 
 export default function FantasyHomePage() {
@@ -23,7 +25,7 @@ export default function FantasyHomePage() {
     async function refresh(){
       try{
         const [liveFeed,todayFeed,upcoming,mine]=await Promise.all([
-          api.liveMatches(), api.todayMatches(), api.upcomingMatches(4), user ? api.myFantasyTeams() : Promise.resolve([]),
+          api.liveMatches(), api.todayMatches(), api.upcomingMatches(4), user ? api.myFantasyTeams().catch(() => []) : Promise.resolve([]),
         ]);
         if(!active)return;
         const savedTeams=list(mine);
@@ -40,6 +42,7 @@ export default function FantasyHomePage() {
         // cancelled, abandoned and other terminal fixtures are excluded.
         const eligible=Array.from(byId.values())
           .filter((m:any)=>{
+            if(isVoid(m) || isStaleNotStarted(m)) return false;
             if(isCompleted(m)) return false;
             if(isLive(m)) return true;
             const start = new Date(m?.starting_at ?? '').getTime();
