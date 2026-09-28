@@ -62,10 +62,26 @@ export default function MatchesPage() {
   async function refreshAll(spinner = false) {
     if (spinner) setLoading(true); else setRefreshing(true);
     try {
-      const [todayResult, upcomingResult, completedResult, entriesResult, teamsResult] = await Promise.all([
-        api.todayMatches(), api.upcomingMatches(4), api.completedMatches(14), user ? api.myEntries() : Promise.resolve([]), user ? api.myFantasyTeams() : Promise.resolve([]),
+      const [liveResult, todayResult, upcomingResult, completedResult, entriesResult, teamsResult] = await Promise.all([
+        api.liveMatches(), api.todayMatches(), api.upcomingMatches(4), api.completedMatches(14), user ? api.myEntries() : Promise.resolve([]), user ? api.myFantasyTeams() : Promise.resolve([]),
       ]);
-      const today = asList(todayResult); const upcomingFeed = asList(upcomingResult);
+      const liveFeed = asList(liveResult);
+      const todayFeed = asList(todayResult);
+
+      // The schedule feed can lag behind Sportmonks /livescores when a match
+      // starts. Merge the live feed into today's fixtures, preferring the live
+      // snapshot so newly started matches appear immediately.
+      const todayById = new Map<number, any>();
+      for (const fixture of todayFeed) {
+        const id = Number(fixture?.id);
+        if (Number.isFinite(id)) todayById.set(id, fixture);
+      }
+      for (const fixture of liveFeed) {
+        const id = Number(fixture?.id);
+        if (Number.isFinite(id)) todayById.set(id, fixture);
+      }
+      const today = Array.from(todayById.values());
+      const upcomingFeed = asList(upcomingResult);
       setTodayScheduled(today.filter((f: any) => !isLiveFixture(f) && !isCompletedFixture(f) && new Date(f.starting_at).getTime() >= Date.now()));
       setLive(today.filter((f: any) => isLiveFixture(f) && !isCompletedFixture(f)));
       setUpcoming(upcomingFeed.filter((f: any) => !isLiveFixture(f) && !isCompletedFixture(f) && new Date(f.starting_at).getTime() > Date.now()));
