@@ -88,11 +88,17 @@ export default function App() {
 
     if (host && ALLOWED_HOSTS.has(host)) return true;
 
-    // Never render third-party web pages inside the app shell. Open payment
-    // gateways, wallet deep links and downloads in the system/browser instead.
-    if (/^https?:\/\//i.test(url) || /\\.apk(?:$|[?#])/i.test(url) || url.includes(':')) {
-      void Linking.openURL(url).catch(() => undefined);
-      return false;
+    // Never render third-party web pages inside the app shell. Open only
+    // explicitly allowed external destinations in the system/browser.
+    try {
+      const parsed = new URL(url);
+      const protocol = parsed.protocol.toLowerCase();
+      const allowedExternalProtocols = new Set(['https:', 'mailto:', 'tel:', 'metamask:', 'wc:']);
+      if (allowedExternalProtocols.has(protocol)) {
+        void Linking.openURL(url).catch(() => undefined);
+      }
+    } catch {
+      // Ignore malformed or unsupported navigation targets.
     }
 
     return false;
