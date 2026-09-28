@@ -58,7 +58,7 @@ export default function ContestScreen({ route, navigation }: any) {
 
       <Card>
         <Text style={{ color: colors.text, fontSize: 17, fontWeight: '900' }}>Your access</Text>
-        <Text style={{ color: colors.muted, lineHeight: 19, marginTop: 6 }}>{activeSubscription ? 'Subscription active. You can join the free contest.' : 'A 50 PKR weekly subscription is required to join contests.'}</Text>
+        <Text style={{ color: colors.muted, lineHeight: 19, marginTop: 6 }}>{activeSubscription ? 'Subscription active. You can join the free contest.' : 'A $0.18 weekly subscription is required to join contests.'}</Text>
         {!!subscription?.expiresAt && activeSubscription && <Text style={{ color: colors.green, fontSize: 12, marginTop: 8, fontWeight: '800' }}>Active until {new Date(subscription.expiresAt).toLocaleString('en-PK')}</Text>}
       </Card>
 
