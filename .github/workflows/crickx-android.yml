@@ -5,17 +5,14 @@ on:
     branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: crickx-android
-  cancel-in-progress: true
-
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-apk:
     name: Validate and build CrickX Android
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -50,7 +47,7 @@ jobs:
           test -f android/app/build.gradle
           chmod +x android/gradlew
 
-      - name: Configure Android release signing
+      - name: Configure CI or production signing
         working-directory: apps/mobile
         env:
           ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
@@ -60,6 +57,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           secrets_present=true
           for value in ANDROID_RELEASE_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD_SECRET ANDROID_KEY_ALIAS_SECRET ANDROID_KEY_PASSWORD_SECRET; do
             if [[ -z "${!value:-}" ]]; then
@@ -78,13 +76,11 @@ jobs:
               echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD_SECRET"
               echo "CRICKX_PRODUCTION_SIGNING=true"
             } >> "$GITHUB_ENV"
-            echo "Using the configured private CrickX release keystore."
           else
-            # CI fallback: produce a validation-only release APK without requiring
-            # a private production key. The fallback key is generated inside the
-            # ephemeral runner and is never committed or published as production.
             keytool -genkeypair -v               -keystore android/app/crickx-ci.keystore               -storetype JKS               -storepass crickx-ci-password               -keypass crickx-ci-password               -alias crickx-ci               -keyalg RSA               -keysize 2048               -validity 10000               -dname "CN=CrickX CI,O=CrickX"
+
             chmod 600 android/app/crickx-ci.keystore
+
             {
               echo "ANDROID_KEYSTORE_PATH=$GITHUB_WORKSPACE/apps/mobile/android/app/crickx-ci.keystore"
               echo "ANDROID_KEYSTORE_PASSWORD=crickx-ci-password"
@@ -92,7 +88,6 @@ jobs:
               echo "ANDROID_KEY_PASSWORD=crickx-ci-password"
               echo "CRICKX_PRODUCTION_SIGNING=false"
             } >> "$GITHUB_ENV"
-            echo "Using an ephemeral CI-only release key for build validation."
           fi
 
       - name: Stabilize generated Gradle signing
@@ -103,72 +98,55 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import os
+          import re
 
-          p = Path("android/app/build.gradle")
-          if not p.exists():
-              raise SystemExit("Generated android/app/build.gradle not found")
+          path = Path("android/app/build.gradle")
+          text = path.read_text()
 
-          store = os.environ.get("ANDROID_KEYSTORE_PATH", "").strip()
-          store_password = os.environ.get("ANDROID_KEYSTORE_PASSWORD", "")
-          alias = os.environ.get("ANDROID_KEY_ALIAS", "")
-          key_password = os.environ.get("ANDROID_KEY_PASSWORD", "")
-          if not all([store, store_password, alias, key_password]):
-              raise SystemExit("Android signing environment is incomplete")
+          store = os.environ["ANDROID_KEYSTORE_PATH"]
+          if not store:
+              raise SystemExit("ANDROID_KEYSTORE_PATH is empty")
 
-          text = p.read_text()
+          escaped_store = store.replace("\\", "\\\\").replace('"', '\\"')
 
-          signing_anchor = "    signingConfigs {"
-          if signing_anchor not in text:
-              signing_anchor = "        signingConfigs {"
-          if signing_anchor not in text:
-              raise SystemExit("Generated Gradle file has no signingConfigs block")
+          # Replace any generated/empty storeFile declaration so Gradle never
+          # evaluates file("") during project configuration.
+          text = re.sub(
+              r'(^\s*storeFile\s+file\()([^\n]*)(\)\s*$)',
+              lambda m: m.group(1) + '"' + escaped_store + '"' + m.group(3),
+              text,
+              flags=re.MULTILINE,
+          )
 
-          signing_block = f'''
+          # Add a known signing config when Expo generated only the debug config.
+          if "crickxRelease {" not in text:
+              anchor = "    signingConfigs {"
+              if anchor not in text:
+                  anchor = "        signingConfigs {"
+              if anchor not in text:
+                  raise SystemExit("Could not find signingConfigs block in generated Gradle file")
+
+              block = f'''
         crickxRelease {{
-            storeFile file("{store.replace(chr(92), chr(92)+chr(92)).replace(chr(34), chr(92)+chr(34))}")
+            storeFile file("{escaped_store}")
             storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
             keyAlias System.getenv("ANDROID_KEY_ALIAS")
             keyPassword System.getenv("ANDROID_KEY_PASSWORD")
         }}
 '''
-          if "crickxRelease {" not in text:
-              text = text.replace(signing_anchor, signing_anchor + signing_block, 1)
+              text = text.replace(anchor, anchor + block, 1)
 
-          occurrences = []
-          token = "signingConfig signingConfigs.debug"
-          start = 0
-          while True:
-              idx = text.find(token, start)
-              if idx < 0:
-                  break
-              occurrences.append(idx)
-              start = idx + len(token)
+          text = text.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.crickxRelease")
+          text = text.replace("signingConfig signingConfigs.release", "signingConfig signingConfigs.crickxRelease")
 
-          if occurrences:
-              idx = occurrences[-1]
-              text = text[:idx] + "signingConfig signingConfigs.crickxRelease" + text[idx + len(token):]
-          elif "signingConfig signingConfigs.crickxRelease" not in text:
-              release_marker = "release {"
-              idx = text.find(release_marker)
-              if idx < 0:
-                  raise SystemExit("Generated Gradle file has no release buildType block")
-              brace_end = text.find("}", idx)
-              if brace_end < 0:
-                  raise SystemExit("Could not locate release buildType block")
-              text = text[:brace_end] + '    signingConfig signingConfigs.crickxRelease\n' + text[brace_end:]
-
-          p.write_text(text)
-          print("Generated Gradle signing configured for CrickX release validation.")
+          path.write_text(text)
+          print("Gradle release signing configured:", store)
           PY
 
       - name: Build release APK
         working-directory: apps/mobile
         env:
           NODE_ENV: production
-          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/apps/mobile/android/app/crickx-release.keystore
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           EXPO_PUBLIC_API_BASE_URL: https://crickx-api.onrender.com/api/v1
           EXPO_PUBLIC_WEB_URL: https://crickx-3d806.web.app
           EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
