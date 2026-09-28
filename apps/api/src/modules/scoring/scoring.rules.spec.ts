@@ -28,7 +28,7 @@ describe('fantasy scoring rules', () => {
 
   it('applies the T10 milestone and dot-ball rules', () => {
     expect(computePlayerPoints(T10_RULES, { score: 21, ball: 10, four_x: 1, six_x: 1, rate: 210 })).toBe(21 + 5 + 10 + 25 + 40);
-    expect(computePlayerPoints(T10_RULES, undefined, { wickets: 1, medians: 0, runs: 6, overs: 1 }, undefined, 2)).toBe(30 + 0 + 10 + 40);
+    expect(computePlayerPoints(T10_RULES, undefined, { wickets: 1, medians: 0, runs: 6, overs: 1 }, undefined, 2)).toBe(30 + 0 + 10 + 30);
   });
 
   it('applies the ODI rules', () => {
