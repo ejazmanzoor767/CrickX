@@ -25,8 +25,19 @@ export default function FantasyScreen({ route }: any) {
       <Card style={{ backgroundColor: '#0f1911' }}>
         <Text style={{ color: colors.green, fontSize: 11, fontWeight: '900', letterSpacing: 1 }}>BUILD YOUR XI</Text>
         <Text style={{ color: colors.text, fontSize: 21, fontWeight: '900', marginTop: 7 }}>Create your team</Text>
-        <Text style={{ color: colors.muted, lineHeight: 19, marginTop: 5, marginBottom: 13 }}>Pick 11 players, captain and vice-captain. The full team-builder remains the same CrickX flow you use on the web.</Text>
+        <Text style={{ color: colors.muted, lineHeight: 19, marginTop: 5, marginBottom: 13 }}>Pick 11 players, captain and vice-captain. Predictions are available from the same match flow and lock when the match starts.</Text>
         <PrimaryButton title="Open Team Builder" onPress={() => Linking.openURL(buildUrl)} />
+        <View style={{ marginTop: 10 }}>
+          <SecondaryButton
+            title="Open Predictions"
+            onPress={() => {
+              const url = fixtureId > 0
+                ? `${WEB_URL}/predictions?fixtureId=${fixtureId}`
+                : `${WEB_URL}/fantasy-home`;
+              Linking.openURL(url);
+            }}
+          />
+        </View>
       </Card>
 
       <Text style={{ color: colors.text, fontSize: 17, fontWeight: '900', marginBottom: 9 }}>Saved teams</Text>
