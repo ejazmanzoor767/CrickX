@@ -3,11 +3,6 @@ name: CrickX Android APK
 on:
   push:
     branches: [main]
-    paths:
-      - "apps/mobile/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/crickx-android.yml"
   workflow_dispatch:
 
 permissions:
@@ -15,11 +10,8 @@ permissions:
 
 jobs:
   build-apk:
+    name: Validate and build CrickX Android
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/mobile
-
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -37,195 +29,42 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install dependencies
-        working-directory: .
+      - name: Install workspace dependencies
         run: npm ci --workspaces --include-workspace-root --no-audit --no-fund
 
-      - name: Configure Node resolution
-        shell: bash
-        run: |
-          echo "NODE_PATH=$GITHUB_WORKSPACE/node_modules:$GITHUB_WORKSPACE/apps/mobile/node_modules" >> "$GITHUB_ENV"
-
-      - name: Generate clean Android project
+      - name: Generate Android project
+        working-directory: apps/mobile
         env:
           CI: "1"
+          NODE_PATH: ${{ github.workspace }}/node_modules:${{ github.workspace }}/apps/mobile/node_modules
         run: npx expo prebuild --clean --platform android --no-install
 
-      - name: Ensure Android splash resources
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          color = "#0B0D12"
-
-          for folder in [
-              Path("android/app/src/main/res/values"),
-              Path("android/app/src/main/res/values-night"),
-          ]:
-              folder.mkdir(parents=True, exist_ok=True)
-              p = folder / "colors.xml"
-              if p.exists():
-                  s = p.read_text()
-                  if 'name="splashscreen_background"' not in s:
-                      s = s.replace("</resources>", f'    <color name="splashscreen_background">{color}</color>\n</resources>')
-                      p.write_text(s)
-              else:
-                  p.write_text(f'<resources>\n    <color name="splashscreen_background">{color}</color>\n</resources>\n')
-
-          splash = Path("android/app/src/main/res/drawable/splashscreen.xml")
-          if not splash.exists():
-              splash.parent.mkdir(parents=True, exist_ok=True)
-              splash.write_text(
-                  '<layer-list xmlns:android="http://schemas.android.com/apk/res/android">\n'
-                  '    <item android:drawable="@color/splashscreen_background"/>\n'
-                  '</layer-list>\n'
-              )
-
-          print("Android splash resources verified.")
-          PY
-
-      - name: Configure release signing
-        env:
-          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "${ANDROID_RELEASE_KEYSTORE_BASE64:-}" ]]; then
-            echo "Missing required GitHub secret: ANDROID_RELEASE_KEYSTORE_BASE64"
-            exit 1
-          fi
-          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/crickx-release.keystore
-          chmod 600 android/app/crickx-release.keystore
-          test -s android/app/crickx-release.keystore
-
-      - name: Stabilize generated Gradle configuration
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "${ANDROID_KEYSTORE_PASSWORD:-}" || -z "${ANDROID_KEY_ALIAS:-}" || -z "${ANDROID_KEY_PASSWORD:-}" ]]; then
-            echo "Missing one or more Android signing secrets: ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD"
-            exit 1
-          fi
-          python3 - <<'PY'
-          from pathlib import Path
-          import subprocess
-
-          def resolve(name):
-              return subprocess.check_output(
-                  ["node", "-p", f"require.resolve('{name}')"],
-                  text=True
-              ).strip()
-
-          def pkg_dir(name):
-              return str(Path(resolve(name)).parent)
-
-          p = Path("android/app/build.gradle")
-          if not p.exists():
-              raise SystemExit("android/app/build.gradle was not generated")
-
-          rn_dir = pkg_dir("react-native/package.json")
-          codegen_dir = pkg_dir("@react-native/codegen/package.json")
-          expo_cli = resolve("@expo/cli")
-
-          replacements = {
-              "entryFile =": 'entryFile = file(projectRoot + "/index.js")',
-              "reactNativeDir =": f'reactNativeDir = file("{rn_dir}")',
-              "hermesCommand =": f'hermesCommand = file("{rn_dir}/sdks/hermesc/%OS-BIN%/hermesc").getAbsolutePath()',
-              "codegenDir =": f'codegenDir = file("{codegen_dir}")',
-              "cliFile =": f'cliFile = file("{expo_cli}")',
-          }
-
-          lines = p.read_text().splitlines()
-          found = set()
-          for i, line in enumerate(lines):
-              stripped = line.strip()
-              for key, replacement in replacements.items():
-                  if stripped.startswith(key):
-                      indent = line[:len(line) - len(line.lstrip())]
-                      lines[i] = indent + replacement
-                      found.add(key)
-                      break
-          missing = set(replacements) - found
-          if missing:
-              raise SystemExit("Missing generated Expo Gradle settings: " + ", ".join(sorted(missing)))
-
-          s = "\n".join(lines) + "\n"
-          signing_anchor = "    signingConfigs {"
-          if signing_anchor not in s:
-              signing_anchor = "        signingConfigs {"
-          if signing_anchor not in s:
-              raise SystemExit("Could not find Android signingConfigs block")
-
-          signing_block = """
-        crickxRelease {
-            storeFile file("crickx-release.keystore")
-            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            keyAlias System.getenv("ANDROID_KEY_ALIAS")
-            keyPassword System.getenv("ANDROID_KEY_PASSWORD")
-        }
-"""
-          s = s.replace(signing_anchor, signing_anchor + signing_block, 1)
-
-          occurrences = [i for i in range(len(s)) if s.startswith("signingConfig signingConfigs.debug", i)]
-          if not occurrences:
-              raise SystemExit("Could not find generated release signing configuration")
-          idx = occurrences[-1]
-          s = s[:idx] + "signingConfig signingConfigs.crickxRelease" + s[idx + len("signingConfig signingConfigs.debug"):]
-
-          p.write_text(s)
-          print("Android release signing configured with the persistent CrickX keystore.")
-          print("React Native:", rn_dir)
-          print("Codegen:", codegen_dir)
-          print("Expo CLI:", expo_cli)
-          PY
-
       - name: Verify Android project
-        shell: bash
+        working-directory: apps/mobile
         run: |
-          test -f android/settings.gradle || test -f android/settings.gradle.kts
-          test -f android/app/build.gradle
           test -f android/gradlew
-          grep -n -E "entryFile =|reactNativeDir =|hermesCommand =|codegenDir =|cliFile =" android/app/build.gradle
+          test -f android/app/build.gradle
+          chmod +x android/gradlew
 
-      - name: Assemble APK
+      - name: Build release APK
+        working-directory: apps/mobile
         env:
           NODE_ENV: production
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           EXPO_PUBLIC_API_BASE_URL: https://crickx-api.onrender.com/api/v1
           EXPO_PUBLIC_WEB_URL: https://crickx-3d806.web.app
           EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx5g
-        shell: bash
         run: |
-          chmod +x android/gradlew
           cd android
           ./gradlew assembleRelease --no-daemon --stacktrace
-
-      - name: Rename APK
-        shell: bash
-        run: |
-          mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk dist/CrickX.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CrickX-Android-APK
-          path: apps/mobile/dist/CrickX.apk
-          retention-days: 30
+          name: CrickX-Android-unsigned-release
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
 
-      - name: Publish GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
+      - name: Publish build metadata
         run: |
-          gh release create "mobile-v1.0-$GITHUB_RUN_NUMBER" "dist/CrickX.apk" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "CrickX Android v1.0-$GITHUB_RUN_NUMBER" \
-            --notes "Installable CrickX Android APK built from main."
+          sha256sum apps/mobile/android/app/build/outputs/apk/release/app-release.apk
