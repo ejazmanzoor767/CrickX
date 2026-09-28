@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -27,8 +27,8 @@ export class AdminController {
   }
 
   @Get('player-credits/:fixtureId')
-  getCredits(@Param('fixtureId') fixtureId: string) {
-    return this.admin.listCreditsForFixture(parseInt(fixtureId, 10));
+  getCredits(@Param('fixtureId', ParseIntPipe) fixtureId: number) {
+    return this.admin.listCreditsForFixture(fixtureId);
   }
 
   @Post('scoring-rule-sets')
