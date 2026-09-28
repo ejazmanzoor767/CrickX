@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - "package.json"
-      - "package-lock.json"
       - "apps/api/package.json"
       - "apps/web/package.json"
       - "apps/mobile/package.json"
