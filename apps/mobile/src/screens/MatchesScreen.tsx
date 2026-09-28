@@ -6,8 +6,10 @@ import { Card, EmptyState, ErrorBox, Header, PrimaryButton, Stat, styles } from 
 
 const normalize = (value: any) => Array.isArray(value) ? value : value?.data ?? [];
 
+const isTerminal = (item: any) => String(item?.applicationState ?? '').toUpperCase() === 'COMPLETED' || /finished|complete|cancelled|canceled|abandoned|no result/i.test(String(item?.status ?? ''));
+
 function MatchCard({ item, navigation }: any) {
-  const live = Boolean(item?.live) && !String(item?.status ?? '').toLowerCase().includes('finish');
+  const live = !isTerminal(item) && (String(item?.applicationState ?? '').toUpperCase() === 'LIVE' || Boolean(item?.live) || /live|innings break|lunch|tea|stumps/i.test(String(item?.status ?? '')));
   const start = item?.starting_at ? new Date(item.starting_at).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' }) : 'Start time unavailable';
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.navigate('MatchDetail', { fixtureId: Number(item.id) })}>
@@ -38,7 +40,8 @@ export default function MatchesScreen({ navigation }: any) {
     setError('');
     try {
       const result = tab === 'live' ? await api.liveMatches() : tab === 'completed' ? await api.completedMatches() : await api.upcomingMatches();
-      setItems(normalize(result));
+      const rows = normalize(result).filter((item: any) => tab === 'live' ? !isTerminal(item) : true);
+      setItems(rows);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load matches.');
     } finally {
