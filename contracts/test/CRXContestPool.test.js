@@ -61,7 +61,7 @@ describe('CRXContestPool - bulk company-funded contest pool', function () {
 
     await expect(
       pool.fundContest(1, 3, ethers.parseEther('30')),
-    ).to.be.revertedWith('contest not open');
+    ).to.be.revertedWith('contest already funded');
   });
 
   it('rejects a pool amount that does not equal 10 CRX per participant', async function () {
