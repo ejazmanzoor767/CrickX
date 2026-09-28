@@ -78,6 +78,19 @@ jobs:
           languages: javascript-typescript
       - uses: github/codeql-action/analyze@v3
 
+  api-build:
+    name: API production build
+    runs-on: ubuntu-latest
+    needs: [dependency-audit]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --workspaces --include-workspace-root --no-audit --no-fund
+      - run: npm run build --workspace @fantasy-cricket/api
+
   web-build:
     name: Web production build
     runs-on: ubuntu-latest
