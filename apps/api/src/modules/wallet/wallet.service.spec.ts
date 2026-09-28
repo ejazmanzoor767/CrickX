@@ -51,7 +51,7 @@ describe('WalletService.mutateBalance', () => {
 
   it('rejects a debit that would take a balance negative', async () => {
     const { prisma } = buildPrismaMock({ depositBalance: 10, version: 0 });
-    const service = new WalletService(prisma as any, {} as any);
+    const service = new WalletService(prisma as any, {} as any, {} as any, {} as any);
 
     await expect(
       service.mutateBalance({ userId: 'u1', bucket: 'DEPOSIT', delta: -20, type: 'CONTEST_ENTRY_DEBIT', idempotencyKey: 'debit-1' }),
