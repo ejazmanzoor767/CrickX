@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsNumber, IsString, ValidateNested, Min } from 'class-validator';
+import { IsArray, IsInt, IsNumber, IsString, ValidateNested, Min, MaxLength, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SetPlayerCreditDto {
@@ -14,18 +14,18 @@ export class BulkSetCreditsDto {
 }
 
 export class CreateScoringRuleSetDto {
-  @IsString() name!: string;
-  @IsString() matchType!: string;
+  @IsString() @MaxLength(80) name!: string;
+  @IsString() @MaxLength(20) matchType!: string;
   rules!: Record<string, number>;
 }
 
 export class ReviewKycDto {
-  @IsString() status!: 'APPROVED' | 'REJECTED';
-  @IsString() note?: string;
+  @IsIn(['APPROVED', 'REJECTED']) status!: 'APPROVED' | 'REJECTED';
+  @IsString() @MaxLength(500) note?: string;
 }
 
 export class ReviewWithdrawalDto {
-  @IsString() status!: 'APPROVED' | 'REJECTED' | 'PAID';
-  @IsString() note?: string;
-  @IsString() payoutReference?: string;
+  @IsIn(['APPROVED', 'REJECTED', 'PAID']) status!: 'APPROVED' | 'REJECTED' | 'PAID';
+  @IsString() @MaxLength(500) note?: string;
+  @IsString() @MaxLength(120) payoutReference?: string;
 }
