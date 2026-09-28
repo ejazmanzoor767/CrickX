@@ -28,11 +28,13 @@ function isActuallyLive(
   const startMs = new Date(startingAt ?? '').getTime();
   const started = Number.isFinite(startMs) && startMs <= Date.now();
 
-  if (!started || isFinished(value, live)) return false;
+  if (isFinished(value, live)) return false;
 
-  // Once the official start time has passed, Sportmonks' live=1 is a
-  // positive live signal even if its status text still says NS.
+  // The provider's explicit live flag is authoritative. This also covers
+  // fixtures whose starting_at value lags because of provider/timezone drift.
   if (live === 1) return true;
+
+  if (!started) return false;
 
   if (['ns', 'scheduled', 'not started', 'upcoming', 'postponed'].some((state) => (
     value === state || value.includes(state)
