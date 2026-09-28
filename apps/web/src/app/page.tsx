@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 const highlights = [
-  ['01', 'Subscribe for 7 days', 'Get CrickX fantasy access for 50 PKR with a weekly subscription.'],
+  ['01', 'Subscribe for 7 days', 'Get CrickX fantasy access for $0.18 with a weekly subscription.'],
   ['02', 'Build your fantasy XI', 'Choose 11 players, then set your captain and vice-captain for each match.'],
   ['03', 'Join contests free', 'Active subscribers can join eligible contests without paying CRX to enter.'],
   ['04', 'Track live points', 'Follow match data, fantasy points and leaderboard positions as the game progresses.'],
@@ -26,7 +26,7 @@ export default function Home() {
               <Link className="secondary-button" href="/matches">Explore matches</Link>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 22 }}>
-              <span className="demo-pill">50 PKR / 7 DAYS</span>
+              <span className="demo-pill">$0.18 / 7 DAYS</span>
               <span className="demo-pill">CONTEST ENTRY: FREE</span>
               <span className="demo-pill">PRIZES: CRX ON-CHAIN</span>
             </div>
@@ -56,7 +56,7 @@ export default function Home() {
           <p className="eyebrow">HOW CRICKX WORKS</p>
           <h2>One simple journey from match to prize.</h2>
           <p className="section-subtitle">
-            Subscribe for 50 PKR, build your fantasy team, join an eligible contest for free,
+            Subscribe for $0.18, build your fantasy team, join an eligible contest for free,
             follow the live leaderboard, then receive any earned CRX prize directly on Polygon.
           </p>
         </div>
