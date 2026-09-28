@@ -39,4 +39,14 @@ describe('applicationState', () => {
       draw_noresult: true,
     } as any)).toBe('COMPLETED');
   });
+
+  it('expires an old NS fixture even when the provider live flag is stale', () => {
+    expect(applicationState({
+      id: 5,
+      status: 'NS',
+      live: 1,
+      starting_at: new Date(now - 7 * 60 * 60 * 1000).toISOString(),
+    } as any)).toBe('COMPLETED');
+  });
+
 });
