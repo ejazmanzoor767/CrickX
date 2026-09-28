@@ -141,7 +141,7 @@ async function refreshFirebaseSession(): Promise<string | null> {
   return data.id_token;
 }
 
-export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function apiFetch<T = any>(path: string, options: RequestOptions = {}): Promise<T> {
   const { skipAuth: _skipAuth, ...request } = options;
 
   async function doRequest(token: string | null) {
