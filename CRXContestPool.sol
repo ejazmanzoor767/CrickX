@@ -6,14 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/// @title CRXContestPool
-/// @notice One pool contract manages many fixture contests. Joining is free
-///         in the application; the company funds 10 CRX per participant at
-///         join time and the contract later distributes 100% of that pool
-///         to every ranked entrant.
 contract CRXContestPool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
-
     IERC20 public immutable crxToken;
     address public fundingWallet;
     uint256 public constant POOL_PER_PARTICIPANT = 10 ether;
@@ -35,22 +29,19 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
     }
 
     uint256 public nextContestId = 1;
+    uint256 public totalEscrowed;
     mapping(uint256 => Contest) private contests;
     mapping(uint256 => bool) public contestExists;
 
     event ContestCreated(uint256 indexed contestId, uint256 joinDeadline);
-    event ParticipantFunded(
-        uint256 indexed contestId,
-        address indexed participant,
-        uint256 participantCount,
-        uint256 totalPool
-    );
+    event ParticipantFunded(uint256 indexed contestId, address indexed participant, uint256 participantCount, uint256 totalPool);
     event ContestFunded(uint256 indexed contestId, uint256 participantCount, uint256 totalPool);
     event RankingFinalized(uint256 indexed contestId, uint256 participantCount);
     event PrizePaid(uint256 indexed contestId, uint256 indexed rank, address indexed winner, uint256 amount);
     event ContestDistributed(uint256 indexed contestId, uint256 totalPool);
     event ContestCancelled(uint256 indexed contestId, uint256 refundedAmount);
     event FundingWalletUpdated(address indexed newWallet);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     constructor(address crxTokenAddress, address fundingWallet_)
         Ownable(msg.sender)
@@ -67,6 +58,11 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
         emit FundingWalletUpdated(newWallet);
     }
 
+    function availableFunding() public view returns (uint256) {
+        uint256 balance = crxToken.balanceOf(address(this));
+        return balance > totalEscrowed ? balance - totalEscrowed : 0;
+    }
+
     function createContest(uint256 joinDeadline_) external onlyOwner returns (uint256 contestId) {
         require(joinDeadline_ > block.timestamp, "deadline must be in the future");
         contestId = nextContestId++;
@@ -77,9 +73,11 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
         emit ContestCreated(contestId, joinDeadline_);
     }
 
-    /// @notice Company funding is deposited immediately when an entrant joins.
-    ///         The participant does not send CRX or pay a token transaction.
-    function fundParticipant(uint256 contestId, address participant)
+    /// @notice Called once when the match starts.
+    ///         The backend first transfers the full contest CRX pool directly
+    ///         from the funding wallet to this contract in one ERC-20 transfer.
+    ///         This function then records that already-held balance for the contest.
+    function fundContest(uint256 contestId, uint256 participantCount_, uint256 totalPool_)
         external
         onlyOwner
         nonReentrant
@@ -87,27 +85,21 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
         Contest storage c = contests[contestId];
         require(contestExists[contestId], "contest not found");
         require(c.stage == Stage.Open, "contest not open");
-        require(block.timestamp < c.joinDeadline, "entry deadline reached");
-        require(participant != address(0), "zero participant");
-        require(!c.isParticipant[participant], "participant already funded");
+        require(block.timestamp >= c.joinDeadline, "match has not started");
+        require(!c.fundingComplete, "contest already funded");
+        require(participantCount_ > 0, "no participants");
+        require(participantCount_ <= 1_000_000, "participant count too large");
+        require(totalPool_ == participantCount_ * POOL_PER_PARTICIPANT, "pool amount mismatch");
+        require(availableFunding() >= totalPool_, "pool balance is insufficient");
 
-        c.isParticipant[participant] = true;
-        c.participantCount += 1;
-        c.totalPool += POOL_PER_PARTICIPANT;
+        c.participantCount = participantCount_;
+        c.totalPool = totalPool_;
+        c.fundingComplete = true;
+        totalEscrowed += totalPool_;
 
-        crxToken.safeTransferFrom(fundingWallet, address(this), POOL_PER_PARTICIPANT);
-
-        emit ParticipantFunded(
-            contestId,
-            participant,
-            c.participantCount,
-            c.totalPool
-        );
+        emit ContestFunded(contestId, participantCount_, totalPool_);
     }
 
-    /// @notice At settlement, the backend supplies the final ranking containing
-    ///         every participant already funded during the join period.
-    ///         No additional CRX is transferred here.
     function finalizeRankingAndFund(uint256 contestId, address[] calldata ranking)
         external
         onlyOwner
@@ -118,27 +110,23 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
         require(c.stage == Stage.Open, "contest not open");
         require(block.timestamp >= c.joinDeadline, "entry deadline not reached");
         require(ranking.length > 0, "no participants");
+        require(c.fundingComplete, "pool not funded");
         require(ranking.length == c.participantCount, "participant count mismatch");
 
         for (uint256 i = 0; i < ranking.length; i++) {
             address participant = ranking[i];
             require(participant != address(0), "zero participant");
-            require(c.isParticipant[participant], "participant not funded");
             require(!c.isRanked[participant], "duplicate participant");
+            c.isParticipant[participant] = true;
             c.isRanked[participant] = true;
             c.ranking.push(participant);
         }
 
-        c.fundingComplete = true;
         c.stage = Stage.Ranked;
 
-        emit ContestFunded(contestId, c.participantCount, c.totalPool);
         emit RankingFinalized(contestId, c.participantCount);
     }
 
-    /// @notice Rank-weighted distribution across every participant:
-    ///         rank 1 gets N weight, rank N gets 1 weight. Integer dust is sent
-    ///         to the last ranked participant so the full pool is distributed.
     function distributePrizes(uint256 contestId, uint256 maxRecipients)
         external
         onlyOwner
@@ -167,15 +155,15 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
             c.distributedCount += 1;
 
             if (amount > 0) {
-                crxToken.safeTransfer(c.ranking[i], amount);
+                require(crxToken.safeTransfer(c.ranking[i], amount), "prize transfer failed");
             }
-
             emit PrizePaid(contestId, i + 1, c.ranking[i], amount);
         }
 
         if (c.distributedCount == n) {
             require(c.distributedAmount == c.totalPool, "pool not fully distributed");
             c.stage = Stage.Distributed;
+            totalEscrowed -= c.totalPool;
             emit ContestDistributed(contestId, c.totalPool);
         }
     }
@@ -191,10 +179,17 @@ contract CRXContestPool is Ownable, ReentrancyGuard {
         c.stage = Stage.Cancelled;
 
         if (refund > 0) {
-            crxToken.safeTransfer(fundingWallet, refund);
+            totalEscrowed -= refund;
+            require(crxToken.safeTransfer(fundingWallet, refund), "refund failed");
         }
 
         emit ContestCancelled(contestId, refund);
+    }
+
+    function recoverExcess(address to, uint256 amount) external onlyOwner nonReentrant {
+        require(to != address(0), "zero address");
+        require(amount <= availableFunding(), "amount exceeds excess");
+        require(crxToken.safeTransfer(to, amount), "transfer failed");
     }
 
     function hasEntered(uint256 contestId, address participant) external view returns (bool) {
