@@ -336,9 +336,29 @@ export class ContestService implements OnModuleInit {
     // once when the match starts.
 
     const entryId = `entry_${contest.id}_${userId}`;
+    const walletLockId = `${contest.id}_${wallet.toLowerCase()}`;
     const result = await this.prisma.$transaction(async (tx) => {
+      const walletLock = await tx.transactionGet('contestWalletLocks', walletLockId);
+      if (walletLock.exists) {
+        const lockData = walletLock.data() as any;
+        if (String(lockData?.userId) !== userId) {
+          throw new ForbiddenException('This wallet has already joined the contest.');
+        }
+      }
+
       const existing = await tx.contestEntry.findUnique({ where: { id: entryId } });
-      if (existing) return { entry: existing, participantCount: Number(contest.filledSpots || 0) };
+      if (existing) {
+        if (String(existing.walletAddress ?? '').toLowerCase() !== wallet.toLowerCase()) {
+          throw new ForbiddenException('This contest entry is already linked to another wallet.');
+        }
+        await tx.transactionSet('contestWalletLocks', walletLockId, {
+          contestId: contest.id,
+          userId,
+          walletAddress: wallet,
+          createdAt: existing.createdAt ?? new Date(),
+        }, true);
+        return { entry: existing, participantCount: Number(contest.filledSpots || 0) };
+      }
 
       const currentContest = await tx.contest.findUnique({ where: { id: contest.id } });
       if (!currentContest) throw new NotFoundException('Contest not found.');
@@ -355,6 +375,13 @@ export class ContestService implements OnModuleInit {
           entryFee: 0,
         },
       });
+
+      await tx.transactionSet('contestWalletLocks', walletLockId, {
+        contestId: contest.id,
+        userId,
+        walletAddress: wallet,
+        createdAt: new Date(),
+      }, true);
 
       const entry = await tx.contestEntry.create({
         data: {
