@@ -36,7 +36,7 @@ describe('WalletService.mutateBalance', () => {
 
   it('is idempotent — replaying the same idempotencyKey does not double-apply', async () => {
     const { prisma } = buildPrismaMock({ depositBalance: 100, version: 0 });
-    const service = new WalletService(prisma, {} as any, {} as any, {} as any);
+    const service = new WalletService(prisma, {} as any, { get: jest.fn((_key: string, fallback?: unknown) => fallback) } as any, {} as any);
 
     const first = await service.mutateBalance({
       userId: 'u1', bucket: 'DEPOSIT', delta: 50, type: 'DEPOSIT', idempotencyKey: 'dep-1',
