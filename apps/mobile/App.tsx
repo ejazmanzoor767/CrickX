@@ -178,7 +178,7 @@ export default function App() {
                 document.documentElement.classList.add('crickx-native-app');
                 var style = document.createElement('style');
                 style.id = 'crickx-native-shell';
-                style.innerHTML = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}.page-shell{padding:0 10px !important;min-height:100vh !important;}";
+                style.innerHTML = ${JSON.stringify(NATIVE_SHELL_CSS)};
                 document.documentElement.appendChild(style);
               })();
               true;
@@ -190,7 +190,7 @@ export default function App() {
                 if (!style) {
                   style = document.createElement('style');
                   style.id = 'crickx-native-shell';
-                  style.innerHTML = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}.page-shell{padding:0 10px !important;min-height:100vh !important;}";
+                  style.innerHTML = ${JSON.stringify(NATIVE_SHELL_CSS)};
                   document.documentElement.appendChild(style);
                 }
               })();
