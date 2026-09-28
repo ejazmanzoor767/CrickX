@@ -7,7 +7,7 @@ import { SubscriptionService } from '../subscription/subscription.service';
 import { OnchainPredictionService } from '../onchain/onchain-prediction.service';
 import { SubmitPredictionDto } from './prediction.dto';
 
-const FIVE=5, TEN=10, TOTAL=50, WINDOW=300;
+const FIVE=5, TEN=10, TOTAL=50, WINDOW=300, PREDICTION_HORIZON_MS=7*24*60*60*1000;
 const SHARES:Record<number,number>={5:50,4:30,3:20};
 const BATTERS=['babar azam','mohammad rizwan','virat kohli','rohit sharma','shubman gill','yashasvi jaiswal','kl rahul','suryakumar yadav','jos buttler','travis head','steve smith','kane williamson','rachin ravindra','david warner','glenn maxwell','phil salt','harry brook','joe root','quinton de kock','heinrich klaasen','aiden markram','fakhar zaman','imam-ul-haq','saim ayub','shai hope','litton das','pathum nissanka','kusal mendis','devon conway','marnus labuschagne'];
 const BOWLERS=['shaheen afridi','jasprit bumrah','mohammed siraj','mitchell starc','pat cummins','josh hazlewood','trent boult','tim southee','rashid khan','kagiso rabada','anrich nortje','keshav maharaj','mustafizur rahman','taskin ahmed','wanindu hasaranga','mark wood','jofra archer','adil rashid','haris rauf','naseem shah','shaheen','bumrah','starc','rabada'];
@@ -50,7 +50,60 @@ export class PredictionService implements OnModuleInit,OnModuleDestroy{
 {id:'powerplay-score',kind:'POWERPLAY_SCORE',title:'Powerplay Score (First 6 Overs)',prompt:'Will '+(a.name??'the home team')+' score 50 or more runs in the first 6 overs?',options:[{value:'YES',label:'YES (50+ Runs)'},{value:'NO',label:'NO (Under 50 Runs)'}],teamId:Number(a.id??f.localteam_id)},
 {id:'match-sixes',kind:'TOTAL_SIXES',title:'Match Sixes Counter',prompt:'Will this match have 11 or more sixes?',options:[{value:'YES',label:'YES (11 or more sixes)'},{value:'NO',label:'NO (10 or fewer sixes)'}]}
 ];}
- private async ensure(fixtureId:number){const id='prediction_'+fixtureId;const ex=await this.read(id);if(ex)return ex;const f=await this.sportmonks.getFixture(fixtureId);const start=new Date(f.starting_at);if(Number.isNaN(start.getTime()))throw new BadRequestException('This match does not have a valid start time.');let squad:any=null;try{squad=await this.sportmonks.getFixtureSquads(fixtureId);}catch(e){this.logger.warn('Prediction squad unavailable: '+String(e));}const status=voided(f.status)?'VOID':terminal(f.status)?'LOCKED':liveNow(f)?'LOCKED':'OPEN';const data={id,sportmonksFixtureId:fixtureId,status,lockAt:start,questions:this.questions(f,squad),participantCount:0,predictionCount:0,poolAmount:0,fundingStatus:'PENDING',poolFundedAmount:0,fundingTxHash:null,fundingError:null,chainPredictionId:null,settlementStatus:'PENDING',settlementTxHash:null,settlementError:null,resultComputedAt:null,completedAt:status==='VOID'?new Date():null,createdAt:new Date(),updatedAt:new Date()};await this.mref(id).set(data,{merge:true});return(await this.read(id))??data;}
+ private async ensure(fixtureId:number){
+  const id='prediction_'+fixtureId;
+  const ex=await this.read(id);
+  if(ex)return ex;
+
+  const f=await this.sportmonks.getFixture(fixtureId);
+  const start=new Date(f.starting_at);
+  if(Number.isNaN(start.getTime())) throw new BadRequestException('This match does not have a valid start time.');
+
+  const providerStatus=String(f.status??'').trim().toLowerCase();
+  if(voided(providerStatus)||terminal(providerStatus)){
+    throw new ForbiddenException('Predictions are unavailable for a completed, cancelled, or abandoned match.');
+  }
+
+  const live=liveNow(f);
+  const now=Date.now();
+  const startMs=start.getTime();
+  if(!live && startMs < now){
+    throw new ForbiddenException('Predictions are unavailable because this match has already started.');
+  }
+  if(startMs > now + PREDICTION_HORIZON_MS){
+    throw new BadRequestException('Predictions are not available for this match yet.');
+  }
+
+  let squad:any=null;
+  try{squad=await this.sportmonks.getFixtureSquads(fixtureId);}
+  catch(e){this.logger.warn('Prediction squad unavailable: '+String(e));}
+
+  const status=live?'LOCKED':'OPEN';
+  const data={
+    id,
+    sportmonksFixtureId:fixtureId,
+    status,
+    lockAt:start,
+    questions:this.questions(f,squad),
+    participantCount:0,
+    predictionCount:0,
+    poolAmount:0,
+    fundingStatus:'PENDING',
+    poolFundedAmount:0,
+    fundingTxHash:null,
+    fundingError:null,
+    chainPredictionId:null,
+    settlementStatus:'PENDING',
+    settlementTxHash:null,
+    settlementError:null,
+    resultComputedAt:null,
+    completedAt:null,
+    createdAt:new Date(),
+    updatedAt:new Date()
+  };
+  await this.mref(id).set(data,{merge:true});
+  return(await this.read(id))??data;
+}
  private pp(f:any,teamId:number){const balls=Array.isArray(f.balls)?f.balls:[],map=new Map<number,number>();for(const r of [...(f.lineup??[]),...(f.batting??[])]){const p=Number(r?.player_id??r?.id),t=Number(r?.team_id);if(Number.isFinite(p)&&Number.isFinite(t))map.set(p,t);}const used=new Map<number,number>();let total=0;for(const ball of balls){if(Number(map.get(Number(ball?.batsman_id)))!==Number(teamId))continue;const inn=Number(ball?.inning??0),sc=ball?.score??{},n=used.get(inn)??0;if(n>=36)continue;total+=Number(sc.runs??0)+Number(sc.wide??0)+Number(sc.noball??0)+Number(sc.bye??0)+Number(sc.leg_bye??0);if(Number(sc.wide??0)===0&&Number(sc.noball??0)===0)used.set(inn,n+1);}return total;}
  private resolve(f:any,qs:Q[]){const bat=Array.isArray(f.batting)?f.batting:[],bowl=Array.isArray(f.bowling)?f.bowling:[],local=Number(f.localteam_id??f.localteam?.id),winner=f.winner_team_id==null?null:Number(f.winner_team_id),draw=Boolean(f.draw_noresult)||winner===null||!Number.isFinite(winner),sixes=bat.reduce((s:number,r:any)=>s+Number(r?.six_x??0),0);return qs.map(q=>{let c='NO';if(q.kind==='MATCH_WINNER')c=draw?'DRAW':winner===local?'LOCAL':'VISITOR';else if(q.kind==='BOWLER_WICKETS')c=Number(bowl.find((r:any)=>Number(r?.player_id)===Number(q.featuredPlayer?.id))?.wickets??0)>=3?'YES':'NO';else if(q.kind==='BATTER_RUNS')c=Number(bat.find((r:any)=>Number(r?.player_id)===Number(q.featuredPlayer?.id))?.score??0)>=50?'YES':'NO';else if(q.kind==='POWERPLAY_SCORE')c=this.pp(f,Number(q.teamId))>=50?'YES':'NO';else if(q.kind==='TOTAL_SIXES')c=sixes>=11?'YES':'NO';return{...q,correctAnswer:c};});}
  private payout(entries:any[],pool:number){const e=entries.filter(x=>Number(x.correctCount)>=3&&x.walletAddress).sort((a,b)=>Number(b.correctCount)-Number(a.correctCount)||String(a.submittedAt??'').localeCompare(String(b.submittedAt??'')));if(!e.length||pool<=0)return{winners:[],ranks:new Map<string,number>(),human:new Map<string,number>(),base:new Map<string,bigint>()};const groups=new Map<number,any[]>();for(const x of e)groups.set(Number(x.correctCount),[...(groups.get(Number(x.correctCount))??[]),x]);const share=[...groups.keys()].reduce((s,k)=>s+(SHARES[k]??0),0),total=BigInt(Math.round(pool*1e18)),base=new Map<string,bigint>();let allocated=0n;for(const k of [5,4,3].filter(x=>groups.has(x))){const g=groups.get(k)!,tier=(total*BigInt(SHARES[k]))/BigInt(share),each=tier/BigInt(g.length);let rem=tier-each*BigInt(g.length);for(const x of g){const v=each+(rem>0n?1n:0n);if(rem>0n)rem-=1n;base.set(x.id,v);allocated+=v;}}const ordered=[5,4,3].filter(x=>groups.has(x)).flatMap(x=>groups.get(x)!);for(let i=0,totalLeft=total-allocated;totalLeft>0n;i++,totalLeft--){const x=ordered[i%ordered.length];base.set(x.id,(base.get(x.id)??0n)+1n);}const ranks=new Map<string,number>();let pos=0,lastScore:number|null=null,lastRank=0;for(const x of e){pos++;const score=Number(x.correctCount),r=score===lastScore?lastRank:pos;ranks.set(x.id,r);lastRank=r;lastScore=score;}const human=new Map<string,number>();for(const [id,v]of base)human.set(id,Number(v)/1e18);return{winners:e,ranks,human,base};}
