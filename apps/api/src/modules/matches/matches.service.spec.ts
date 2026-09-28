@@ -21,12 +21,22 @@ describe('applicationState', () => {
     } as any)).toBe('LIVE');
   });
 
-  it('keeps an unstarted stale-live fixture upcoming', () => {
+  it('trusts live=1 even when the provider start time is still in the future', () => {
     expect(applicationState({
       id: 3,
       status: 'NS',
       live: 1,
       starting_at: new Date(now + 60_000).toISOString(),
-    } as any)).toBe('UPCOMING');
+    } as any)).toBe('LIVE');
+  });
+
+  it('marks no-result fixtures completed', () => {
+    expect(applicationState({
+      id: 4,
+      status: 'No Result',
+      live: 0,
+      starting_at: new Date(now - 60_000).toISOString(),
+      draw_noresult: true,
+    } as any)).toBe('COMPLETED');
   });
 });
