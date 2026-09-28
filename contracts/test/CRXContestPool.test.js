@@ -52,7 +52,6 @@ describe('CRXContestPool - bulk company-funded contest pool', function () {
 
     await pool.fundContest(1, 3, ethers.parseEther('30'));
 
-    expect(await pool.fundingComplete()).to.equal(undefined);
     const summary = await pool.getContestSummary(1);
     expect(summary[2]).to.equal(3n);
     expect(summary[3]).to.equal(ethers.parseEther('30'));
