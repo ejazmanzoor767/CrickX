@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsNumber, IsString, ValidateNested, Min, MaxLength, IsIn } from 'class-validator';
+import { IsArray, IsInt, IsNumber, IsString, ValidateNested, Min, MaxLength, IsIn, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SetPlayerCreditDto {
@@ -21,11 +21,11 @@ export class CreateScoringRuleSetDto {
 
 export class ReviewKycDto {
   @IsIn(['APPROVED', 'REJECTED']) status!: 'APPROVED' | 'REJECTED';
-  @IsString() @MaxLength(500) note?: string;
+  @IsOptional() @IsString() @MaxLength(500) note?: string;
 }
 
 export class ReviewWithdrawalDto {
   @IsIn(['APPROVED', 'REJECTED', 'PAID']) status!: 'APPROVED' | 'REJECTED' | 'PAID';
   @IsString() @MaxLength(500) note?: string;
-  @IsString() @MaxLength(120) payoutReference?: string;
+  @IsOptional() @IsString() @MaxLength(120) payoutReference?: string;
 }
