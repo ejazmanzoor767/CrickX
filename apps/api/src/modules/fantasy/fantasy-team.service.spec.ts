@@ -15,8 +15,18 @@ describe('FantasyTeamService.createTeam', () => {
 
   function buildDeps(overrides: Partial<{ credits: number }> = {}) {
     const lineup = buildLineup(fixtureId);
+    const squadPlayers = lineup.reduce((teams: any[], player: any) => {
+      const team = teams.find((item) => item.id === player.team_id);
+      if (team) team.players.push({ player_id: player.player_id, team_id: player.team_id });
+      else teams.push({ id: player.team_id, players: [{ player_id: player.player_id, team_id: player.team_id }] });
+      return teams;
+    }, []);
     const sportmonks = {
-      getFixture: jest.fn().mockResolvedValue({ id: fixtureId, starting_at: futureStart, lineup }),
+      getFixtureSquads: jest.fn().mockResolvedValue({
+        status: 'upcoming',
+        startingAt: futureStart,
+        teams: squadPlayers,
+      }),
     };
     const creditValue = overrides.credits ?? 9;
     const prisma = {
@@ -111,7 +121,19 @@ describe('FantasyTeamService.createTeam', () => {
 
   it('rejects team creation once the fixture has started (lineup lock)', async () => {
     const lineup = buildLineup(fixtureId);
-    const sportmonks = { getFixture: jest.fn().mockResolvedValue({ id: fixtureId, starting_at: new Date(Date.now() - 1000).toISOString(), lineup }) };
+    const squadPlayers = lineup.reduce((teams: any[], player: any) => {
+      const team = teams.find((item) => item.id === player.team_id);
+      if (team) team.players.push({ player_id: player.player_id, team_id: player.team_id });
+      else teams.push({ id: player.team_id, players: [{ player_id: player.player_id, team_id: player.team_id }] });
+      return teams;
+    }, []);
+    const sportmonks = {
+      getFixtureSquads: jest.fn().mockResolvedValue({
+        status: 'live',
+        startingAt: new Date(Date.now() - 1000).toISOString(),
+        teams: squadPlayers,
+      }),
+    };
     const prisma = { playerFixtureCredit: { findMany: jest.fn() }, fantasyTeam: { create: jest.fn() } };
     const service = new FantasyTeamService(prisma as any, sportmonks as any);
 
