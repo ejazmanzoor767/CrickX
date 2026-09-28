@@ -7,6 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: crickx-release-gate
+  cancel-in-progress: true
+
 permissions:
   contents: read
   security-events: write
