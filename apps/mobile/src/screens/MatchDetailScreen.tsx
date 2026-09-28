@@ -27,7 +27,8 @@ export default function MatchDetailScreen({ route, navigation }: any) {
   const home = fixture?.localteam?.name ?? 'Home';
   const away = fixture?.visitorteam?.name ?? 'Away';
   const status = String(fixture?.status ?? 'UPCOMING');
-  const live = fixture?.live === 1 || status.toLowerCase().includes('innings');
+  const terminal = String(fixture?.applicationState ?? '').toUpperCase() === 'COMPLETED' || /finished|complete|cancelled|canceled|abandoned|no result/i.test(status);
+  const live = !terminal && (String(fixture?.applicationState ?? '').toUpperCase() === 'LIVE' || fixture?.live === 1 || /live|innings break|lunch|tea|stumps/i.test(status));
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.scroll}>

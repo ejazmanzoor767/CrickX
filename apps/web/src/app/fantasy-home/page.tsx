@@ -22,15 +22,17 @@ export default function FantasyHomePage() {
     let active=true;
     async function refresh(){
       try{
-        const [today,upcoming,mine]=await Promise.all([
-          api.todayMatches(), api.upcomingMatches(4), user ? api.myFantasyTeams() : Promise.resolve([]),
+        const [liveFeed,todayFeed,upcoming,mine]=await Promise.all([
+          api.liveMatches(), api.todayMatches(), api.upcomingMatches(4), user ? api.myFantasyTeams() : Promise.resolve([]),
         ]);
         if(!active)return;
         const savedTeams=list(mine);
         const byId=new Map<number,any>();
-        for(const raw of [...list(today),...list(upcoming)]){
+        // Merge /livescores over the schedule feed so a started match is
+        // promoted to LIVE as soon as the provider exposes it.
+        for(const raw of [...list(todayFeed), ...list(upcoming), ...list(liveFeed)]){
           const id=Number(raw?.id);
-          if(Number.isFinite(id) && !byId.has(id)) byId.set(id,raw);
+          if(Number.isFinite(id)) byId.set(id,raw);
         }
 
         // Fantasy only exposes matches that are still actionable:
@@ -55,7 +57,7 @@ export default function FantasyHomePage() {
       finally{ if(active)setLoading(false); }
     }
     void refresh();
-    const timer=window.setInterval(()=>void refresh(),60000);
+    const timer=window.setInterval(()=>void refresh(),15000);
     return()=>{active=false;window.clearInterval(timer)};
   },[user?.uid]);
 

@@ -4,7 +4,7 @@ import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { SportmonksFixture } from '../sportmonks/sportmonks.types';
 
 function sportmonksDate(value: Date) { return value.toISOString().slice(0, 10); }
-function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE' | 'COMPLETED' {
+export function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE' | 'COMPLETED' {
   const status = String(fixture.status ?? '').trim().toLowerCase();
   const startingAt = fixture.starting_at ? new Date(fixture.starting_at).getTime() : NaN;
   const started = Number.isFinite(startingAt) && startingAt <= Date.now();
@@ -19,13 +19,18 @@ function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE' | 'CO
   // because a provider flag/status is present.
   if (!started) return 'UPCOMING';
 
-  // Explicit not-started/scheduled states are never live, even when a stale
-  // provider flag is present.
+  // Once the scheduled start time has passed, trust Sportmonks' explicit
+  // live flag even when its human-readable status is still "NS"/"Not Started".
+  // The provider can update the live flag before the status string catches up.
+  if (fixture.live === 1) return 'LIVE';
+
+  // Explicit not-started/scheduled states remain upcoming when there is no
+  // positive live signal.
   if (['ns', 'scheduled', 'not started', 'upcoming', 'postponed'].some((value) => status === value || status.includes(value))) {
     return 'UPCOMING';
   }
 
-  if (fixture.live === 1 || ['live', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => status.includes(part))) {
+  if (['live', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => status.includes(part))) {
     return 'LIVE';
   }
 
@@ -183,7 +188,10 @@ export class MatchesService {
   }
   async listLive() {
     const result = await this.sportmonks.listLiveFixtures();
-    return { ...result, data: Array.isArray(result.data) ? result.data.map(normalize) : [] };
+    const data = Array.isArray(result.data)
+      ? result.data.map(normalize).filter((fixture) => applicationState(fixture) === 'LIVE')
+      : [];
+    return { ...result, data };
   }
 
   async listUpcoming(days = 4) {
