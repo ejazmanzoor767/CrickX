@@ -41,6 +41,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf node_modules apps/*/node_modules
+          rm -f package-lock.json
           npm install --workspaces --include-workspace-root --no-audit --no-fund
           cd apps/mobile
           npx expo install --fix --npm
