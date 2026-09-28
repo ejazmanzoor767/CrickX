@@ -46,10 +46,34 @@ jobs:
           test -f android/app/build.gradle
           chmod +x android/gradlew
 
+      - name: Configure persistent release signing
+        working-directory: apps/mobile
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for value in ANDROID_RELEASE_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!value:-}" ]]; then
+              echo "Missing required Android release signing secret: $value"
+              exit 1
+            fi
+          done
+          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/crickx-release.keystore
+          chmod 600 android/app/crickx-release.keystore
+          test -s android/app/crickx-release.keystore
+
       - name: Build release APK
         working-directory: apps/mobile
         env:
           NODE_ENV: production
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/apps/mobile/android/app/crickx-release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           EXPO_PUBLIC_API_BASE_URL: https://crickx-api.onrender.com/api/v1
           EXPO_PUBLIC_WEB_URL: https://crickx-3d806.web.app
           EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
@@ -61,7 +85,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CrickX-Android-unsigned-release
+          name: CrickX-Android-signed-release
           path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 14
 
