@@ -4,7 +4,8 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { randomUUID } from 'crypto';
 
-const USER_CACHE_TTL_MS = 60_000;
+const USER_CACHE_TTL_MS = 5_000;
+const MAX_USER_CACHE_ENTRIES = 5_000;
 
 type CachedUser = {
   userId: string;
@@ -39,6 +40,10 @@ function cachedUser(firebaseUid: string) {
 }
 
 function putUserCache(firebaseUid: string, user: CachedUser) {
+  if (!userCache.has(firebaseUid) && userCache.size >= MAX_USER_CACHE_ENTRIES) {
+    const oldestKey = userCache.keys().next().value;
+    if (oldestKey) userCache.delete(oldestKey);
+  }
   userCache.set(firebaseUid, { ...user, cachedAt: Date.now() });
   return user;
 }
