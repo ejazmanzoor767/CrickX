@@ -7,6 +7,7 @@ export const colors = {
   muted: '#96a0b3',
   green: '#9bf34a',
   greenDark: '#12220a',
+  accentSoft: 'rgba(155,243,74,.10)',
   gold: '#ffd45a',
   red: '#ff6b6b',
   blue: '#7db7ff',
