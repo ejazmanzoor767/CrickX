@@ -8,7 +8,7 @@ import { useAuth } from '../../lib/auth-context';
 const list = (x:any) => Array.isArray(x) ? x : (x?.data ?? []);
 const fmtTime = (v:string) => new Date(v).toLocaleString('en-PK',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 const hasStarted = (m:any) => { const start = new Date(m?.starting_at ?? '').getTime(); return Number.isFinite(start) && start <= Date.now(); };
-const isCompleted = (m:any) => String(m?.applicationState??'').toUpperCase()==='COMPLETED' || ['finished','complete','completed','cancelled','canceled','abandoned'].some((part)=>String(m?.status??'').toLowerCase().includes(part));
+const isCompleted = (m:any) => String(m?.applicationState??'').toUpperCase()==='COMPLETED' || m?.draw_noresult === true || ['finished','finish','complete','completed','cancelled','canceled','abandoned','no result','no-result','washout'].some((part)=>String(m?.status??'').toLowerCase().includes(part));
 const isLive = (m:any) => !isCompleted(m) && hasStarted(m) && (Number(m?.live)===1 || ['live','innings break','lunch','tea','stumps'].some((part)=>String(m?.status??'').toLowerCase().includes(part)) || String(m?.applicationState??'').toUpperCase()==='LIVE');
 
 export default function FantasyHomePage() {
