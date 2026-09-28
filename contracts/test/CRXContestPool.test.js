@@ -1,7 +1,7 @@
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
 
-describe('CRXContestPool - free app entry with company-funded prizes', function () {
+describe('CRXContestPool - bulk company-funded contest pool', function () {
   async function deployFixture() {
     const [owner, a, b, c] = await ethers.getSigners();
     const MockCRX = await ethers.getContractFactory('MockCRX');
@@ -12,106 +12,158 @@ describe('CRXContestPool - free app entry with company-funded prizes', function 
     const pool = await Pool.deploy(await token.getAddress(), owner.address);
     await pool.waitForDeployment();
 
-    const now = Math.floor(Date.now() / 1000);
+    const now = (await ethers.provider.getBlock('latest')).timestamp;
     await pool.createContest(BigInt(now + 3600));
     await pool.createContest(BigInt(now + 7200));
 
-    await token.mint(owner.address, ethers.parseUnits('1000', 18));
     return { owner, a, b, c, token, pool };
   }
 
-  it('funds exactly 10 CRX on each participant join while the user pays nothing', async function () {
+  async function fundPool(pool, token, owner, amount) {
+    await token.mint(await pool.getAddress(), ethers.parseEther(String(amount)));
+  }
+
+  async function moveTo(timestamp) {
+    await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp]);
+    await ethers.provider.send('evm_mine');
+  }
+
+  it('creates contests with future deadlines and starts open', async function () {
+    const { pool } = await deployFixture();
+    expect(await pool.stage(1)).to.equal(0n);
+    expect(await pool.contestExists(1)).to.equal(true);
+    expect(await pool.participantCount(1)).to.equal(0n);
+    expect(await pool.totalPool(1)).to.equal(0n);
+  });
+
+  it('rejects funding before the join deadline', async function () {
+    const { pool } = await deployFixture();
+    await expect(
+      pool.fundContest(1, 3, ethers.parseEther('30')),
+    ).to.be.revertedWith('match has not started');
+  });
+
+  it('records one bulk funding operation for the full participant pool', async function () {
+    const { owner, token, pool } = await deployFixture();
+    await fundPool(pool, token, owner, 50);
+
+    const deadline = await pool.joinDeadline(1);
+    await moveTo(Number(deadline));
+
+    await pool.fundContest(1, 3, ethers.parseEther('30'));
+
+    expect(await pool.fundingComplete()).to.equal(undefined);
+    const summary = await pool.getContestSummary(1);
+    expect(summary[2]).to.equal(3n);
+    expect(summary[3]).to.equal(ethers.parseEther('30'));
+    expect(summary[6]).to.equal(true);
+    expect(await pool.totalEscrowed()).to.equal(ethers.parseEther('30'));
+    expect(await pool.availableFunding()).to.equal(ethers.parseEther('20'));
+
+    await expect(
+      pool.fundContest(1, 3, ethers.parseEther('30')),
+    ).to.be.revertedWith('contest not open');
+  });
+
+  it('rejects a pool amount that does not equal 10 CRX per participant', async function () {
+    const { token, pool } = await deployFixture();
+    await fundPool(pool, token, null, 50);
+
+    const deadline = await pool.joinDeadline(1);
+    await moveTo(Number(deadline));
+
+    await expect(
+      pool.fundContest(1, 3, ethers.parseEther('20')),
+    ).to.be.revertedWith('pool amount mismatch');
+  });
+
+  it('finalizes an exact, unique ranking after funding and exposes ranked participants', async function () {
     const { owner, a, b, c, token, pool } = await deployFixture();
-    const poolAddress = await pool.getAddress();
-    await token.connect(owner).approve(poolAddress, ethers.parseUnits('1000', 18));
+    await fundPool(pool, token, owner, 30);
+
+    const deadline = await pool.joinDeadline(1);
+    await moveTo(Number(deadline));
+    await pool.fundContest(1, 3, ethers.parseEther('30'));
+
+    await pool.finalizeRankingAndFund(1, [a.address, b.address, c.address]);
+
+    expect(await pool.stage(1)).to.equal(1n);
+    expect(await pool.hasEntered(1, a.address)).to.equal(true);
+    expect(await pool.hasEntered(1, b.address)).to.equal(true);
+
+    await expect(
+      pool.finalizeRankingAndFund(1, [a.address, a.address, c.address]),
+    ).to.be.revertedWith('contest not open');
+  });
+
+  it('rejects duplicate ranking addresses before any payout can be finalized', async function () {
+    const { owner, a, b, token, pool } = await deployFixture();
+    await fundPool(pool, token, owner, 20);
+
+    const deadline = await pool.joinDeadline(1);
+    await moveTo(Number(deadline));
+    await pool.fundContest(1, 2, ethers.parseEther('20'));
+
+    await expect(
+      pool.finalizeRankingAndFund(1, [a.address, a.address]),
+    ).to.be.revertedWith('duplicate participant');
+  });
+
+  it('distributes 100% of the pool across batches and gives the rounding remainder to the last rank', async function () {
+    const { owner, a, b, c, token, pool } = await deployFixture();
+    await fundPool(pool, token, owner, 30);
+
+    const deadline = await pool.joinDeadline(1);
+    await moveTo(Number(deadline));
+    await pool.fundContest(1, 3, ethers.parseEther('30'));
+    await pool.finalizeRankingAndFund(1, [a.address, b.address, c.address]);
 
     const beforeA = await token.balanceOf(a.address);
-    await pool.fundParticipant(1, a.address);
-    const afterA = await token.balanceOf(a.address);
+    const beforeB = await token.balanceOf(b.address);
+    const beforeC = await token.balanceOf(c.address);
 
-    expect(afterA).to.equal(beforeA);
-    expect(await pool.hasEntered(1, a.address)).to.equal(true);
-    expect(await pool.participantCount(1)).to.equal(1n);
-    expect(await pool.totalPool(1)).to.equal(10n * 10n ** 18n);
-    expect(await token.balanceOf(poolAddress)).to.equal(10n * 10n ** 18n);
-
-    await pool.fundParticipant(1, b.address);
-    await pool.fundParticipant(1, c.address);
-
-    expect(await pool.participantCount(1)).to.equal(3n);
-    expect(await pool.totalPool(1)).to.equal(30n * 10n ** 18n);
-    expect(await token.balanceOf(poolAddress)).to.equal(30n * 10n ** 18n);
-    await expect(pool.fundParticipant(1, a.address)).to.be.revertedWith('participant already funded');
-  });
-
-  it('finalizes the existing funded pool without pulling CRX a second time', async function () {
-    const { owner, a, b, c, token, pool } = await deployFixture();
-    const poolAddress = await pool.getAddress();
-    await token.connect(owner).approve(poolAddress, ethers.parseUnits('1000', 18));
-
-    await pool.fundParticipant(1, a.address);
-    await pool.fundParticipant(1, b.address);
-    await pool.fundParticipant(1, c.address);
-
-    const poolBefore = await token.balanceOf(poolAddress);
-    const deadline = await pool.joinDeadline(1);
-    await ethers.provider.send('evm_setNextBlockTimestamp', [Number(deadline)]);
-    await ethers.provider.send('evm_mine');
-
-    await pool.finalizeRankingAndFund(1, [a.address, b.address, c.address]);
-
-    expect(await pool.stage(1)).to.equal(1n);
-    expect(await pool.participantCount(1)).to.equal(3n);
-    expect(await pool.totalPool(1)).to.equal(30n * 10n ** 18n);
-    expect(await token.balanceOf(poolAddress)).to.equal(poolBefore);
-  });
-
-  it('distributes 100% of the funded pool to every ranked participant', async function () {
-    const { owner, a, b, c, token, pool } = await deployFixture();
-    const poolAddress = await pool.getAddress();
-    await token.connect(owner).approve(poolAddress, ethers.parseUnits('1000', 18));
-
-    await pool.fundParticipant(1, a.address);
-    await pool.fundParticipant(1, b.address);
-    await pool.fundParticipant(1, c.address);
-
-    const deadline = await pool.joinDeadline(1);
-    await ethers.provider.send('evm_setNextBlockTimestamp', [Number(deadline)]);
-    await ethers.provider.send('evm_mine');
-
-    await pool.finalizeRankingAndFund(1, [a.address, b.address, c.address]);
     await pool.distributePrizes(1, 2);
     expect(await pool.stage(1)).to.equal(1n);
-    await pool.distributePrizes(1, 2);
 
+    await pool.distributePrizes(1, 2);
     expect(await pool.stage(1)).to.equal(2n);
     expect(await pool.distributedCount(1)).to.equal(3n);
-    expect(await pool.distributedAmount(1)).to.equal(30n * 10n ** 18n);
-    expect(await token.balanceOf(poolAddress)).to.equal(0n);
-    expect(await token.balanceOf(a.address)).to.be.gt(await token.balanceOf(b.address));
-    expect(await token.balanceOf(b.address)).to.be.gt(await token.balanceOf(c.address));
+    expect(await pool.distributedAmount(1)).to.equal(ethers.parseEther('30'));
+    expect(await token.balanceOf(await pool.getAddress())).to.equal(0n);
+
+    expect((await token.balanceOf(a.address)) - beforeA).to.equal(ethers.parseEther('15'));
+    expect((await token.balanceOf(b.address)) - beforeB).to.equal(ethers.parseEther('10'));
+    expect((await token.balanceOf(c.address)) - beforeC).to.equal(ethers.parseEther('5'));
+    expect(await pool.prizeAmount(1, 0)).to.equal(ethers.parseEther('15'));
+    expect(await pool.prizeAmount(1, 1)).to.equal(ethers.parseEther('10'));
+    expect(await pool.prizeAmount(1, 2)).to.equal(ethers.parseEther('5'));
   });
 
-  it('keeps separate fixture contests independent', async function () {
-    const { owner, a, b, c, token, pool } = await deployFixture();
-    const poolAddress = await pool.getAddress();
-    await token.connect(owner).approve(poolAddress, ethers.parseUnits('1000', 18));
-
-    expect(await pool.stage(1)).to.equal(0n);
-    expect(await pool.stage(2)).to.equal(0n);
-
-    await pool.fundParticipant(1, a.address);
-    await pool.fundParticipant(1, b.address);
-    await pool.fundParticipant(2, c.address);
+  it('can cancel a funded contest and return exactly the escrowed pool', async function () {
+    const { owner, token, pool } = await deployFixture();
+    await fundPool(pool, token, owner, 30);
 
     const deadline = await pool.joinDeadline(1);
-    await ethers.provider.send('evm_setNextBlockTimestamp', [Number(deadline)]);
-    await ethers.provider.send('evm_mine');
+    await moveTo(Number(deadline));
+    await pool.fundContest(1, 3, ethers.parseEther('30'));
 
-    await pool.finalizeRankingAndFund(1, [a.address, b.address]);
-    expect(await pool.stage(1)).to.equal(1n);
-    expect(await pool.stage(2)).to.equal(0n);
-    expect(await pool.totalPool(1)).to.equal(20n * 10n ** 18n);
-    expect(await pool.totalPool(2)).to.equal(10n * 10n ** 18n);
+    const before = await token.balanceOf(owner.address);
+    await pool.cancelContest(1);
+
+    expect(await pool.stage(1)).to.equal(3n);
+    expect(await pool.totalEscrowed()).to.equal(0n);
+    expect(await token.balanceOf(await pool.getAddress())).to.equal(0n);
+    expect((await token.balanceOf(owner.address)) - before).to.equal(ethers.parseEther('30'));
+  });
+
+  it('only allows the owner to create, fund, rank, distribute, cancel and recover', async function () {
+    const { a, token, pool } = await deployFixture();
+    const deadline = await pool.joinDeadline(1);
+    await expect(pool.connect(a).createContest(deadline)).to.be.revertedWithCustomError(pool, 'OwnableUnauthorizedAccount');
+    await fundPool(pool, token, a, 20);
+    await moveTo(Number(deadline));
+    await expect(pool.connect(a).fundContest(1, 2, ethers.parseEther('20'))).to.be.revertedWithCustomError(pool, 'OwnableUnauthorizedAccount');
+    await expect(pool.connect(a).cancelContest(1)).to.be.revertedWithCustomError(pool, 'OwnableUnauthorizedAccount');
+    await expect(pool.connect(a).recoverExcess(a.address, 1)).to.be.revertedWithCustomError(pool, 'OwnableUnauthorizedAccount');
   });
 });
