@@ -91,6 +91,72 @@ jobs:
             echo "Using an ephemeral CI-only release key for build validation."
           fi
 
+      - name: Stabilize generated Gradle signing
+        working-directory: apps/mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+
+          p = Path("android/app/build.gradle")
+          if not p.exists():
+              raise SystemExit("Generated android/app/build.gradle not found")
+
+          store = os.environ.get("ANDROID_KEYSTORE_PATH", "").strip()
+          store_password = os.environ.get("ANDROID_KEYSTORE_PASSWORD", "")
+          alias = os.environ.get("ANDROID_KEY_ALIAS", "")
+          key_password = os.environ.get("ANDROID_KEY_PASSWORD", "")
+          if not all([store, store_password, alias, key_password]):
+              raise SystemExit("Android signing environment is incomplete")
+
+          text = p.read_text()
+
+          signing_anchor = "    signingConfigs {"
+          if signing_anchor not in text:
+              signing_anchor = "        signingConfigs {"
+          if signing_anchor not in text:
+              raise SystemExit("Generated Gradle file has no signingConfigs block")
+
+          signing_block = f'''
+        crickxRelease {{
+            storeFile file("{store.replace(chr(92), chr(92)+chr(92)).replace(chr(34), chr(92)+chr(34))}")
+            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias System.getenv("ANDROID_KEY_ALIAS")
+            keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+        }}
+'''
+          if "crickxRelease {" not in text:
+              text = text.replace(signing_anchor, signing_anchor + signing_block, 1)
+
+          occurrences = []
+          token = "signingConfig signingConfigs.debug"
+          start = 0
+          while True:
+              idx = text.find(token, start)
+              if idx < 0:
+                  break
+              occurrences.append(idx)
+              start = idx + len(token)
+
+          if occurrences:
+              idx = occurrences[-1]
+              text = text[:idx] + "signingConfig signingConfigs.crickxRelease" + text[idx + len(token):]
+          elif "signingConfig signingConfigs.crickxRelease" not in text:
+              release_marker = "release {"
+              idx = text.find(release_marker)
+              if idx < 0:
+                  raise SystemExit("Generated Gradle file has no release buildType block")
+              brace_end = text.find("}", idx)
+              if brace_end < 0:
+                  raise SystemExit("Could not locate release buildType block")
+              text = text[:brace_end] + '    signingConfig signingConfigs.crickxRelease\n' + text[brace_end:]
+
+          p.write_text(text)
+          print("Generated Gradle signing configured for CrickX release validation.")
+          PY
+
       - name: Build release APK
         working-directory: apps/mobile
         env:
