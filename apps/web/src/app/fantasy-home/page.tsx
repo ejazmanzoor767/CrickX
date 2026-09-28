@@ -9,9 +9,9 @@ const list = (x:any) => Array.isArray(x) ? x : (x?.data ?? []);
 const fmtTime = (v:string) => new Date(v).toLocaleString('en-PK',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 const hasStarted = (m:any) => { const start = new Date(m?.starting_at ?? '').getTime(); return Number.isFinite(start) && start <= Date.now(); };
 const isVoid = (m:any) => m?.draw_noresult === true || ['abandoned','cancelled','canceled','no result','no-result','washout'].some((part)=>String(m?.status??'').toLowerCase().includes(part));
-const isStaleNotStarted = (m:any) => { const start = new Date(m?.starting_at ?? '').getTime(); const status = String(m?.status ?? '').toLowerCase(); return Number.isFinite(start) && Date.now() - start >= 6 * 60 * 60 * 1000 && ['ns','scheduled','not started','upcoming'].some((value) => status === value || status.includes(value)); };
+const isStaleNotStarted = (m:any) => { const start = new Date(m?.starting_at ?? '').getTime(); const status = String(m?.status ?? '').toLowerCase(); const ageExpired = Number.isFinite(start) && Date.now() - start >= 6 * 60 * 60 * 1000; const scheduledBeforeToday = Number.isFinite(start) && new Date(start).toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10); return (ageExpired || scheduledBeforeToday) && ['ns','scheduled','not started','upcoming'].some((value) => status === value || status.includes(value)); };
 const isCompleted = (m:any) => String(m?.applicationState??'').toUpperCase()==='COMPLETED' || isVoid(m) || isStaleNotStarted(m);
-const isLive = (m:any) => !isCompleted(m) && hasStarted(m) && (Number(m?.live)===1 || ['live','innings break','lunch','tea','stumps'].some((part)=>String(m?.status??'').toLowerCase().includes(part)) || String(m?.applicationState??'').toUpperCase()==='LIVE');
+const isLive = (m:any) => !isCompleted(m) && (String(m?.applicationState??'').toUpperCase()==='LIVE' || Number(m?.live)===1 || (hasStarted(m) && ['live','innings break','lunch','tea','stumps'].some((part)=>String(m?.status??'').toLowerCase().includes(part))));
 
 export default function FantasyHomePage() {
   const { user } = useAuth();
