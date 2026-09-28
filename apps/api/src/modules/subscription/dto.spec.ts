@@ -17,7 +17,7 @@ describe('CreateSubscriptionCheckoutDto', () => {
 
   it('rejects unexpected checkout fields', async () => {
     const dto = plainToInstance(CreateSubscriptionCheckoutDto, { unknownField: 'x' });
-    const errors = await validate(dto);
-    expect(errors.some((error) => error.property === 'unknownField')).toBe(false);
+    const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+    expect(errors.some((error) => error.property === 'unknownField')).toBe(true);
   });
 });
