@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { LeaderboardService } from './leaderboard.service';
@@ -25,8 +25,8 @@ export class LeaderboardController {
   }
 
   @Get('fixture/:fixtureId')
-  fixture(@Param('fixtureId') fixtureId: string, @Query('limit') limit?: string) {
-    const parsed = Number.parseInt(fixtureId, 10);
+  fixture(@Param('fixtureId', ParseIntPipe) fixtureId: number, @Query('limit') limit?: string) {
+    const parsed = fixtureId;
     const value = limit ? Number.parseInt(limit, 10) : 100;
     const bounded = Number.isFinite(value) ? Math.min(Math.max(value, 1), 100) : 100;
     return this.leaderboard.fixture(parsed, bounded);
