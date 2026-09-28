@@ -81,6 +81,6 @@ describe('WalletService.mutateBalance', () => {
 
     expect(Number(tx.amount)).toEqual(250);
     expect(Number(tx.balanceAfter)).toEqual(250);
-    expect(wallet.depositBalance).toBe(250);
+    expect(Number(wallet.depositBalance)).toBe(250);
   });
 });
