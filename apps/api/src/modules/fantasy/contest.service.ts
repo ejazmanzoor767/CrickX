@@ -388,5 +388,23 @@ export class ContestService implements OnModuleInit {
 
   async myEntries(userId: string) { return this.prisma.contestEntry.findMany({ where: { userId }, include: { contest: true, fantasyTeam: { include: { players: true } } }, orderBy: { createdAt: 'desc' } }); }
 
-  async leaderboard(contestId: string) { return this.prisma.contestEntry.findMany({ where: { contestId }, orderBy: [{ totalPoints: 'desc' }], select: { id: true, userId: true, fantasyTeamId: true, totalPoints: true, rank: true, prizeWon: true, walletAddress: true } }); }
+  async leaderboard(contestId: string) {
+    const snap = await this.prisma.db.collection('contestEntries')
+      .where('contestId', '==', contestId)
+      .orderBy('totalPoints', 'desc')
+      .limit(200)
+      .get();
+
+    return snap.docs.map((doc) => {
+      const row = doc.data() as any;
+      return {
+        id: doc.id,
+        userId: row.userId,
+        fantasyTeamId: row.fantasyTeamId,
+        totalPoints: Number(row.totalPoints ?? 0),
+        rank: row.rank == null ? null : Number(row.rank),
+        prizeWon: row.prizeWon == null ? null : Number(row.prizeWon),
+      };
+    });
+  }
 }
