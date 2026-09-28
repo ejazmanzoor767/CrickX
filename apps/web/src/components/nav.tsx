@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '../lib/auth-context';
+import { useAuthOptional } from '../lib/auth-context';
 
 const primaryItems = [
   { href: '/matches', label: 'Matches', icon: 'matches' },
@@ -68,7 +68,9 @@ function NavIcon({ name }: { name: typeof primaryItems[number]['icon'] }) {
 
 export default function Nav() {
   const pathname = usePathname();
-  const { user, loading } = useAuth();
+  const auth = useAuthOptional();
+  const user = auth?.user ?? null;
+  const loading = auth?.loading ?? false;
 
   return (
     <>
