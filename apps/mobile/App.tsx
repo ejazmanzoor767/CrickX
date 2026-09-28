@@ -161,7 +161,6 @@ export default function App() {
             originWhitelist={['https://*', 'about:blank']}
             javaScriptEnabled
             domStorageEnabled
-            databaseEnabled={false}
             thirdPartyCookiesEnabled={false}
             mixedContentMode="never"
             sharedCookiesEnabled
@@ -350,7 +349,7 @@ const styles = StyleSheet.create({
   tabLabel: { color: '#7f8999', fontSize: 10.5, fontWeight: '800', marginTop: 4 },
   tabLabelActive: { color: '#9bf34a' },
   loading: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#080b10',
     justifyContent: 'center',
     alignItems: 'center',
