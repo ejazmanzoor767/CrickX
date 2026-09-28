@@ -4,25 +4,31 @@ import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { SportmonksFixture } from '../sportmonks/sportmonks.types';
 
 function sportmonksDate(value: Date) { return value.toISOString().slice(0, 10); }
+export function isTerminalFixture(fixture: Partial<SportmonksFixture>): boolean {
+  const status = String(fixture.status ?? '').trim().toLowerCase();
+  return [
+    'finish', 'complete', 'completed', 'aband', 'cancelled', 'canceled',
+    'no result', 'no-result', 'washout',
+  ].some((value) => status.includes(value)) || fixture.draw_noresult === true;
+}
+
 export function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE' | 'COMPLETED' {
   const status = String(fixture.status ?? '').trim().toLowerCase();
   const startingAt = fixture.starting_at ? new Date(fixture.starting_at).getTime() : NaN;
   const started = Number.isFinite(startingAt) && startingAt <= Date.now();
 
-  // Resolve terminal states before live flags. Sportmonks can keep the live
-  // field populated on feeds such as /livescores after a fixture has ended.
-  if (status.includes('finish') || status.includes('complete') || status.includes('aband') || status.includes('cancel')) {
-    return 'COMPLETED';
-  }
+  // Terminal status always wins, because Sportmonks may briefly leave live=1
+  // populated on /livescores after a match is abandoned/cancelled/finished.
+  if (isTerminalFixture(fixture)) return 'COMPLETED';
 
-  // A fixture with no valid start time must never be promoted to LIVE just
-  // because a provider flag/status is present.
-  if (!started) return 'UPCOMING';
-
-  // Once the scheduled start time has passed, trust Sportmonks' explicit
-  // live flag even when its human-readable status is still "NS"/"Not Started".
-  // The provider can update the live flag before the status string catches up.
+  // Sportmonks' explicit live flag is authoritative. Do not let a stale or
+  // timezone-shifted starting_at timestamp suppress a match that the provider
+  // is actively publishing in its live feed.
   if (fixture.live === 1) return 'LIVE';
+
+  // A fixture with no valid start time cannot be promoted by a weak status-only
+  // signal. Status-based LIVE below still requires the scheduled start time.
+  if (!started) return 'UPCOMING';
 
   // Explicit not-started/scheduled states remain upcoming when there is no
   // positive live signal.
@@ -188,8 +194,16 @@ export class MatchesService {
   }
   async listLive() {
     const result = await this.sportmonks.listLiveFixtures();
+    // /livescores is itself a positive provider signal. Preserve fixtures from
+    // that feed as LIVE unless they carry an explicit terminal state. This
+    // avoids dropping real live matches when starting_at/status fields lag.
     const data = Array.isArray(result.data)
-      ? result.data.map(normalize).filter((fixture) => applicationState(fixture) === 'LIVE')
+      ? result.data
+          .filter((fixture) => !isTerminalFixture(fixture))
+          .map((fixture) => ({
+            ...normalize(fixture),
+            applicationState: 'LIVE' as const,
+          }))
       : [];
     return { ...result, data };
   }
