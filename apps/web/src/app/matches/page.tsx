@@ -97,7 +97,7 @@ export default function MatchesPage() {
       const liveFeedIds = new Set(liveFeed.map((fixture: any) => Number(fixture?.id)).filter(Number.isFinite));
       const upcomingFeed = asList(upcomingResult);
       setTodayScheduled(today.filter((f: any) => !isVoidFixture(f) && !liveFeedIds.has(Number(f?.id)) && !isLiveFixture(f) && !isCompletedFixture(f) && new Date(f.starting_at).getTime() >= Date.now()));
-      setLive(today.filter((f: any) => !isVoidFixture(f) && liveFeedIds.has(Number(f?.id)) && !isCompletedFixture(f) || (!isVoidFixture(f) && isLiveFixture(f) && !isCompletedFixture(f))));
+      setLive(today.filter((f: any) => !isVoidFixture(f) && !isCompletedFixture(f) && (liveFeedIds.has(Number(f?.id)) || isLiveFixture(f))));
       setUpcoming(upcomingFeed.filter((f: any) => !isLiveFixture(f) && !isCompletedFixture(f) && new Date(f.starting_at).getTime() > Date.now()));
       setCompleted(asList(completedResult).filter((f: any) => !isVoidFixture(f) && !isStaleNotStarted(f))); setMyEntries(asList(entriesResult)); setMyTeams(asList(teamsResult)); setError('');
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to load matches.'); }
