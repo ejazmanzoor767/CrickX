@@ -101,7 +101,6 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         this.prisma.db
           .collection('contests')
           .where('status', '==', 'UPCOMING')
-          .where('lineupLockAt', '<=', nowDate)
           .select('sportmonksFixtureId', 'lineupLockAt')
           .limit(100)
           .get(),
