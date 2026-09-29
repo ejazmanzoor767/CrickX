@@ -17,6 +17,15 @@ const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://crickx-3d806.web.app
 const START_URL = WEB_URL.replace(/\/$/, '') + '/matches';
 const ALLOWED_HOSTS = new Set(['crickx-3d806.web.app', 'crickx-3d806.firebaseapp.com']);
 
+function isAllowedCrickXUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && ALLOWED_HOSTS.has(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 const TABS = [
   { path: '/matches', label: 'Matches', icon: '🏏' },
   { path: '/fantasy-home', label: 'Fantasy', icon: '✦' },
@@ -143,7 +152,7 @@ export default function App() {
 
   let currentHost = '';
   try { currentHost = new URL(currentUrl).hostname.toLowerCase(); } catch { currentHost = ''; }
-  const isCrickXPage = ALLOWED_HOSTS.has(currentHost);
+  const isCrickXPage = isAllowedCrickXUrl(currentUrl);
   const screenTitle = titleForTab(activeTab);
 
   return (
@@ -247,7 +256,7 @@ export default function App() {
             onHttpError={(event) => {
               const status = event.nativeEvent.statusCode;
               const url = event.nativeEvent.url || '';
-              if (status >= 500 && url.startsWith(WEB_URL)) {
+              if (status >= 500 && isAllowedCrickXUrl(url)) {
                 setFailed(`CrickX page returned HTTP ${status}.`);
               }
             }}
