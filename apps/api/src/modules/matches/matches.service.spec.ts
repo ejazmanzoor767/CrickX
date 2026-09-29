@@ -12,12 +12,22 @@ describe('applicationState', () => {
     } as any)).toBe('COMPLETED');
   });
 
-  it('promotes a started fixture to LIVE when live=1 but status is still NS', () => {
+  it('does not mark a stale NS fixture LIVE from live=1 alone', () => {
     expect(applicationState({
       id: 2,
       status: 'NS',
       live: 1,
       starting_at: new Date(now - 60_000).toISOString(),
+    } as any)).toBe('UPCOMING');
+  });
+
+  it('allows a started NS fixture LIVE when live=1 has scoring evidence', () => {
+    expect(applicationState({
+      id: 6,
+      status: 'NS',
+      live: 1,
+      starting_at: new Date(now - 60_000).toISOString(),
+      scoreboards: [{ score: 12 }],
     } as any)).toBe('LIVE');
   });
 
