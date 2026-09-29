@@ -100,10 +100,14 @@ async function getConnectedWalletClient() {
   }
 
   const ethereum = await getEthereumProvider(true);
-  const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
-  const [account] = await walletClient.requestAddresses();
+  const baseWalletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
+  const [account] = await baseWalletClient.requestAddresses();
   if (!account) throw new Error('No wallet account was selected.');
-  return walletClient;
+  return createWalletClient({
+    account,
+    chain: polygon,
+    transport: custom(ethereum as any),
+  });
 }
 
 export function shortAddress(address?: string | null) { return address ? `${address.slice(0, 6)}…${address.slice(-4)}` : ''; }
