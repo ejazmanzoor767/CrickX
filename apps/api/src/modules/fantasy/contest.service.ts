@@ -26,7 +26,7 @@ export class ContestService implements OnModuleInit {
     void this.provisionUpcomingChainContests();
   }
 
-  @Cron('*/30 * * * * *')
+  @Cron('0 */2 * * * *')
   private async scheduledChainProvisioning() {
     await this.provisionUpcomingChainContests();
   }
@@ -36,9 +36,18 @@ export class ContestService implements OnModuleInit {
       try {
         const now = Date.now();
         const horizon = now + 7 * 24 * 60 * 60 * 1000;
-        const contests = await this.prisma.contest.findMany({ where: { status: 'UPCOMING' }, orderBy: { createdAt: 'asc' } });
+        const contestSnapshot = await this.prisma.db
+          .collection('contests')
+          .where('status', '==', 'UPCOMING')
+          .limit(100)
+          .get();
 
-        for (const contest of contests.slice(0, 100)) {
+        const contests = contestSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...(doc.data() as any),
+        }));
+
+        for (const contest of contests) {
           const chainId = Number((contest as any).chainContestId);
           const startMs = new Date((contest as any).lineupLockAt).getTime();
           if (Number.isFinite(chainId) && chainId > 0) continue;
