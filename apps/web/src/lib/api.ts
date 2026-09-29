@@ -112,7 +112,13 @@ export const api = {
   leaderboardContest: (contestId: string, limit = 100) => leaderboard(`/contest/${contestId}`, { limit }),
 
   subscription: () => apiFetch(`/subscription?_=${Date.now()}`, { cache: 'no-store' }),
-  createSubscriptionCheckout: (customerMobile?: string) => apiFetch('/subscription/checkout', { method: 'POST', body: JSON.stringify(customerMobile ? { customerMobile } : {}) }),
+  createSubscriptionCheckout: (plan: 'WEEKLY' | 'MONTHLY', customerMobile?: string) => apiFetch('/subscription/checkout', {
+    method: 'POST',
+    body: JSON.stringify({
+      plan,
+      ...(customerMobile ? { customerMobile } : {}),
+    }),
+  }),
   subscriptionStatus: (basket: string) =>
     apiFetch(
       `/subscription/status?basket=${encodeURIComponent(basket)}&_=${Date.now()}`,
