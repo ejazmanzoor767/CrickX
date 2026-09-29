@@ -23,15 +23,30 @@ const voided=(s:any, noResult?: boolean)=>{
  return Boolean(noResult)||x.includes('aband')||x.includes('cancel')||x.includes('no result')||x.includes('no-result')||x.includes('washout');
 };
 const liveNow=(f:any)=>{
- const status=String(f?.status??'').trim().toLowerCase();
- if(terminal(status, f?.draw_noresult===true)) return false;
- // Sportmonks live=1 is authoritative even when starting_at is stale.
- if(Number(f?.live)===1) return true;
- const start=new Date(f?.starting_at??'').getTime();
- const started=Number.isFinite(start)&&start<=Date.now();
- if(!started) return false;
- if(['ns','scheduled','not started','upcoming','postponed'].some((value)=>status===value||status.includes(value))) return false;
- return ['live','innings break','lunch','tea','stumps'].some((part)=>status.includes(part));
+  const status=String(f?.status??'').trim().toLowerCase();
+  if(terminal(status, f?.draw_noresult===true)) return false;
+  const start=new Date(f?.starting_at??'').getTime();
+  const started=Number.isFinite(start)&&start<=Date.now();
+  if(!started) return false;
+  const notStartedStatus=['ns','scheduled','not started','upcoming','postponed']
+    .some((value)=>status===value||status.includes(value));
+  const explicitLiveStatus=['live','in progress','innings break','lunch','tea','stumps']
+    .some((part)=>status.includes(part));
+  if(explicitLiveStatus) return true;
+  if(notStartedStatus){
+    const runs=Array.isArray(f?.runs)?f.runs:[];
+    const scoreboards=Array.isArray(f?.scoreboards)?f.scoreboards:[];
+    const batting=Array.isArray(f?.batting)?f.batting:[];
+    const bowling=Array.isArray(f?.bowling)?f.bowling:[];
+    const balls=Array.isArray(f?.balls)?f.balls:[];
+    return Number(f?.live)===1 && (
+      balls.length>0 || runs.length>0 ||
+      scoreboards.some((x:any)=>Number(x?.score??x?.total??0)>0) ||
+      batting.some((x:any)=>Number(x?.score??x?.runs??x?.runs_scored??0)>0) ||
+      bowling.some((x:any)=>Number(x?.wickets??x?.wicket??0)>0)
+    );
+  }
+  return Number(f?.live)===1;
 };
 
 @Injectable()
@@ -55,9 +70,26 @@ export class PredictionService implements OnModuleInit,OnModuleDestroy{
  private async ensure(fixtureId:number){
   const id='prediction_'+fixtureId;
   const ex=await this.read(id);
-  if(ex)return ex;
+   if(ex){
+     if(['OPEN','LOCKED'].includes(String(ex.status))){
+       try{
+         const current=await this.sportmonks.getFixture(fixtureId,{forceLive:true});
+         const currentlyLive=liveNow(current);
+         const currentStart=new Date(current.starting_at??'').getTime();
+         if(ex.status==='LOCKED'&&!currentlyLive&&Number.isFinite(currentStart)&&currentStart>Date.now()){
+           await this.mref(id).update({status:'OPEN',updatedAt:new Date()});
+           return {...ex,status:'OPEN'};
+         }
+         if(ex.status==='OPEN'&&currentlyLive){
+           await this.mref(id).update({status:'LOCKED',updatedAt:new Date()});
+           return {...ex,status:'LOCKED'};
+         }
+       }catch(e){ this.logger.warn('Prediction state refresh failed fixture='+fixtureId+': '+String(e)); }
+     }
+     return ex;
+   }
 
-  const f=await this.sportmonks.getFixture(fixtureId);
+   const f=await this.sportmonks.getFixture(fixtureId);
   const start=new Date(f.starting_at);
   if(Number.isNaN(start.getTime())) throw new BadRequestException('This match does not have a valid start time.');
 
