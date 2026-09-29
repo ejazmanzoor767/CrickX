@@ -18,6 +18,7 @@ function CaptainPicker() {
   const [teams, setTeams] = useState<any[]>([]);
   const [captain, setCaptain] = useState<number | null>(null);
   const [viceCaptain, setViceCaptain] = useState<number | null>(null);
+  const [locked, setLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -27,12 +28,21 @@ function CaptainPicker() {
     let active = true;
     (async () => {
       try {
-        const [draftResult, squadResult, teamResult] = await Promise.all([
+        const [matchResult, draftResult, squadResult, teamResult] = await Promise.all([
+          api.matchDetail(fixtureId),
           api.fantasyDraft(fixtureId),
           api.fixtureSquads(fixtureId),
           api.myFantasyTeams(),
         ]);
         if (!active) return;
+        const match = unwrap(matchResult);
+        const state = String(match?.applicationState ?? '').toUpperCase();
+        const status = String(match?.status ?? '').toLowerCase();
+        const startMs = new Date(match?.starting_at ?? '').getTime();
+        const terminal = ['finish', 'complete', 'aband', 'cancel', 'no result', 'no-result', 'washout']
+          .some((value) => status.includes(value)) || Boolean(match?.draw_noresult);
+        const matchStarted = (Number.isFinite(startMs) && startMs <= Date.now()) || state === 'LIVE' || state === 'COMPLETED' || terminal;
+        if (matchStarted) setLocked(true);
         const savedDraft = unwrap(draftResult);
         setDraft(savedDraft);
         setSquad(unwrap(squadResult));
@@ -79,6 +89,7 @@ function CaptainPicker() {
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   async function saveTeam() {
+    if (locked) return setMessage('This match has started. Your fantasy team is now view-only.');
     if (selectedIds.length !== 11) return setMessage('Go back and select exactly 11 players.');
     if (players.length !== 11) return setMessage('Your XI could not be loaded completely. Go back and verify all 11 unique players.');
     if (!captain || !viceCaptain) return setMessage('Select both captain and vice-captain.');
@@ -105,6 +116,15 @@ function CaptainPicker() {
 
   if (!hasFixture) return <section className="app-page"><div className="card empty-state"><strong>No match selected.</strong><Link className="primary-button" href="/matches">Go to matches</Link></div></section>;
   if (loading) return <section className="app-page"><div className="card skeleton-card">Loading captain selection…</div></section>;
+  if (locked) return <section className="app-page"><div className="card empty-state">
+    <strong>Captain selection is locked.</strong>
+    <span>The match has started, so your fantasy XI can no longer be changed.</span>
+    <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:12}}>
+      <Link className="primary-button" href={'/fantasy/view?fixtureId=' + fixtureId}>View Team</Link>
+      <Link className="secondary-button" href={'/leaderboard?fixtureId=' + fixtureId}>Leaderboard</Link>
+      <Link className="secondary-button" href="/matches">Back to Matches</Link>
+    </div>
+  </div></section>;
 
   return <section className="app-page" style={{ paddingBottom: 96 }}>
     <div className="page-intro"><div><p className="eyebrow">CRICKX FANTASY · STEP 2</p><h1 className="section-title">Captain & Vice-captain</h1><p className="section-subtitle">Choose your captain and vice-captain from your selected XI.</p></div><Link className="secondary-button" href={`/fantasy?fixtureId=${fixtureId}`}>← Back to XI</Link></div>
@@ -125,7 +145,7 @@ function CaptainPicker() {
     {message && <div className="notice">{message}</div>}
     <div className="card" style={{ position: 'sticky', bottom: 12, zIndex: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 12 }}>
       <div><strong>{captain ? 'Captain selected' : 'Captain missing'}</strong><span className="section-subtitle" style={{ display: 'block' }}>{viceCaptain ? 'Vice-captain selected' : 'Vice-captain missing'}</span></div>
-      <button className="primary-button" onClick={saveTeam} disabled={saving || selectedIds.length !== 11 || players.length !== 11 || !selectedIds.includes(Number(captain)) || !selectedIds.includes(Number(viceCaptain)) || !captain || !viceCaptain || captain === viceCaptain}>{saving ? 'Saving…' : 'Save XI'}</button>
+      <button className="primary-button" onClick={saveTeam} disabled={locked || saving || selectedIds.length !== 11 || players.length !== 11 || !selectedIds.includes(Number(captain)) || !selectedIds.includes(Number(viceCaptain)) || !captain || !viceCaptain || captain === viceCaptain}>{saving ? 'Saving…' : 'Save XI'}</button>
     </div>
   </section>;
 }
