@@ -16,6 +16,6 @@ export default function PaymentAndCheckoutPage() {
       <h2>Payment records</h2>
       <p>CrickX may retain transaction references, payment status, customer account information and order/service details needed for reconciliation, support, fraud prevention and dispute handling.</p>
       <h2>Support</h2>
-      <p>Payment questions can be sent to <a href="mailto:ejazchouhan27@gmail.com">ejazchouhan27@gmail.com</a> or by phone at 03197789243.</p>
+      <p>Payment questions can be sent to <a href="mailto:contact@crickxfantasy.site">ejazchouhan27@gmail.com</a> or by phone at 03197789243.</p>
     </div></section>;
 }

@@ -5,7 +5,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 function allowedOrigins() {
   const configured = String(process.env.CRICKX_ALLOWED_ORIGINS || '').split(',').map((v) => v.trim()).filter(Boolean);
-  const web = String(process.env.CRICKX_WEB_URL || 'https://crickx-3d806.web.app').trim().replace(/\/$/, '');
+  const web = String(process.env.CRICKX_WEB_URL || 'https://crickxfantasy.site').trim().replace(/\/$/, '');
   return [...new Set([web, 'https://crickx-3d806.web.app', 'https://crickx-3d806.firebaseapp.com', ...configured])];
 }
 

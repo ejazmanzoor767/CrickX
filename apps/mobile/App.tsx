@@ -13,9 +13,9 @@ import {
 } from 'react-native';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
 
-const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://crickx-3d806.web.app';
+const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://crickxfantasy.site';
 const START_URL = WEB_URL.replace(/\/$/, '') + '/matches';
-const ALLOWED_HOSTS = new Set(['crickx-3d806.web.app', 'crickx-3d806.firebaseapp.com']);
+const ALLOWED_HOSTS = new Set(['crickxfantasy.site', 'www.crickxfantasy.site', 'crickx-3d806.web.app', 'crickx-3d806.firebaseapp.com']);
 
 function isAllowedCrickXUrl(value: string) {
   try {
