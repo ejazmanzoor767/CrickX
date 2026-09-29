@@ -257,7 +257,7 @@ model Withdrawal {
 
 
 // ---------------------------------------------------------------------------
-// Weekly subscriptions and OxaPay USD payments
+// Weekly and monthly subscriptions and OxaPay USD payments
 // ---------------------------------------------------------------------------
 
 enum SubscriptionStatus {
@@ -277,7 +277,7 @@ model Subscription {
   id          String             @id @default(uuid())
   userId      String
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan        String             // WEEKLY
+  plan        String             // WEEKLY | MONTHLY
   amount      Decimal            @db.Decimal(10, 2)
   currency    String             @default("USD")
   status      SubscriptionStatus @default(PENDING)
