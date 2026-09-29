@@ -266,8 +266,14 @@ jobs:
           apk="android/app/build/outputs/apk/release/app-release.apk"
           test -s "$apk"
           unzip -t "$apk" >/dev/null
-          apksigner verify --verbose "$apk"
-          aapt2 dump badging "$apk" | grep -E "^package: name='com\.crickx\.app'"
+          build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          test -n "$build_tools"
+          apksigner="$build_tools/apksigner"
+          aapt2="$build_tools/aapt2"
+          test -x "$apksigner"
+          test -x "$aapt2"
+          "$apksigner" verify --verbose "$apk"
+          "$aapt2" dump badging "$apk" | grep -E "^package: name='com\.crickx\.app'"
           echo "APK package, ZIP structure, and Android signature verified."
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
