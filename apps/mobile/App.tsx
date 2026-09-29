@@ -43,7 +43,6 @@ function titleForTab(path: string | null) {
 export default function App() {
   const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [currentUrl, setCurrentUrl] = useState(START_URL);
@@ -85,11 +84,6 @@ export default function App() {
     webViewRef.current?.injectJavaScript(
       `window.location.href = ${JSON.stringify(target)}; true;`,
     );
-  }
-
-  function refresh() {
-    setRefreshing(true);
-    webViewRef.current?.reload();
   }
 
   function handleNavigationRequest(request: WebViewNavigation) {
@@ -181,14 +175,6 @@ export default function App() {
                 </View>
               </View>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Refresh current page"
-              onPress={refresh}
-              style={({ pressed }) => [styles.refreshButton, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.refreshIcon}>{refreshing ? '…' : '↻'}</Text>
-            </Pressable>
           </View>
         )}
 
@@ -251,11 +237,9 @@ export default function App() {
             onLoadEnd={() => {
               initialLoadComplete.current = true;
               setLoading(false);
-              setRefreshing(false);
             }}
             onError={(event) => {
               setLoading(false);
-              setRefreshing(false);
               if (!initialLoadComplete.current) {
                 setFailed(event.nativeEvent.description || 'Unable to connect to CrickX.');
               }
@@ -369,18 +353,6 @@ const styles = StyleSheet.create({
   sectionRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   sectionTitle: { color: '#f3f6fb', fontWeight: '900', fontSize: 16, marginTop: 1, letterSpacing: 0.05, flexShrink: 1 },
   sectionDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#9bf34a', marginLeft: 7, marginTop: 3 },
-  refreshButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#131923',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,.09)',
-    marginLeft: 12,
-  },
-  refreshIcon: { color: '#dfe7ef', fontSize: 25, lineHeight: 27, fontWeight: '700' },
   webContainer: { flex: 1, backgroundColor: '#080b10' },
   web: { flex: 1, backgroundColor: '#080b10' },
   bottomBar: {

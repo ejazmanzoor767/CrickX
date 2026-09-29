@@ -40,23 +40,14 @@ export function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE
   const liveStatus = ['live', 'innings break', 'lunch', 'tea', 'stumps']
     .some((part) => status.includes(part));
 
-  // Sportmonks /livescores can retain a stale live=1 flag on fixtures that
-  // have not actually entered play. When the status still says NS/scheduled,
-  // require positive scoring evidence before promoting it to LIVE.
-  const runs = Array.isArray((fixture as any).runs) ? (fixture as any).runs : [];
-  const scoreboards = Array.isArray((fixture as any).scoreboards) ? (fixture as any).scoreboards : [];
-  const batting = Array.isArray((fixture as any).batting) ? (fixture as any).batting : [];
-  const bowling = Array.isArray((fixture as any).bowling) ? (fixture as any).bowling : [];
-  const balls = Array.isArray((fixture as any).balls) ? (fixture as any).balls : [];
-  const hasLivePayload =
-    balls.length > 0 ||
-    runs.some((row: any) => Number(row?.score ?? row?.runs ?? row?.total ?? 0) > 0) ||
-    scoreboards.some((row: any) => Number(row?.score ?? row?.total ?? row?.runs ?? 0) > 0) ||
-    batting.some((row: any) => Number(row?.score ?? row?.runs ?? row?.runs_scored ?? 0) > 0) ||
-    bowling.some((row: any) => Number(row?.wickets ?? row?.wicket ?? row?.total_wickets ?? 0) > 0);
-
+  // Once a fixture has reached its scheduled start, Sportmonks' live flag is
+  // sufficient to enter LIVE even before the first scoring payload arrives.
+  // This avoids a kickoff dead-zone where a real match remains UPCOMING until
+  // the first run/wicket is published. Future fixtures are still protected by
+  // the started check above, and stale NS fixtures are handled by the 6-hour
+  // terminal safeguard.
   if (liveStatus) return 'LIVE';
-  if (fixture.live === 1 && (!notStartedStatus || hasLivePayload)) return 'LIVE';
+  if (fixture.live === 1) return 'LIVE';
   if (notStartedStatus) return 'UPCOMING';
 
   return 'UPCOMING';
@@ -212,13 +203,41 @@ export class MatchesService {
     return { data, meta: { pagination: { total: data.length, count: data.length, per_page: data.length, current_page: 1, total_pages: 1 } } };
   }
   async listLive() {
-    const result = await this.sportmonks.listLiveFixtures();
-    const data = Array.isArray(result.data)
-      ? result.data
-          .filter((fixture) => applicationState(fixture) === 'LIVE')
-          .map(normalize)
-      : [];
-    return { ...result, data };
+    const liveResult = await this.sportmonks.listLiveFixtures();
+    const liveRows = Array.isArray(liveResult.data) ? liveResult.data : [];
+
+    // Sportmonks can briefly omit a match from /livescores during the
+    // kickoff transition. Merge the current day's fixture feed as a fallback
+    // so a started live fixture is not invisible to the app.
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
+    const scheduledResult = await this.sportmonks.listFixtures({
+      startsBetween: {
+        start: sportmonksDate(startOfDay),
+        end: sportmonksDate(endOfDay),
+      },
+      include: 'localteam,visitorteam,league,season,stage,runs,scoreboards',
+    });
+    const scheduledRows = Array.isArray(scheduledResult.data) ? scheduledResult.data : [];
+
+    const byId = new Map<number, SportmonksFixture>();
+    for (const fixture of [...scheduledRows, ...liveRows]) {
+      const id = Number(fixture?.id);
+      if (Number.isFinite(id) && id > 0) byId.set(id, fixture);
+    }
+
+    const data = [...byId.values()]
+      .filter((fixture) => applicationState(fixture) === 'LIVE')
+      .map(normalize);
+
+    return {
+      ...liveResult,
+      data,
+      meta: liveResult.meta ?? scheduledResult.meta,
+    };
   }
 
   async listUpcoming(days = 4) {
