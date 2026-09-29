@@ -246,12 +246,13 @@ export class ContestService implements OnModuleInit {
 
     const liveFixture = await this.sportmonks.getFixture(contest.sportmonksFixtureId, { forceLive: true });
     const liveStatus = String(liveFixture.status ?? '').toLowerCase();
-    const liveFinished = liveStatus.includes('finish') || liveStatus.includes('abandon') || liveStatus.includes('cancel');
+    const liveFinished = liveStatus.includes('finish') || liveStatus.includes('complete') || liveStatus.includes('abandon') || liveStatus.includes('cancel');
     const startingAtMs = new Date(liveFixture.starting_at).getTime();
     const kickoffReached = Number.isFinite(startingAtMs) ? Date.now() >= startingAtMs : true;
-    const matchLive = liveFixture.live === 1 && !liveFinished && kickoffReached;
+    const explicitLiveStatus = kickoffReached && ['live', 'in progress', 'innings break', 'lunch', 'tea', 'stumps']
+      .some((value) => liveStatus === value || liveStatus.includes(value));
     if (liveFinished) throw new ForbiddenException('Entries are closed because the match is finished or cancelled.');
-    if (kickoffReached || matchLive) throw new ForbiddenException('Entries are closed because the match has started.');
+    if (kickoffReached || explicitLiveStatus) throw new ForbiddenException('Entries are closed because the match has started.');
 
     if (contest.status === 'CANCELLED') throw new ForbiddenException('Contest is cancelled.');
     if (contest.status !== 'UPCOMING') contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING', entryFee: 0 } });
