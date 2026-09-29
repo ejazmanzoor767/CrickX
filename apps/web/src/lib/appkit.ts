@@ -1,5 +1,7 @@
 'use client';
 
+// Centralized multi-wallet provider bootstrap for the CrickX web client.
+
 import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { polygon } from '@reown/appkit/networks';
