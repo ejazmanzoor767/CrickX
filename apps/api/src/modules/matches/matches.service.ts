@@ -51,11 +51,11 @@ export function applicationState(fixture: SportmonksFixture, options: { provider
 
   return 'UPCOMING';
 }
-function normalize(fixture: SportmonksFixture) {
+function normalize(fixture: SportmonksFixture, forcedApplicationState?: 'UPCOMING' | 'LIVE' | 'COMPLETED') {
   const unwrap = (value: any) => Array.isArray(value) ? value : (Array.isArray(value?.data) ? value.data : value);
   return {
     ...fixture,
-    applicationState: applicationState(fixture),
+    applicationState: forcedApplicationState ?? applicationState(fixture),
     runs: unwrap((fixture as any).runs),
     batting: unwrap((fixture as any).batting),
     bowling: unwrap((fixture as any).bowling),
@@ -235,7 +235,7 @@ export class MatchesService {
 
     const liveData = [...liveById.values()]
       .filter((fixture) => applicationState(fixture, { providerLiveFeed: true }) === 'LIVE')
-      .map(normalize);
+      .map((fixture) => normalize(fixture, 'LIVE'));
 
     const fallbackData = scheduledRows
       .filter((fixture: SportmonksFixture) => !liveById.has(Number(fixture?.id)))
