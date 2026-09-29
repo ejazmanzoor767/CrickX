@@ -90,7 +90,6 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       // for the sweep, then process fixtures sequentially so one sweep cannot
       // exhaust the Render instance.
       const now = Date.now();
-      const nowDate = new Date(now);
       const [liveSnapshot, startedSnapshot] = await Promise.all([
         this.prisma.db
           .collection('contests')
@@ -775,7 +774,6 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     // Do not scan the entire fantasyTeams collection every 30 seconds just to
     // discover fixture IDs; score only contests that are actually UPCOMING/LIVE.
     const now = Date.now();
-    const nowDate = new Date(now);
     const [liveSnapshot, startedSnapshot] = await Promise.all([
       this.prisma.db
         .collection('contests')
@@ -786,7 +784,6 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       this.prisma.db
         .collection('contests')
         .where('status', '==', 'UPCOMING')
-        .where('lineupLockAt', '<=', nowDate)
         .select('sportmonksFixtureId', 'lineupLockAt')
         .limit(100)
         .get(),
