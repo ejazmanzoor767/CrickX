@@ -1,7 +1,6 @@
 'use client';
 
 import { createPublicClient, createWalletClient, custom, formatUnits, http, isAddress, parseUnits, type Address } from 'viem';
-import { createEVMClient } from '@metamask/connect-evm';
 import { getAccount, getWalletClient, switchChain } from '@wagmi/core';
 import { appKit, MULTI_WALLET_ENABLED, wagmiAdapter } from './appkit';
 import { polygon } from 'viem/chains';
@@ -35,35 +34,23 @@ type EthereumProvider = {
   removeListener?: Function;
 };
 
-type EvmClient = Awaited<ReturnType<typeof createEVMClient>>;
-let metamaskClientPromise: Promise<EvmClient> | null = null;
-
-async function getMetaMaskClient(): Promise<EvmClient> {
-  if (typeof window === 'undefined') throw new Error('Wallet connection is only available in the browser.');
-  if (!metamaskClientPromise) {
-    metamaskClientPromise = createEVMClient({
-      dapp: { name: 'CrickX', url: window.location.origin, iconUrl: `${window.location.origin}/crickx-app-logo.svg` },
-      api: { supportedNetworks: { '0x89': DEFAULT_RPC_URL, '0x1': 'https://ethereum-rpc.publicnode.com' } },
-      // Keep the SDK provider hidden until connect() establishes a session.
-      // MetaMask Connect then selects the proper desktop extension or mobile
-      // deeplink + relay transport automatically.
-      skipAutoAnnounce: true,
-      mobile: {
-        preferredOpenLink: (deeplink: string) => {
-          window.location.href = deeplink;
-        },
-      },
-      analytics: { enabled: false },
-    });
+function getBrowserEthereumProvider(): EthereumProvider {
+  if (typeof window === 'undefined') {
+    throw new Error('Wallet connection is only available in the browser.');
   }
-  return metamaskClientPromise;
+
+  const provider = (window as typeof window & { ethereum?: EthereumProvider }).ethereum;
+  if (!provider) {
+    throw new Error('No compatible Polygon wallet extension was found. Use the wallet picker to connect a supported wallet.');
+  }
+
+  return provider;
 }
 
 async function getEthereumProvider(connect = false): Promise<EthereumProvider> {
-  const client = await getMetaMaskClient();
-  if (connect && client.status !== 'connected') await client.connect({ chainIds: ['0x89', '0x1'] });
-  if (client.status !== 'connected') throw new Error('MetaMask connection was not established. Please try again.');
-  return client.getProvider() as EthereumProvider;
+  const provider = getBrowserEthereumProvider();
+  if (connect) await provider.request({ method: 'eth_requestAccounts' });
+  return provider;
 }
 
 function getWagmiConfig() {
@@ -123,17 +110,25 @@ export async function switchToPolygon() {
     return;
   }
 
-  const client = await getMetaMaskClient();
-  if (client.status !== 'connected') await client.connect({ chainIds: ['0x89', '0x1'] });
-  if (client.getChainId() === '0x89') return;
-  await client.switchChain({
-    chainId: '0x89',
-    chainConfiguration: {
-      chainId: '0x89', chainName: 'Polygon Mainnet',
-      nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
-      rpcUrls: [DEFAULT_RPC_URL], blockExplorerUrls: ['https://polygonscan.com'],
-    },
-  });
+  const provider = await getEthereumProvider(true);
+  const chainId = await provider.request({ method: 'eth_chainId' });
+  if (chainId === '0x89') return;
+  try {
+    await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
+  } catch (error) {
+    const code = typeof error === 'object' && error && 'code' in error ? (error as { code?: number }).code : undefined;
+    if (code !== 4902) throw error;
+    await provider.request({
+      method: 'wallet_addEthereumChain',
+      params: [{
+        chainId: '0x89',
+        chainName: 'Polygon Mainnet',
+        nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
+        rpcUrls: [DEFAULT_RPC_URL],
+        blockExplorerUrls: ['https://polygonscan.com'],
+      }],
+    });
+  }
 }
 
 export async function connectWallet() {
@@ -150,20 +145,11 @@ export async function connectWallet() {
     return account.address as Address;
   }
 
-  const client = await getMetaMaskClient();
-  const result = await client.connect({ chainIds: ['0x89', '0x1'] });
-  if (client.getChainId() !== '0x89') {
-    await client.switchChain({
-      chainId: '0x89',
-      chainConfiguration: {
-        chainId: '0x89', chainName: 'Polygon Mainnet',
-        nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
-        rpcUrls: [DEFAULT_RPC_URL], blockExplorerUrls: ['https://polygonscan.com'],
-      },
-    });
-  }
-  const address = result.accounts?.[0] ?? client.getAccount();
-  if (!address || !isAddress(address)) throw new Error('No wallet account was selected.');
+  const provider = await getEthereumProvider(true);
+  if ((await provider.request({ method: 'eth_chainId' })) !== '0x89') await switchToPolygon();
+  const accounts = await provider.request({ method: 'eth_accounts' }) as unknown;
+  const address = Array.isArray(accounts) ? accounts[0] : undefined;
+  if (typeof address !== 'string' || !isAddress(address)) throw new Error('No wallet account was selected.');
   return address as Address;
 }
 
@@ -192,10 +178,10 @@ export async function getCurrentWallet() {
   }
 
   try {
-    const client = await getMetaMaskClient();
-    if (client.status !== 'connected') return null;
-    const address = client.getAccount();
-    return address && isAddress(address) ? address as Address : null;
+    const provider = getBrowserEthereumProvider();
+    const accounts = await provider.request({ method: 'eth_accounts' }) as unknown;
+    const address = Array.isArray(accounts) ? accounts[0] : undefined;
+    return typeof address === 'string' && isAddress(address) ? address as Address : null;
   } catch {
     return null;
   }
@@ -212,7 +198,7 @@ export async function getConnectedWalletName() {
     }
   }
 
-  return 'MetaMask';
+  return 'Browser wallet';
 }
 
 export async function readCrxWallet(address: Address) {
