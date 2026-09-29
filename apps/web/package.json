@@ -26,5 +26,6 @@
     "@types/node": "^22.5.0",
     "@types/react": "^19.2.3",
     "typescript": "6.0.3"
-  }
+  },
+  "description": "CrickX fantasy cricket web app"
 }
