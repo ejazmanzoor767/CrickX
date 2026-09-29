@@ -19,37 +19,34 @@ function isFinished(status: string | null | undefined, live: 0 | 1) {
   );
 }
 
-function isActuallyLive(
-  status: string | null | undefined,
-  startingAt: string | Date | null | undefined,
-  live: 0 | 1,
-) {
-  const value = String(status ?? '').trim().toLowerCase();
-  const startMs = new Date(startingAt ?? '').getTime();
+function isActuallyLive(fixture: any) {
+  const value = String(fixture?.status ?? '').trim().toLowerCase();
+  const live = Number(fixture?.live) === 1;
+  const startMs = new Date(fixture?.starting_at ?? '').getTime();
   const started = Number.isFinite(startMs) && startMs <= Date.now();
 
-  if (isFinished(value, live)) return false;
+  if (isFinished(value, live) || !started) return false;
 
-  // The provider's explicit live flag is authoritative. This also covers
-  // fixtures whose starting_at value lags because of provider/timezone drift.
-  if (live === 1) return true;
+  const notStartedStatus = ['ns', 'scheduled', 'not started', 'upcoming', 'postponed']
+    .some((state) => value === state || value.includes(state));
+  const explicitLiveStatus = ['live', 'in progress', 'innings break', 'lunch', 'tea', 'stumps']
+    .some((state) => value.includes(state));
 
-  if (!started) return false;
+  if (explicitLiveStatus) return true;
+  if (!notStartedStatus && live) return true;
 
-  if (['ns', 'scheduled', 'not started', 'upcoming', 'postponed'].some((state) => (
-    value === state || value.includes(state)
-  ))) {
-    return false;
+  if (notStartedStatus) {
+    const balls = Array.isArray(fixture?.balls) ? fixture.balls : [];
+    const batting = Array.isArray(fixture?.batting) ? fixture.batting : [];
+    const bowling = Array.isArray(fixture?.bowling) ? fixture.bowling : [];
+    return live && (
+      balls.length > 0 ||
+      batting.some((row: any) => Number(row?.score ?? row?.runs ?? row?.runs_scored ?? 0) > 0) ||
+      bowling.some((row: any) => Number(row?.wickets ?? row?.wicket ?? 0) > 0)
+    );
   }
 
-  return [
-    'live',
-    'in progress',
-    'innings break',
-    'lunch',
-    'tea',
-    'stumps',
-  ].some((state) => value.includes(state));
+  return false;
 }
 
 @Injectable()
@@ -332,7 +329,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     const bowling = fixture.bowling ?? [];
     const balls = fixture.balls ?? [];
     const final = isFinished(fixture.status, fixture.live);
-    const actuallyLive = isActuallyLive(fixture.status, fixture.starting_at, fixture.live);
+    const actuallyLive = isActuallyLive(fixture);
     this.logger.log(
       'Fixture ' + fixtureId + ' scoring check: status=' + String(fixture.status ?? '') + ', providerLive=' + fixture.live + ', live=' + actuallyLive + ', final=' + final,
     );
