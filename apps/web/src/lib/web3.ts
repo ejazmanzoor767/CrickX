@@ -145,12 +145,37 @@ export async function switchToPolygon() {
   }
 }
 
-export async function changeWallet(currentAddress?: Address) {
+async function openWalletPicker() {
+  const config = getWagmiConfig();
+  if (!config || !appKit) {
+    throw new Error('The multi-wallet picker is not configured yet. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX build environment to enable wallet icons and wallet selection.');
+  }
+
+  try {
+    await appKit.open({ view: 'AllWallets' });
+  } catch (error) {
+    throw normalizeWalletError(error, 'Unable to open the wallet picker.');
+  }
+
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const account = getAccount(config);
+    if (account.isConnected && account.address) {
+      if (account.chainId !== POLYGON_CHAIN_ID) {
+        await switchToPolygon();
+      }
+      return account.address as Address;
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+
+  throw new Error('No wallet was selected. Please choose a wallet from the list.');
+}
+
+export async function changeWallet(_currentAddress?: Address) {
   const config = getWagmiConfig();
 
   if (config && appKit) {
-    const previousAddress = currentAddress || getAccount(config).address || null;
-
     try {
       await appKit.disconnect();
     } catch (error) {
@@ -158,28 +183,7 @@ export async function changeWallet(currentAddress?: Address) {
     }
 
     await new Promise(resolve => setTimeout(resolve, 200));
-
-    try {
-      await appKit.open({ view: 'AllWallets' });
-    } catch (error) {
-      throw normalizeWalletError(error, 'Unable to open the wallet picker.');
-    }
-
-    const deadline = Date.now() + 60_000;
-    while (Date.now() < deadline) {
-      const account = getAccount(config);
-      if (account.isConnected && account.address) {
-        if (!previousAddress || account.address.toLowerCase() !== previousAddress.toLowerCase()) {
-          if (account.chainId !== POLYGON_CHAIN_ID) {
-            await switchToPolygon();
-          }
-          return account.address as Address;
-        }
-      }
-      await new Promise(resolve => setTimeout(resolve, 250));
-    }
-
-    throw new Error('No new wallet was selected. Please choose a wallet from the list.');
+    return openWalletPicker();
   }
 
   throw new Error('The multi-wallet picker is not configured yet. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX build environment to enable wallet icons and wallet selection.');
@@ -189,14 +193,7 @@ export async function connectWallet() {
   const config = getWagmiConfig();
 
   if (config && appKit) {
-    const current = getAccount(config);
-    if (!current.isConnected || !current.address) {
-      await appKit.open({ view: 'Connect' });
-    }
-
-    const account = await waitForWalletConnection();
-    if (account.chainId !== POLYGON_CHAIN_ID) await switchToPolygon();
-    return account.address as Address;
+    return openWalletPicker();
   }
 
   const provider = await getEthereumProvider(true);
