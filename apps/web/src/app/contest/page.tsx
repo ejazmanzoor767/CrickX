@@ -68,24 +68,24 @@ function ContestContent() {
 
     setBusy(true);
     setError('');
-    setMessage('Refreshing your subscription and preparing the free entry…');
+    setMessage('Checking your subscription…');
 
     try {
       const latestSubscription: any = await api.subscription();
       setSubscription(latestSubscription);
       if (!latestSubscription?.active) {
-        throw new Error('An active CrickX weekly subscription is required to join this contest.');
+        throw new Error('An active CrickX subscription is required to join this contest.');
       }
 
       const prepared: any = await api.prepareContestJoin(contest.id, teamId);
-      setMessage('Connect your wallet to confirm the prize wallet address…');
+      setMessage('Connect your wallet to continue…');
       const connected: Address = address || await connectWallet();
       setAddress(connected);
 
-      setMessage('Sign the free contest confirmation in MetaMask…');
+      setMessage('Confirm your free entry in your wallet…');
       const signed = await signContestJoinMessage(prepared.walletMessage);
 
-      setMessage('Confirming your contest entry with CrickX…');
+      setMessage('Confirming your entry…');
       const result: any = await api.confirmContestJoin(
         contest.id,
         teamId,
@@ -139,19 +139,19 @@ function ContestContent() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 12 }}>
         <div><span className="muted-label">ENTRY</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>FREE</strong><small className="section-subtitle">0 CRX charged</small></div>
         <div><span className="muted-label">PARTICIPANTS</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{participantCount}</strong><small className="section-subtitle">{participantCount === 1 ? '1 participant joined' : 'participants joined'} · Unlimited</small></div>
-        <div><span className="muted-label">PRIZE POOL</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{prizePool} CRX</strong><small className="section-subtitle">10 CRX per participant{contest.prizePoolFundingStatus === 'FUNDED' ? ' · Funded on-chain' : ''}</small></div>
+        <div><span className="muted-label">PRIZE POOL</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{prizePool} CRX</strong><small className="section-subtitle">10 CRX per participant</small></div>
         <div><span className="muted-label">STATUS</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{open ? 'OPEN' : 'CLOSED'}</strong></div>
       </div>
     </div>
 
     <div className="card" style={{ padding: 18, marginBottom: 14 }}>
-      <p className="eyebrow">WEEKLY ACCESS</p>
+      <p className="eyebrow">SUBSCRIBER ACCESS</p>
       {subscriptionActive ? (
         <p className="section-subtitle" style={{ margin: 0 }}>Subscription active until <strong>{expires}</strong>. Contest entry is free.</p>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
-          <div><h2 style={{ margin: 0 }}>Subscription required</h2><p className="section-subtitle" style={{ margin: '5px 0 0' }}>Pay $0.18 USD for 7 days to access contest joining and other subscriber features.</p></div>
-          <Link className="primary-button" href="/subscription">Subscribe for $0.18</Link>
+          <div><h2 style={{ margin: 0 }}>Subscription required</h2><p className="section-subtitle" style={{ margin: '5px 0 0' }}>Choose a subscription to access contest joining and other subscriber features.</p></div>
+          <Link className="primary-button" href="/subscription">View subscription plans</Link>
         </div>
       )}
     </div>
@@ -180,7 +180,7 @@ function ContestContent() {
       <div className="card" style={{ padding: 24 }}>
         <p className="eyebrow">FREE CONTEST ENTRY</p>
         <h2>Join with 0 CRX</h2>
-        <p className="section-subtitle">No CRX is deducted from your wallet. MetaMask is used only to sign a message proving that the payout wallet belongs to you; signing does not cost gas.</p>
+        <p className="section-subtitle">Your wallet is used to confirm ownership. No CRX or gas is charged.</p>
         {address && <p className="section-subtitle">Payout wallet: {address.slice(0, 6)}…{address.slice(-4)}</p>}
         <button
           className="primary-button full"
@@ -197,9 +197,9 @@ function ContestContent() {
     {error && <div className="card" style={{ marginTop: 14 }}><p className="error-text">{error}</p></div>}
 
     <div className="card" style={{ marginTop: 14 }}>
-      <p className="eyebrow">PRIZE FUNDING & SETTLEMENT</p>
+      <p className="eyebrow">PRIZE POOL</p>
       <p className="section-subtitle">
-        Each successful join adds 10 CRX to the prize pool. No CRX is deducted from the participant wallet during joining. When the match starts, CrickX transfers the accumulated pool to the on-chain prize pool in one transaction; settlement then pays winners from that funded pool.
+        Each successful join adds 10 CRX to the prize pool. Prizes are distributed after the match.
       </p>
       <Link className="secondary-button" href={`/leaderboard?fixtureId=${fixtureId}`}>View Leaderboard</Link>
     </div>
