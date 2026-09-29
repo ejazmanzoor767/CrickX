@@ -192,9 +192,8 @@ export class SubscriptionService {
     const pendingPayment = payment ??
       await this.firestore.subscriptionPayment.findFirst({
         where: { basketId: subscription.basketId },
-      });
-
     const planConfig = getPlanConfig(subscription.plan);
+      });
 
     if (
       !pendingPayment ||
@@ -226,13 +225,11 @@ export class SubscriptionService {
     if (
       !['paid', 'manual_accept'].includes(gatewayStatus) ||
       gatewayOrderId !== String(subscription.basketId) ||
-      gatewayTrackId !== String(pendingPayment.gatewayTxnRef) ||
       !Number.isFinite(gatewayAmount) ||
       Math.abs(gatewayAmount - planConfig.amount) > 0.000001 ||
       Number(pendingPayment.amount) !== planConfig.amount ||
       String(pendingPayment.currency).toUpperCase() !== 'USD' ||
       gatewayCurrency !== 'USD'
-    ) {
       return null;
     }
 
@@ -386,7 +383,6 @@ export class SubscriptionService {
         Number(pendingPayment.amount) === planConfig.amount &&
         String(pendingPayment.currency).toUpperCase() === 'USD' &&
         getPlanConfig(current.plan).plan === planConfig.plan
-      ) {
         return {
           checkoutUrl: pendingPayment.checkoutUrl,
           basketId: current.basketId,
@@ -439,172 +435,12 @@ export class SubscriptionService {
         orderId: basketId,
         customerEmail: String(user.email || ''),
         returnUrl: `${this.webUrl()}/subscription/return?basket=${encodeURIComponent(basketId)}`,
-        description: 'CrickX ' + planConfig.label.toLowerCase() + ' subscription - {
-        where: { id: payment.id },
-        data: { checkoutUrl: checkout.paymentUrl, gatewayTxnRef: checkout.trackId || undefined },
-      });
-
-      return {
-        checkoutUrl: checkout.paymentUrl,
-        basketId,
-        plan: planConfig.plan,
-        amount: planConfig.amount,
-        currency: 'USD',
-        durationDays: planConfig.durationDays,
-      };
-    } catch (error) {
-      await this.firestore.subscriptionPayment.update({ where: { id: payment.id }, data: { status: 'FAILED', failureReason: error instanceof Error ? error.message : 'Checkout creation failed' } });
-      await this.firestore.subscription.update({ where: { id: subscription.id }, data: { status: 'PAYMENT_FAILED' } });
-      throw error;
-    }
-  }
-
-  async paymentStatus(userId: string, basketId: string) {
-    const payment = await this.firestore.subscriptionPayment.findFirst({ where: { basketId } });
-    if (!payment || payment.userId !== userId) throw new ForbiddenException('Subscription payment not found.');
-
-    let subscription = await this.firestore.subscription.findUnique({ where: { id: payment.subscriptionId } });
-
-    const recovered = await this.recoverPaidPendingSubscription(userId, subscription, payment);
-    if (recovered) {
-      subscription = recovered.subscription;
-      const recoveredPlan = getPlanConfig(subscription?.plan);
-      return {
-        basketId,
-        plan: recoveredPlan.plan,
-        amount: recoveredPlan.amount,
-        durationDays: recoveredPlan.durationDays,
-        paymentStatus: 'SUCCEEDED',
-        subscriptionStatus: 'ACTIVE',
-        active: true,
-        expiresAt: recovered.expiresAt,
-        gatewayTxnRef: recovered.gatewayTxnRef,
-      };
-    }
-
-    const subscriptionExpiresDate = this.asDate(subscription?.expiresAt);
-    const subscriptionPlan = getPlanConfig(subscription?.plan);
-    return {
-      basketId,
-      plan: subscriptionPlan.plan,
-      amount: Number(subscription?.amount ?? subscriptionPlan.amount),
-      durationDays: subscriptionPlan.durationDays,
-      paymentStatus: payment.status,
-      subscriptionStatus: subscription?.status ?? 'NONE',
-      active: subscription?.status === 'ACTIVE' && !!subscriptionExpiresDate && subscriptionExpiresDate.getTime() > Date.now(),
-      expiresAt: this.isoDate(subscription?.expiresAt),
-      gatewayTxnRef: payment.gatewayTxnRef ?? null,
-    };
-  }
-
-  async handleWebhook(payload: any) {
-    if (String(payload?.type || '').toLowerCase() !== 'invoice') {
-      return { received: true, ignored: true };
-    }
-
-    const basketId = String(payload?.order_id || '');
-    if (!basketId) return { received: true, ignored: true };
-
-    const payment = await this.firestore.subscriptionPayment.findFirst({ where: { basketId } });
-    if (!payment) return { received: true, ignored: true };
-
-    const subscription = await this.firestore.subscription.findUnique({ where: { id: payment.subscriptionId } });
-    if (!subscription) return { received: true, ignored: true };
-    const planConfig = getPlanConfig(subscription.plan);
-
-    if (payment.status === 'SUCCEEDED' || payment.status === 'FAILED') {
-      return { received: true, duplicate: true };
-    }
-
-    const status = String(payload?.status || '').toLowerCase();
-    const amount = Number(payload?.amount);
-    const currency = String(payload?.currency || '').toUpperCase();
-    const gatewayTxnRef = payload?.track_id !== undefined && payload?.track_id !== null
-      ? String(payload.track_id)
-      : undefined;
-
-    if (status === 'paid') {
-      if (payment.gatewayTxnRef && gatewayTxnRef && String(payment.gatewayTxnRef) !== gatewayTxnRef) {
-        return { received: true, rejected: true };
-      }
-
-      if (
-        !Number.isFinite(amount) ||
-        Math.abs(amount - planConfig.amount) > 0.000001 ||
-        Number(payment.amount) !== planConfig.amount ||
-        String(payment.currency).toUpperCase() !== 'USD'
-      ) {
-        await this.firestore.subscriptionPayment.update({
-          where: { id: payment.id },
-          data: { status: 'FAILED', gatewayTxnRef, failureReason: 'OxaPay webhook amount mismatch' },
-        });
-        await this.firestore.subscription.update({
-          where: { id: payment.subscriptionId },
-          data: { status: 'PAYMENT_FAILED' },
-        });
-        return { received: true, rejected: true };
-      }
-
-      if (currency !== 'USD') {
-        await this.firestore.subscriptionPayment.update({
-          where: { id: payment.id },
-          data: { status: 'FAILED', gatewayTxnRef, failureReason: 'OxaPay webhook currency mismatch' },
-        });
-        await this.firestore.subscription.update({
-          where: { id: payment.subscriptionId },
-          data: { status: 'PAYMENT_FAILED' },
-        });
-        return { received: true, rejected: true };
-      }
-
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + planConfig.durationMs);
-      await this.firestore.subscriptionPayment.update({
-        where: { id: payment.id },
-        data: {
-          status: 'SUCCEEDED',
-          gatewayTxnRef,
-          eventId: gatewayTxnRef,
-          completedAt: now,
-        },
-      });
-      await this.firestore.subscription.update({
-        where: { id: payment.subscriptionId },
-        data: { status: 'ACTIVE', startedAt: now, expiresAt },
-      });
-      await this.markReferralValid(payment.userId, payment.subscriptionId);
-      return { received: true };
-    }
-
-    if (status === 'failed' || status === 'expired' || status === 'cancelled' || status === 'canceled') {
-      await this.firestore.subscriptionPayment.update({
-        where: { id: payment.id },
-        data: {
-          status: 'FAILED',
-          gatewayTxnRef,
-          failureReason: `OxaPay payment status: ${status}`,
-        },
-      });
-      await this.firestore.subscription.update({
-        where: { id: payment.subscriptionId },
-        data: { status: 'PAYMENT_FAILED' },
-      });
-      return { received: true };
-    }
-
-    return { received: true, pending: true };
-  }
-}
- + planConfig.amount.toFixed(2) + ' for ' + planConfig.durationDays + ' days.',
+        description: 'CrickX ' + planConfig.label.toLowerCase() + ' subscription - $' + planConfig.amount.toFixed(2) + ' for ' + planConfig.durationDays + ' days.',
         thanksMessage: 'Thank you for choosing the CrickX ' + planConfig.label.toLowerCase() + ' plan.',
       });
 
       await this.firestore.subscriptionPayment.update({
         where: { id: payment.id },
-        data: { checkoutUrl: checkout.paymentUrl, gatewayTxnRef: checkout.trackId || undefined },
-      });
-
-      return {
         checkoutUrl: checkout.paymentUrl,
         basketId,
         plan: planConfig.plan,
@@ -640,7 +476,6 @@ export class SubscriptionService {
         expiresAt: recovered.expiresAt,
         gatewayTxnRef: recovered.gatewayTxnRef,
       };
-    }
 
     const subscriptionExpiresDate = this.asDate(subscription?.expiresAt);
     const subscriptionPlan = getPlanConfig(subscription?.plan);
@@ -649,8 +484,6 @@ export class SubscriptionService {
       plan: subscriptionPlan.plan,
       amount: Number(subscription?.amount ?? subscriptionPlan.amount),
       durationDays: subscriptionPlan.durationDays,
-      paymentStatus: payment.status,
-      subscriptionStatus: subscription?.status ?? 'NONE',
       active: subscription?.status === 'ACTIVE' && !!subscriptionExpiresDate && subscriptionExpiresDate.getTime() > Date.now(),
       expiresAt: this.isoDate(subscription?.expiresAt),
       gatewayTxnRef: payment.gatewayTxnRef ?? null,
@@ -667,7 +500,6 @@ export class SubscriptionService {
 
     const payment = await this.firestore.subscriptionPayment.findFirst({ where: { basketId } });
     if (!payment) return { received: true, ignored: true };
-
     const subscription = await this.firestore.subscription.findUnique({ where: { id: payment.subscriptionId } });
     if (!subscription) return { received: true, ignored: true };
     const planConfig = getPlanConfig(subscription.plan);
@@ -687,7 +519,6 @@ export class SubscriptionService {
       if (payment.gatewayTxnRef && gatewayTxnRef && String(payment.gatewayTxnRef) !== gatewayTxnRef) {
         return { received: true, rejected: true };
       }
-
       if (
         !Number.isFinite(amount) ||
         Math.abs(amount - planConfig.amount) > 0.000001 ||
