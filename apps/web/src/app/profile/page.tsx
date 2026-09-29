@@ -55,7 +55,7 @@ export default function ProfilePage() {
   const [referralError, setReferralError] = useState('');
   const [referralCodeInput, setReferralCodeInput] = useState('');
   const [referralApplying, setReferralApplying] = useState(false);
-  const [referralCopied, setReferralCopied] = useState<'code' | 'link' | ''>('');
+  const [referralCopied, setReferralCopied] = useState<'code' | ''>('');
   const [editing, setEditing] = useState(false);
   const router = useRouter();
 
@@ -157,18 +157,6 @@ export default function ProfilePage() {
       window.setTimeout(() => setReferralCopied(''), 1800);
     } catch {
       setReferralError('Unable to copy the referral code.');
-    }
-  }
-
-  async function copyReferralLink() {
-    const link = referralLink();
-    if (!link) return;
-    try {
-      await navigator.clipboard.writeText(link);
-      setReferralCopied('link');
-      window.setTimeout(() => setReferralCopied(''), 1800);
-    } catch {
-      setReferralError('Unable to copy the referral link.');
     }
   }
 
@@ -342,9 +330,7 @@ export default function ProfilePage() {
                 <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#dce2eb', fontSize: 13 }}>
                   {referral?.code ? referralLink() : 'Generating your referral link…'}
                 </span>
-                <button className="primary-button" type="button" onClick={() => void copyReferralLink()} disabled={!referral?.code} style={{ padding: '8px 11px', flexShrink: 0 }}>
-                  {referralCopied === 'link' ? 'Copied ✓' : 'Copy Link'}
-                </button>
+
               </div>
             </div>
           </div>
