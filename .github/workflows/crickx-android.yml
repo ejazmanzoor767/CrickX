@@ -205,6 +205,34 @@ jobs:
           print("Gradle release signing configured:", store)
           PY
 
+      - name: Set unique Android version code
+        working-directory: apps/mobile
+        shell: bash
+        env:
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          path = Path("android/app/build.gradle")
+          text = path.read_text()
+          version_code = int(os.environ["ANDROID_VERSION_CODE"])
+          if version_code < 1:
+              raise SystemExit("Invalid Android version code")
+          updated, count = re.subn(
+              r"versionCode\s+\d+",
+              f"versionCode {version_code}",
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Generated Gradle file did not contain exactly one versionCode")
+          path.write_text(updated)
+          print(f"Android versionCode set to {version_code}.")
+          PY
       - name: Ensure Hermes compiler is executable
         shell: bash
         run: |
@@ -230,6 +258,17 @@ jobs:
           cd android
           ./gradlew assembleRelease --no-daemon --stacktrace
 
+      - name: Validate APK package and signature
+        working-directory: apps/mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          unzip -t "$apk" >/dev/null
+          apksigner verify --verbose "$apk"
+          aapt2 dump badging "$apk" | grep -E "^package: name='com\.crickx\.app'"
+          echo "APK package, ZIP structure, and Android signature verified."
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
