@@ -17,7 +17,7 @@ export default function Footer() {
           </div>
           <p className="footer-copy">Fantasy cricket and digital services delivered online through the CrickX platform.</p>
           <p className="footer-copy" style={{ marginTop: 10 }}>
-            <strong>Email:</strong> <a href="mailto:ejazchouhan27@gmail.com">ejazchouhan27@gmail.com</a><br />
+            <strong>Email:</strong> <a href="mailto:contact@crickxfantasy.site">contact@crickxfantasy.site</a><br />
             <strong>Phone:</strong> <a href="tel:03197789243">03197789243</a><br />
             <strong>Business Address:</strong> chah bakshay wala p/o pakka shahnawaz tehsil &amp; District Dera ghazi khan, dera ghazi khan
           </p>
@@ -35,14 +35,14 @@ export default function Footer() {
               <Link href="/profile/refund">Refund Policy</Link>
               <Link href="/profile/shipping">Shipping Policy</Link>
               <Link href="/profile/metamask">CRX in MetaMask</Link>
-              <a href="https://crickx-3d806.web.app" target="_blank" rel="noreferrer">Web App</a>
+              <a href="https://crickxfantasy.site" target="_blank" rel="noreferrer">Web App</a>
               <a href="https://github.com/ejazmanzoor767/CrickX/releases/latest/download/CrickX.apk">Download Android APK</a>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <span>© {new Date().getFullYear()} CrickX</span>
             <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted)' }}>
-              Web App: <a href="https://crickx-3d806.web.app" target="_blank" rel="noreferrer">https://crickx-3d806.web.app</a>
+              Web App: <a href="https://crickxfantasy.site" target="_blank" rel="noreferrer">https://crickxfantasy.site</a>
             </div>
           </div>
         </div>
