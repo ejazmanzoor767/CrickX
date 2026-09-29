@@ -43,7 +43,9 @@ export const appKit =
           socials: false,
           swaps: false,
           send: false,
+          connectMethodsOrder: ['wallet'],
         },
+        allWallets: 'SHOW',
         themeMode: 'dark',
       })
     : null;
