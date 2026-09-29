@@ -31,7 +31,19 @@ export default function SubscriptionPage() {
       router.push('/login');
       return;
     }
+
     void load();
+
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
   }, [authLoading, user, router]);
 
   async function subscribe() {
@@ -48,8 +60,14 @@ export default function SubscriptionPage() {
 
   if (authLoading || loading) return <section className="app-page"><div className="card skeleton-card">Loading subscription…</div></section>;
 
-  const active = Boolean(status?.active);
-  const expires = status?.expiresAt ? new Date(status.expiresAt).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' }) : null;
+  const expiresDate = status?.expiresAt ? new Date(status.expiresAt) : null;
+  const expiresMs = expiresDate && !Number.isNaN(expiresDate.getTime()) ? expiresDate.getTime() : 0;
+  // The API's active flag is authoritative, while the normalized ACTIVE +
+  // future-expiry check protects the UI from an incomplete response shape.
+  const active = (Boolean(status?.active) || status?.status === 'ACTIVE') && expiresMs > Date.now();
+  const expires = expiresMs > 0
+    ? expiresDate!.toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' })
+    : null;
 
   return <section className="app-page subscription-page" style={{ maxWidth: 860, paddingBottom: 96 }}>
     <div className="page-intro">
