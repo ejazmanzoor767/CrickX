@@ -12,11 +12,20 @@ describe('applicationState', () => {
     } as any)).toBe('COMPLETED');
   });
 
-  it('does not mark a stale NS fixture LIVE from live=1 alone', () => {
+  it('promotes a started NS fixture to LIVE from the provider live flag before scoring data arrives', () => {
     expect(applicationState({
       id: 2,
       status: 'NS',
       live: 1,
+      starting_at: new Date(now - 60_000).toISOString(),
+    } as any)).toBe('LIVE');
+  });
+
+  it('keeps a started NS fixture UPCOMING when the provider has not marked it live', () => {
+    expect(applicationState({
+      id: 8,
+      status: 'NS',
+      live: 0,
       starting_at: new Date(now - 60_000).toISOString(),
     } as any)).toBe('UPCOMING');
   });
@@ -31,14 +40,14 @@ describe('applicationState', () => {
     } as any)).toBe('LIVE');
   });
 
-  it('keeps an NS fixture UPCOMING when only an initialized scoreboard is present', () => {
+  it('promotes an NS fixture with an initialized scoreboard when the provider marks it live', () => {
     expect(applicationState({
       id: 7,
       status: 'NS',
       live: 1,
       starting_at: new Date(now - 60_000).toISOString(),
       scoreboards: [{ score: 0, total: 0 }],
-    } as any)).toBe('UPCOMING');
+    } as any)).toBe('LIVE');
   });
 
 
