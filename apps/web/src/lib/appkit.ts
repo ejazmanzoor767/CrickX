@@ -31,7 +31,6 @@ export const appKit =
         projectId,
         networks: appKitNetworks,
         defaultNetwork: polygon,
-        allowUnsupportedChain: false,
         metadata: {
           name: 'CrickX',
           description: 'Fantasy cricket powered by CrickX.',
@@ -46,9 +45,5 @@ export const appKit =
           send: false,
         },
         themeMode: 'dark',
-        themeVariables: {
-          '--w3m-accent': '#9bff47',
-          '--w3m-border-radius-master': '12px',
-        },
       })
     : null;
