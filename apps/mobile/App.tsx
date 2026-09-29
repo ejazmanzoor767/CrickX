@@ -143,8 +143,6 @@ export default function App() {
     );
   }
 
-  let currentHost = '';
-  try { currentHost = new URL(currentUrl).hostname.toLowerCase(); } catch { currentHost = ''; }
   const isCrickXPage = isAllowedCrickXUrl(currentUrl);
   const screenTitle = titleForTab(activeTab);
 
