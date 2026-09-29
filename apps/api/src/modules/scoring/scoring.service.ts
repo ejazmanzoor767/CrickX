@@ -21,7 +21,7 @@ function isFinished(status: string | null | undefined, live: 0 | 1) {
 
 function isActuallyLive(fixture: any) {
   const value = String(fixture?.status ?? '').trim().toLowerCase();
-  const live = Number(fixture?.live) === 1;
+  const live: 0 | 1 = Number(fixture?.live) === 1 ? 1 : 0;
   const startMs = new Date(fixture?.starting_at ?? '').getTime();
   const started = Number.isFinite(startMs) && startMs <= Date.now();
 
