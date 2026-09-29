@@ -31,6 +31,17 @@ describe('applicationState', () => {
     } as any)).toBe('LIVE');
   });
 
+  it('keeps an NS fixture UPCOMING when only an initialized scoreboard is present', () => {
+    expect(applicationState({
+      id: 7,
+      status: 'NS',
+      live: 1,
+      starting_at: new Date(now - 60_000).toISOString(),
+      scoreboards: [{ score: 0, total: 0 }],
+    } as any)).toBe('UPCOMING');
+  });
+
+
   it('keeps a future fixture UPCOMING even when the provider live flag is premature', () => {
     expect(applicationState({
       id: 3,
