@@ -38,7 +38,7 @@ jobs:
           set -euo pipefail
           rm -rf node_modules apps/*/node_modules
           rm -f package-lock.json
-          npm install --workspaces --include-workspace-root --no-audit --no-fund
+          npm install --package-lock-only --workspaces --include-workspace-root --ignore-scripts --no-audit --no-fund
           git diff -- package-lock.json
 
       - name: Commit lockfile
