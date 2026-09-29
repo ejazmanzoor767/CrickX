@@ -34,6 +34,14 @@ type EthereumProvider = {
   removeListener?: Function;
 };
 
+function normalizeWalletError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  if (/broadcast channel unavailable/i.test(message)) {
+    return new Error('Your wallet extension could not open its connection channel. Refresh this page and reconnect, or choose another wallet from the wallet picker.');
+  }
+  return error instanceof Error ? error : new Error(fallback);
+}
+
 function getBrowserEthereumProvider(): EthereumProvider {
   if (typeof window === 'undefined') {
     throw new Error('Wallet connection is only available in the browser.');
@@ -49,7 +57,13 @@ function getBrowserEthereumProvider(): EthereumProvider {
 
 async function getEthereumProvider(connect = false): Promise<EthereumProvider> {
   const provider = getBrowserEthereumProvider();
-  if (connect) await provider.request({ method: 'eth_requestAccounts' });
+  if (connect) {
+    try {
+      await provider.request({ method: 'eth_requestAccounts' });
+    } catch (error) {
+      throw normalizeWalletError(error, 'Unable to connect the selected wallet.');
+    }
+  }
   return provider;
 }
 
@@ -189,7 +203,7 @@ export async function changeWallet(currentAddress?: Address) {
     });
   }
 
-  return connectWallet();
+  throw new Error('The multi-wallet picker is not configured yet. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX build environment to enable wallet icons and wallet selection.');
 }
 
 export async function connectWallet() {
