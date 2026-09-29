@@ -77,6 +77,7 @@ export default function App() {
   }, [canGoBack, exitHintVisible]);
 
   function navigate(path: string) {
+    if (activeTab === path && currentUrl.includes(path)) return;
     const target = WEB_URL.replace(/\/$/, '') + path;
     setActiveTab(path);
     setExitHintVisible(false);
@@ -174,7 +175,10 @@ export default function App() {
               <Image source={require('./assets/crickx-original-icon.png')} style={styles.logo} />
               <View style={styles.headerCopy}>
                 <Text style={styles.brand}>CRICKX</Text>
-                <Text style={styles.sectionTitle} numberOfLines={1}>{screenTitle}</Text>
+                <View style={styles.sectionRow}>
+                  <Text style={styles.sectionTitle} numberOfLines={1}>{screenTitle}</Text>
+                  <View style={styles.sectionDot} />
+                </View>
               </View>
             </View>
             <Pressable
@@ -298,6 +302,7 @@ export default function App() {
                   accessibilityRole="button"
                   accessibilityLabel={tab.label}
                   onPress={() => navigate(tab.path)}
+                  accessibilityState={{ selected: active }}
                   style={({ pressed }) => [
                     styles.tab,
                     active && styles.tabActive,
@@ -306,6 +311,7 @@ export default function App() {
                 >
                   <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{tab.icon}</Text>
                   <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{tab.label}</Text>
+                  {active && <View style={styles.tabIndicator} />}
                 </Pressable>
               );
             })}
@@ -360,7 +366,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,.08)',
   },
   brand: { color: '#9bf34a', fontWeight: '900', letterSpacing: 2.8, fontSize: 11 },
-  sectionTitle: { color: '#f3f6fb', fontWeight: '900', fontSize: 16, marginTop: 1, letterSpacing: 0.05 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+  sectionTitle: { color: '#f3f6fb', fontWeight: '900', fontSize: 16, marginTop: 1, letterSpacing: 0.05, flexShrink: 1 },
+  sectionDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#9bf34a', marginLeft: 7, marginTop: 3 },
   refreshButton: {
     width: 40,
     height: 40,
@@ -400,6 +408,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   tabActive: { backgroundColor: 'rgba(155,243,74,.10)', borderWidth: 1, borderColor: 'rgba(155,243,74,.08)' },
+  tabIndicator: { position: 'absolute', top: 4, left: '50%', marginLeft: -10, width: 20, height: 2, borderRadius: 2, backgroundColor: '#9bf34a' },
   tabIcon: { color: '#7f8999', fontSize: 18, lineHeight: 21, fontWeight: '900' },
   tabIconActive: { color: '#9bf34a' },
   tabLabel: { color: '#7f8999', fontSize: 10, fontWeight: '800', marginTop: 4, letterSpacing: 0.1 },
@@ -429,9 +438,10 @@ const styles = StyleSheet.create({
   },
   loading: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#080b10',
+    backgroundColor: 'rgba(8,11,16,.965)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 20,
   },
   loadingLogo: { width: 78, height: 78, borderRadius: 22 },
   loadingBrand: { color: '#9bf34a', fontWeight: '900', letterSpacing: 4, fontSize: 14, marginTop: 12 },
