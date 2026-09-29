@@ -131,6 +131,67 @@ export async function switchToPolygon() {
   }
 }
 
+export async function changeWallet(currentAddress?: Address) {
+  const config = getWagmiConfig();
+
+  if (config && appKit) {
+    const previousAddress = currentAddress || getAccount(config).address || null;
+
+    return new Promise<Address>(async (resolve, reject) => {
+      let sawOpen = false;
+      let settled = false;
+      let interval: ReturnType<typeof setInterval> | null = null;
+      let unsubscribe: (() => void) | null = null;
+
+      const cleanup = () => {
+        if (interval) clearInterval(interval);
+        if (unsubscribe) unsubscribe();
+      };
+
+      const finish = (value?: Address, error?: Error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (error) reject(error);
+        else if (value) resolve(value);
+        else reject(new Error('Wallet selection was cancelled.'));
+      };
+
+      unsubscribe = appKit.subscribeState(state => {
+        if (state.open) {
+          sawOpen = true;
+          return;
+        }
+
+        if (!sawOpen) return;
+
+        const account = getAccount(config);
+        if (account.isConnected && account.address) {
+          finish(account.address as Address);
+        } else {
+          finish(undefined, new Error('Wallet selection was cancelled.'));
+        }
+      });
+
+      interval = setInterval(() => {
+        const account = getAccount(config);
+        if (!account.isConnected || !account.address) return;
+        if (!previousAddress || account.address.toLowerCase() !== previousAddress.toLowerCase()) {
+          finish(account.address as Address);
+        }
+      }, 250);
+
+      try {
+        await appKit.open({ view: 'AllWallets' });
+      } catch (error) {
+        finish(undefined, error instanceof Error ? error : new Error('Unable to open the wallet picker.'));
+      }
+    });
+  }
+
+  return connectWallet();
+}
+
 export async function connectWallet() {
   const config = getWagmiConfig();
 
