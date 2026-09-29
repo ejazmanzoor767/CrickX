@@ -157,6 +157,91 @@ export class SubscriptionService {
     });
   }
 
+  /**
+   * Recover a genuinely paid OxaPay invoice when its webhook did not reach
+   * CrickX or was rejected before the subscription record was activated.
+   *
+   * We only query invoices already tied to this authenticated user's own
+   * pending subscription, then verify the gateway order, track id, amount,
+   * and currency before activating access.
+   */
+  private async recoverPaidPendingSubscription(userId: string, subscription: any, payment?: any) {
+    if (!subscription || subscription.status !== 'PENDING') return null;
+
+    const pendingPayment = payment ??
+      await this.firestore.subscriptionPayment.findFirst({
+        where: { basketId: subscription.basketId },
+      });
+
+    if (
+      !pendingPayment ||
+      pendingPayment.userId !== userId ||
+      pendingPayment.subscriptionId !== subscription.id ||
+      pendingPayment.provider !== 'OXAPAY' ||
+      pendingPayment.status !== 'INITIATED' ||
+      !pendingPayment.gatewayTxnRef
+    ) {
+      return null;
+    }
+
+    const createdMs = this.asDate(pendingPayment.createdAt)?.getTime() ?? 0;
+    if (!createdMs || Date.now() - createdMs < 5_000) return null;
+
+    let gateway: any;
+    try {
+      gateway = await this.oxapay.getPaymentInfo(String(pendingPayment.gatewayTxnRef));
+    } catch {
+      return null;
+    }
+
+    const gatewayStatus = String(gateway?.status || '').toLowerCase();
+    const gatewayAmount = Number(gateway?.amount);
+    const gatewayCurrency = String(gateway?.currency || '').toUpperCase();
+    const gatewayOrderId = String(gateway?.order_id ?? gateway?.orderId ?? '');
+    const gatewayTrackId = String(gateway?.track_id ?? gateway?.trackId ?? pendingPayment.gatewayTxnRef);
+
+    if (
+      !['paid', 'manual_accept'].includes(gatewayStatus) ||
+      gatewayOrderId !== String(subscription.basketId) ||
+      gatewayTrackId !== String(pendingPayment.gatewayTxnRef) ||
+      !Number.isFinite(gatewayAmount) ||
+      Math.abs(gatewayAmount - PRICE_USD) > 0.000001 ||
+      gatewayCurrency !== 'USD'
+    ) {
+      return null;
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + DURATION_MS);
+
+    await this.firestore.subscriptionPayment.update({
+      where: { id: pendingPayment.id },
+      data: {
+        status: 'SUCCEEDED',
+        gatewayTxnRef: gatewayTrackId,
+        eventId: gatewayTrackId,
+        completedAt: now,
+      },
+    });
+    await this.firestore.subscription.update({
+      where: { id: subscription.id },
+      data: { status: 'ACTIVE', startedAt: now, expiresAt },
+    });
+    try {
+      await this.markReferralValid(userId, subscription.id);
+    } catch {
+      // Referral qualification is secondary; a verified payment must still
+      // activate the subscription even when referral storage is temporarily unavailable.
+    }
+
+    return {
+      subscription: { ...subscription, status: 'ACTIVE', startedAt: now, expiresAt },
+      payment: { ...pendingPayment, status: 'SUCCEEDED', gatewayTxnRef: gatewayTrackId, eventId: gatewayTrackId, completedAt: now },
+      expiresAt,
+      gatewayTxnRef: gatewayTrackId,
+    };
+  }
+
   async status(userId: string) {
     const rows = await this.subscriptionsForUser(userId);
     if (!rows.length) {
@@ -173,12 +258,30 @@ export class SubscriptionService {
       };
     }
 
-    const now = Date.now();
-    const normalized = rows.map((row: any) => ({
+    let normalized = rows.map((row: any) => ({
       row,
       createdMs: this.asDate(row.createdAt)?.getTime() ?? 0,
       expiresMs: this.asDate(row.expiresAt)?.getTime() ?? 0,
     }));
+
+    // First, repair a locally PENDING subscription if OxaPay confirms that the
+    // corresponding invoice was actually paid. This covers webhook delivery
+    // failures without trusting client-side redirects.
+    const pendingCandidates = [...normalized]
+      .filter(({ row }) => row.status === 'PENDING' && row.basketId)
+      .sort((a, b) => b.createdMs - a.createdMs);
+
+    for (const candidate of pendingCandidates) {
+      const recovered = await this.recoverPaidPendingSubscription(userId, candidate.row);
+      if (recovered) {
+        candidate.row = recovered.subscription;
+        candidate.expiresMs = recovered.expiresAt.getTime();
+        normalized = normalized.map((item) => item.row.id === candidate.row.id ? candidate : item);
+        break;
+      }
+    }
+
+    const now = Date.now();
 
     // A valid ACTIVE subscription must win over newer pending/failed records.
     const active = normalized
@@ -230,7 +333,6 @@ export class SubscriptionService {
       id: current.id,
     };
   }
-
 
   async getReferralInfo(userId: string) {
     return this.referralInfo(userId);
@@ -330,58 +432,17 @@ export class SubscriptionService {
 
     let subscription = await this.firestore.subscription.findUnique({ where: { id: payment.subscriptionId } });
 
-    // Webhooks are the primary source of truth. As a fallback, query OxaPay while
-    // the local payment is still pending so a delayed webhook does not leave the
-    // customer stuck on the confirmation page.
-    if (
-      payment.status === 'INITIATED' &&
-      payment.gatewayTxnRef &&
-      subscription?.status === 'PENDING' &&
-      Date.now() - new Date(payment.createdAt).getTime() >= 5_000
-    ) {
-      try {
-        const gateway = await this.oxapay.getPaymentInfo(String(payment.gatewayTxnRef));
-        const gatewayStatus = String(gateway?.status || '').toLowerCase();
-        const gatewayAmount = Number(gateway?.amount);
-        const gatewayCurrency = String(gateway?.currency || '').toUpperCase();
-
-        if (
-          (gatewayStatus === 'paid' || gatewayStatus === 'manual_accept') &&
-          Number.isFinite(gatewayAmount) &&
-          Math.abs(gatewayAmount - PRICE_USD) <= 0.000001 &&
-          gatewayCurrency === 'USD'
-        ) {
-          const now = new Date();
-          const expiresAt = new Date(now.getTime() + DURATION_MS);
-
-          await this.firestore.subscriptionPayment.update({
-            where: { id: payment.id },
-            data: {
-              status: 'SUCCEEDED',
-              gatewayTxnRef: String(gateway.track_id ?? gateway.trackId ?? payment.gatewayTxnRef),
-              eventId: String(gateway.track_id ?? gateway.trackId ?? payment.gatewayTxnRef),
-              completedAt: now,
-            },
-          });
-          await this.firestore.subscription.update({
-            where: { id: payment.subscriptionId },
-            data: { status: 'ACTIVE', startedAt: now, expiresAt },
-          });
-
-          subscription = { ...subscription, status: 'ACTIVE', startedAt: now, expiresAt };
-          await this.markReferralValid(userId, payment.subscriptionId);
-          return {
-            basketId,
-            paymentStatus: 'SUCCEEDED',
-            subscriptionStatus: 'ACTIVE',
-            active: true,
-            expiresAt,
-            gatewayTxnRef: String(gateway.track_id ?? gateway.trackId ?? payment.gatewayTxnRef),
-          };
-        }
-      } catch {
-        // Keep waiting for the webhook if the gateway status lookup is temporarily unavailable.
-      }
+    const recovered = await this.recoverPaidPendingSubscription(userId, subscription, payment);
+    if (recovered) {
+      subscription = recovered.subscription;
+      return {
+        basketId,
+        paymentStatus: 'SUCCEEDED',
+        subscriptionStatus: 'ACTIVE',
+        active: true,
+        expiresAt: recovered.expiresAt,
+        gatewayTxnRef: recovered.gatewayTxnRef,
+      };
     }
 
     const subscriptionExpiresDate = this.asDate(subscription?.expiresAt);
