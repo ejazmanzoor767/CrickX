@@ -240,7 +240,6 @@ export class SubscriptionService {
       expiresAt,
       gatewayTxnRef: gatewayTrackId,
     };
-    }
   }
 
   async status(userId: string) {
