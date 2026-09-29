@@ -192,8 +192,9 @@ export class SubscriptionService {
     const pendingPayment = payment ??
       await this.firestore.subscriptionPayment.findFirst({
         where: { basketId: subscription.basketId },
-    const planConfig = getPlanConfig(subscription.plan);
       });
+
+    const planConfig = getPlanConfig(subscription.plan);
 
     if (
       !pendingPayment ||
@@ -225,11 +226,13 @@ export class SubscriptionService {
     if (
       !['paid', 'manual_accept'].includes(gatewayStatus) ||
       gatewayOrderId !== String(subscription.basketId) ||
+      gatewayTrackId !== String(pendingPayment.gatewayTxnRef) ||
       !Number.isFinite(gatewayAmount) ||
       Math.abs(gatewayAmount - planConfig.amount) > 0.000001 ||
       Number(pendingPayment.amount) !== planConfig.amount ||
       String(pendingPayment.currency).toUpperCase() !== 'USD' ||
       gatewayCurrency !== 'USD'
+    ) {
       return null;
     }
 
@@ -383,6 +386,7 @@ export class SubscriptionService {
         Number(pendingPayment.amount) === planConfig.amount &&
         String(pendingPayment.currency).toUpperCase() === 'USD' &&
         getPlanConfig(current.plan).plan === planConfig.plan
+      ) {
         return {
           checkoutUrl: pendingPayment.checkoutUrl,
           basketId: current.basketId,
@@ -441,6 +445,10 @@ export class SubscriptionService {
 
       await this.firestore.subscriptionPayment.update({
         where: { id: payment.id },
+        data: { checkoutUrl: checkout.paymentUrl, gatewayTxnRef: checkout.trackId || undefined },
+      });
+
+      return {
         checkoutUrl: checkout.paymentUrl,
         basketId,
         plan: planConfig.plan,
@@ -476,6 +484,7 @@ export class SubscriptionService {
         expiresAt: recovered.expiresAt,
         gatewayTxnRef: recovered.gatewayTxnRef,
       };
+    }
 
     const subscriptionExpiresDate = this.asDate(subscription?.expiresAt);
     const subscriptionPlan = getPlanConfig(subscription?.plan);
@@ -484,6 +493,8 @@ export class SubscriptionService {
       plan: subscriptionPlan.plan,
       amount: Number(subscription?.amount ?? subscriptionPlan.amount),
       durationDays: subscriptionPlan.durationDays,
+      paymentStatus: payment.status,
+      subscriptionStatus: subscription?.status ?? 'NONE',
       active: subscription?.status === 'ACTIVE' && !!subscriptionExpiresDate && subscriptionExpiresDate.getTime() > Date.now(),
       expiresAt: this.isoDate(subscription?.expiresAt),
       gatewayTxnRef: payment.gatewayTxnRef ?? null,
@@ -500,6 +511,7 @@ export class SubscriptionService {
 
     const payment = await this.firestore.subscriptionPayment.findFirst({ where: { basketId } });
     if (!payment) return { received: true, ignored: true };
+
     const subscription = await this.firestore.subscription.findUnique({ where: { id: payment.subscriptionId } });
     if (!subscription) return { received: true, ignored: true };
     const planConfig = getPlanConfig(subscription.plan);
