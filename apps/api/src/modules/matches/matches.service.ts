@@ -32,22 +32,27 @@ export function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE
   // dropped fixtures from reappearing forever in Live/Fantasy.
   if (staleNotStarted) return 'COMPLETED';
 
-  // A match cannot be LIVE before its scheduled start time. Sportmonks can
-  // briefly expose live=1 on a fixture ahead of the real start, so the
-  // provider flag is only accepted after the scheduled start timestamp.
+  // A match cannot be LIVE before its scheduled start time.
   if (!started) return 'UPCOMING';
 
-  if (fixture.live === 1) return 'LIVE';
+  const notStartedStatus = ['ns', 'scheduled', 'not started', 'upcoming', 'postponed']
+    .some((value) => status === value || status.includes(value));
+  const liveStatus = ['live', 'innings break', 'lunch', 'tea', 'stumps']
+    .some((part) => status.includes(part));
 
-  // Explicit not-started/scheduled states remain upcoming when there is no
-  // positive live signal.
-  if (['ns', 'scheduled', 'not started', 'upcoming', 'postponed'].some((value) => status === value || status.includes(value))) {
-    return 'UPCOMING';
-  }
+  // Sportmonks /livescores can retain a stale live=1 flag on fixtures that
+  // have not actually entered play. When the status still says NS/scheduled,
+  // require positive scoring evidence before promoting it to LIVE.
+  const hasLivePayload =
+    (Array.isArray((fixture as any).runs) && (fixture as any).runs.length > 0) ||
+    (Array.isArray((fixture as any).scoreboards) && (fixture as any).scoreboards.length > 0) ||
+    (Array.isArray((fixture as any).batting) && (fixture as any).batting.length > 0) ||
+    (Array.isArray((fixture as any).bowling) && (fixture as any).bowling.length > 0) ||
+    (Array.isArray((fixture as any).balls) && (fixture as any).balls.length > 0);
 
-  if (['live', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => status.includes(part))) {
-    return 'LIVE';
-  }
+  if (liveStatus) return 'LIVE';
+  if (fixture.live === 1 && (!notStartedStatus || hasLivePayload)) return 'LIVE';
+  if (notStartedStatus) return 'UPCOMING';
 
   return 'UPCOMING';
 }
@@ -203,19 +208,10 @@ export class MatchesService {
   }
   async listLive() {
     const result = await this.sportmonks.listLiveFixtures();
-    // /livescores is itself a positive provider signal. Preserve fixtures from
-    // that feed as LIVE unless they carry an explicit terminal state. This
-    // avoids dropping real live matches when starting_at/status fields lag.
-    const now = Date.now();
     const data = Array.isArray(result.data)
       ? result.data
-          .filter((fixture) => {
-            if (isTerminalFixture(fixture)) return false;
-            const startingAt = fixture.starting_at ? new Date(fixture.starting_at).getTime() : NaN;
-            return Number.isFinite(startingAt) && startingAt <= now;
-          })
-          .map((fixture) => normalize(fixture))
-          .map((fixture) => ({ ...fixture, applicationState: 'LIVE' as const }))
+          .filter((fixture) => applicationState(fixture) === 'LIVE')
+          .map(normalize)
       : [];
     return { ...result, data };
   }
