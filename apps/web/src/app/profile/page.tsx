@@ -294,7 +294,7 @@ export default function ProfilePage() {
               </div>
               <h2 style={{ margin: '12px 0 7px', fontSize: 28 }}>Grow your CrickX network</h2>
               <p className="section-subtitle" style={{ margin: 0, lineHeight: 1.65 }}>
-                Invite friends with your personal link. A referral becomes <strong style={{ color: '#eef2f7' }}>valid</strong> after the referred user successfully completes a subscription.
+                Invite friends with your referral code. A referral becomes <strong style={{ color: '#eef2f7' }}>valid</strong> after the referred user successfully completes a subscription.
               </p>
             </div>
             <div style={{ minWidth: 170, padding: 16, borderRadius: 18, background: 'rgba(0,0,0,.18)', border: '1px solid rgba(255,255,255,.07)' }}>
@@ -326,7 +326,7 @@ export default function ProfilePage() {
               <div>
                 <strong style={{ display: 'block', fontSize: 14 }}>How valid referrals work</strong>
                 <p style={{ margin: '5px 0 0', color: '#9aa3b5', fontSize: 13, lineHeight: 1.6 }}>
-                  Your friend can register through your link or apply your code. They are counted as a valid referral only after their subscription is successfully confirmed.
+                  Your friend can register and apply your code. They are counted as a valid referral only after their subscription is successfully confirmed.
                 </p>
               </div>
             </div>
@@ -372,7 +372,7 @@ export default function ProfilePage() {
           </div>
 
           <div style={{ paddingTop: 2, borderTop: '1px solid rgba(255,255,255,.06)' }}>
-            <p style={{ margin: '14px 0 0', color: '#8f98aa', fontSize: 12, lineHeight: 1.6 }}>At launch, rewards will be distributed according to the number of valid referrals.</p>
+            <p style={{ margin: '14px 0 0', color: '#8f98aa', fontSize: 12, lineHeight: 1.6 }}>Rewards are distributed according to the number of valid referrals.</p>
           </div>
         </div>
       </div>
