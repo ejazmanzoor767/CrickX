@@ -22,6 +22,11 @@ describe('FantasyTeamService.createTeam', () => {
       return teams;
     }, []);
     const sportmonks = {
+      getFixture: jest.fn().mockResolvedValue({
+        starting_at: futureStart,
+        status: 'upcoming',
+        live: 0,
+      }),
       getFixtureSquads: jest.fn().mockResolvedValue({
         status: 'upcoming',
         startingAt: futureStart,
