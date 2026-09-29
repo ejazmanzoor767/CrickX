@@ -97,22 +97,15 @@ export default function App() {
 
   function handleNavigationRequest(request: WebViewNavigation) {
     const url = request.url;
-    if (url.startsWith('about:blank') || url.startsWith('blob:')) return true;
-
-    let host = '';
-    try {
-      host = new URL(url).hostname.toLowerCase();
-    } catch {
-      host = '';
-    }
-
-    if (host && ALLOWED_HOSTS.has(host)) return true;
-
-    // Never render third-party web pages inside the app shell. Open only
-    // explicitly allowed external destinations in the system/browser.
     try {
       const parsed = new URL(url);
       const protocol = parsed.protocol.toLowerCase();
+
+      if (protocol === 'about:' || protocol === 'blob:') return true;
+      if (protocol === 'https:' && ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) return true;
+
+      // Never render third-party web pages inside the app shell. Open only
+      // explicitly allowed external destinations in the system/browser.
       const allowedExternalProtocols = new Set(['https:', 'mailto:', 'tel:', 'metamask:', 'wc:']);
       if (allowedExternalProtocols.has(protocol)) {
         void Linking.openURL(url).catch(() => undefined);
@@ -228,7 +221,7 @@ export default function App() {
               const nextUrl = state.url || WEB_URL;
               setCurrentUrl(nextUrl);
               setCanGoBack(state.canGoBack);
-              if (ALLOWED_HOSTS.has(new URL(nextUrl).hostname.toLowerCase())) {
+              if (isAllowedCrickXUrl(nextUrl)) {
                 const nextTab = tabForUrl(nextUrl);
                 if (nextTab) setActiveTab(nextTab);
               }
