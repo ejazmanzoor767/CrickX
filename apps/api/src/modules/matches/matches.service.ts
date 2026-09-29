@@ -203,13 +203,41 @@ export class MatchesService {
     return { data, meta: { pagination: { total: data.length, count: data.length, per_page: data.length, current_page: 1, total_pages: 1 } } };
   }
   async listLive() {
-    const result = await this.sportmonks.listLiveFixtures();
-    const data = Array.isArray(result.data)
-      ? result.data
-          .filter((fixture) => applicationState(fixture) === 'LIVE')
-          .map(normalize)
-      : [];
-    return { ...result, data };
+    const liveResult = await this.sportmonks.listLiveFixtures();
+    const liveRows = Array.isArray(liveResult.data) ? liveResult.data : [];
+
+    // Sportmonks can briefly omit a match from /livescores during the
+    // kickoff transition. Merge the current day's fixture feed as a fallback
+    // so a started live fixture is not invisible to the app.
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
+    const scheduledResult = await this.sportmonks.listFixtures({
+      startsBetween: {
+        start: sportmonksDate(startOfDay),
+        end: sportmonksDate(endOfDay),
+      },
+      include: 'localteam,visitorteam,league,season,stage,runs,scoreboards',
+    });
+    const scheduledRows = Array.isArray(scheduledResult.data) ? scheduledResult.data : [];
+
+    const byId = new Map<number, SportmonksFixture>();
+    for (const fixture of [...scheduledRows, ...liveRows]) {
+      const id = Number(fixture?.id);
+      if (Number.isFinite(id) && id > 0) byId.set(id, fixture);
+    }
+
+    const data = [...byId.values()]
+      .filter((fixture) => applicationState(fixture) === 'LIVE')
+      .map(normalize);
+
+    return {
+      ...liveResult,
+      data,
+      meta: liveResult.meta ?? scheduledResult.meta,
+    };
   }
 
   async listUpcoming(days = 4) {
