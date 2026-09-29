@@ -12,7 +12,7 @@ const defaultRpcUrl = process.env.NEXT_PUBLIC_POLYGON_RPC_URL || 'https://polygo
 
 export const MULTI_WALLET_ENABLED = Boolean(projectId);
 
-export const appKitNetworks = [polygon] as const;
+export const appKitNetworks = [polygon];
 
 export const wagmiAdapter =
   MULTI_WALLET_ENABLED && typeof window !== 'undefined'
