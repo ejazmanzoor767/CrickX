@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth-context';
 import { api } from '../../lib/api';
-import { connectWallet, getConnectedWalletName, getCurrentWallet, readCrxWallet, sendCrx, shortAddress } from '../../lib/web3';
+import { changeWallet, connectWallet, getConnectedWalletName, getCurrentWallet, readCrxWallet, sendCrx, shortAddress } from '../../lib/web3';
 
 export default function WalletPage() {
   const { user, loading: authLoading } = useAuth();
@@ -58,6 +58,24 @@ export default function WalletPage() {
     }
   }
 
+  async function chooseAnotherWallet() {
+    if (!address) return connect();
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const next = await changeWallet(address as any);
+      setAddress(next);
+      setWallet(await readCrxWallet(next));
+      setWalletName(await getConnectedWalletName());
+      setMessage((await getConnectedWalletName()) + ' connected on Polygon.');
+    } catch (e) {
+      const text = e instanceof Error ? e.message : 'Unable to change wallet.';
+      if (!/cancelled/i.test(text)) setError(text);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function send() {
     if (!address) return setError('Connect a wallet first.');
     if (!sendTo || !sendAmount || Number(sendAmount) <= 0) {
@@ -191,7 +209,7 @@ export default function WalletPage() {
           <div className="section-subtitle">{walletName} · {shortAddress(address)}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
             <button className="secondary-button" onClick={() => refresh()} disabled={busy}>Refresh balance</button>
-            <button className="secondary-button" onClick={connect} disabled={busy}>{busy ? 'Connecting…' : 'Change wallet'}</button>
+            <button className="secondary-button" onClick={chooseAnotherWallet} disabled={busy}>{busy ? 'Choose wallet…' : 'Change wallet'}</button>
           </div>
         </div>
         <div className="card" style={{ padding: 28 }}>

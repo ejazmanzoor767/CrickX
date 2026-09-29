@@ -34,6 +34,14 @@ type EthereumProvider = {
   removeListener?: Function;
 };
 
+function normalizeWalletError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  if (/broadcast channel unavailable/i.test(message)) {
+    return new Error('Your wallet extension could not open its connection channel. Refresh this page and reconnect, or choose another wallet from the wallet picker.');
+  }
+  return error instanceof Error ? error : new Error(fallback);
+}
+
 function getBrowserEthereumProvider(): EthereumProvider {
   if (typeof window === 'undefined') {
     throw new Error('Wallet connection is only available in the browser.');
@@ -49,7 +57,13 @@ function getBrowserEthereumProvider(): EthereumProvider {
 
 async function getEthereumProvider(connect = false): Promise<EthereumProvider> {
   const provider = getBrowserEthereumProvider();
-  if (connect) await provider.request({ method: 'eth_requestAccounts' });
+  if (connect) {
+    try {
+      await provider.request({ method: 'eth_requestAccounts' });
+    } catch (error) {
+      throw normalizeWalletError(error, 'Unable to connect the selected wallet.');
+    }
+  }
   return provider;
 }
 
@@ -131,18 +145,55 @@ export async function switchToPolygon() {
   }
 }
 
+async function openWalletPicker() {
+  const config = getWagmiConfig();
+  if (!config || !appKit) {
+    throw new Error('The multi-wallet picker is not configured yet. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX build environment to enable wallet icons and wallet selection.');
+  }
+
+  try {
+    await appKit.open({ view: 'AllWallets' });
+  } catch (error) {
+    throw normalizeWalletError(error, 'Unable to open the wallet picker.');
+  }
+
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const account = getAccount(config);
+    if (account.isConnected && account.address) {
+      if (account.chainId !== POLYGON_CHAIN_ID) {
+        await switchToPolygon();
+      }
+      return account.address as Address;
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+
+  throw new Error('No wallet was selected. Please choose a wallet from the list.');
+}
+
+export async function changeWallet(_currentAddress?: Address) {
+  const config = getWagmiConfig();
+
+  if (config && appKit) {
+    try {
+      await appKit.disconnect();
+    } catch (error) {
+      throw normalizeWalletError(error, 'Unable to disconnect the current wallet.');
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return openWalletPicker();
+  }
+
+  throw new Error('The multi-wallet picker is not configured yet. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX build environment to enable wallet icons and wallet selection.');
+}
+
 export async function connectWallet() {
   const config = getWagmiConfig();
 
   if (config && appKit) {
-    const current = getAccount(config);
-    if (!current.isConnected || !current.address) {
-      await appKit.open({ view: 'Connect' });
-    }
-
-    const account = await waitForWalletConnection();
-    if (account.chainId !== POLYGON_CHAIN_ID) await switchToPolygon();
-    return account.address as Address;
+    return openWalletPicker();
   }
 
   const provider = await getEthereumProvider(true);
