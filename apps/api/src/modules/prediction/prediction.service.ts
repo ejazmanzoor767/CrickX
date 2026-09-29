@@ -40,8 +40,9 @@ const liveNow=(f:any)=>{
     const bowling=Array.isArray(f?.bowling)?f.bowling:[];
     const balls=Array.isArray(f?.balls)?f.balls:[];
     return Number(f?.live)===1 && (
-      balls.length>0 || runs.length>0 ||
-      scoreboards.some((x:any)=>Number(x?.score??x?.total??0)>0) ||
+      balls.length>0 ||
+      runs.some((x:any)=>Number(x?.score??x?.runs??x?.total??0)>0) ||
+      scoreboards.some((x:any)=>Number(x?.score??x?.total??x?.runs??0)>0) ||
       batting.some((x:any)=>Number(x?.score??x?.runs??x?.runs_scored??0)>0) ||
       bowling.some((x:any)=>Number(x?.wickets??x?.wicket??0)>0)
     );
