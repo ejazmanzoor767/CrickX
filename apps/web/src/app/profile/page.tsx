@@ -144,11 +144,6 @@ export default function ProfilePage() {
     }
   }
 
-  function referralLink() {
-    if (!referral?.code) return '';
-    return window.location.origin + '/register?ref=' + encodeURIComponent(referral.code);
-  }
-
   async function copyReferralCode() {
     if (!referral?.code) return;
     try {
@@ -324,14 +319,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div style={{ padding: 15, borderRadius: 16, background: 'rgba(255,255,255,.028)', border: '1px solid rgba(255,255,255,.065)' }}>
-              <span style={{ display: 'block', color: '#8f98aa', fontSize: 10, fontWeight: 900, letterSpacing: '.12em' }}>REFERRAL LINK</span>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 }}>
-                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#dce2eb', fontSize: 13 }}>
-                  {referral?.code ? referralLink() : 'Generating your referral link…'}
-                </span>
 
-              </div>
             </div>
           </div>
 
@@ -372,7 +360,7 @@ export default function ProfilePage() {
           ) : (
             <div style={{ padding: '16px 15px', borderRadius: 15, border: '1px dashed rgba(255,255,255,.10)', background: 'rgba(255,255,255,.018)' }}>
               <strong style={{ display: 'block', fontSize: 14 }}>No referrals yet</strong>
-              <span className="section-subtitle" style={{ display: 'block', marginTop: 5 }}>Share your referral link above to invite your first friend.</span>
+              <span className="section-subtitle" style={{ display: 'block', marginTop: 5 }}>Use your referral code with friends to build your valid referral count.</span>
             </div>
           )}
 
@@ -389,35 +377,6 @@ export default function ProfilePage() {
           <div style={{ paddingTop: 2, borderTop: '1px solid rgba(255,255,255,.06)' }}>
             <p style={{ margin: '14px 0 0', color: '#8f98aa', fontSize: 12, lineHeight: 1.6 }}>At launch, rewards will be distributed according to the number of valid referrals.</p>
           </div>
-        </div>
-      </div>
-
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="section-mini-row">
-          <div>
-            <p className="eyebrow">CRICKX APPS</p>
-            <h2>Use CrickX anywhere</h2>
-          </div>
-        </div>
-        <div style={{ display: 'grid', gap: 12 }}>
-          <a
-            className="secondary-button"
-            href="https://crickx-3d806.web.app"
-            target="_blank"
-            rel="noreferrer"
-            style={{ justifyContent: 'space-between', textDecoration: 'none' }}
-          >
-            <span>Open CrickX Web App</span>
-            <span style={{ color: 'var(--muted)', fontSize: 12 }}>crickx-3d806.web.app ↗</span>
-          </a>
-          <a
-            className="primary-button"
-            href="https://github.com/ejazmanzoor767/CrickX/releases/latest/download/CrickX.apk"
-            style={{ justifyContent: 'space-between', textDecoration: 'none' }}
-          >
-            <span>Download Android APK</span>
-            <span style={{ fontSize: 12, opacity: .8 }}>Latest version ↓</span>
-          </a>
         </div>
       </div>
 
