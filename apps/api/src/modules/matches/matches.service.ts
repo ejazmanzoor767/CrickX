@@ -32,13 +32,12 @@ export function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE
   // dropped fixtures from reappearing forever in Live/Fantasy.
   if (staleNotStarted) return 'COMPLETED';
 
-  // Sportmonks' explicit live flag is authoritative for current fixtures. Do
-  // not let a small starting_at/timezone drift suppress an actual live match.
-  if (fixture.live === 1) return 'LIVE';
-
-  // A fixture with no valid start time cannot be promoted by a weak status-only
-  // signal. Status-based LIVE below still requires the scheduled start time.
+  // A match cannot be LIVE before its scheduled start time. Sportmonks can
+  // briefly expose live=1 on a fixture ahead of the real start, so the
+  // provider flag is only accepted after the scheduled start timestamp.
   if (!started) return 'UPCOMING';
+
+  if (fixture.live === 1) return 'LIVE';
 
   // Explicit not-started/scheduled states remain upcoming when there is no
   // positive live signal.
@@ -207,13 +206,16 @@ export class MatchesService {
     // /livescores is itself a positive provider signal. Preserve fixtures from
     // that feed as LIVE unless they carry an explicit terminal state. This
     // avoids dropping real live matches when starting_at/status fields lag.
+    const now = Date.now();
     const data = Array.isArray(result.data)
       ? result.data
-          .filter((fixture) => !isTerminalFixture(fixture))
-          .map((fixture) => ({
-            ...normalize(fixture),
-            applicationState: 'LIVE' as const,
-          }))
+          .filter((fixture) => {
+            if (isTerminalFixture(fixture)) return false;
+            const startingAt = fixture.starting_at ? new Date(fixture.starting_at).getTime() : NaN;
+            return Number.isFinite(startingAt) && startingAt <= now;
+          })
+          .map((fixture) => normalize(fixture))
+          .map((fixture) => ({ ...fixture, applicationState: 'LIVE' as const }))
       : [];
     return { ...result, data };
   }

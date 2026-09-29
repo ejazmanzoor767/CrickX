@@ -21,13 +21,13 @@ describe('applicationState', () => {
     } as any)).toBe('LIVE');
   });
 
-  it('trusts live=1 even when the provider start time is still in the future', () => {
+  it('keeps a future fixture UPCOMING even when the provider live flag is premature', () => {
     expect(applicationState({
       id: 3,
       status: 'NS',
       live: 1,
       starting_at: new Date(now + 60_000).toISOString(),
-    } as any)).toBe('LIVE');
+    } as any)).toBe('UPCOMING');
   });
 
   it('marks no-result fixtures completed', () => {
