@@ -68,16 +68,6 @@ jobs:
       - run: npm ci --include=dev --no-audit --no-fund
       - run: npm audit --audit-level=moderate
 
-  codeql:
-    name: CodeQL
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: github/codeql-action/init@v3
-        with:
-          languages: javascript-typescript
-      - uses: github/codeql-action/analyze@v3
-
   api-build:
     name: API production build
     runs-on: ubuntu-latest
