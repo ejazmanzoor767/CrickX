@@ -187,53 +187,59 @@ export class SubscriptionService {
     const createdMs = this.asDate(pendingPayment.createdAt)?.getTime() ?? 0;
     if (!createdMs || Date.now() - createdMs < 5_000) return null;
 
+    let gateway: any;
     try {
-      const gateway = await this.oxapay.getPaymentInfo(String(pendingPayment.gatewayTxnRef));
-      const gatewayStatus = String(gateway?.status || '').toLowerCase();
-      const gatewayAmount = Number(gateway?.amount);
-      const gatewayCurrency = String(gateway?.currency || '').toUpperCase();
-      const gatewayOrderId = String(gateway?.order_id ?? gateway?.orderId ?? '');
-      const gatewayTrackId = String(gateway?.track_id ?? gateway?.trackId ?? pendingPayment.gatewayTxnRef);
-
-      if (
-        !['paid', 'manual_accept'].includes(gatewayStatus) ||
-        gatewayOrderId !== String(subscription.basketId) ||
-        gatewayTrackId !== String(pendingPayment.gatewayTxnRef) ||
-        !Number.isFinite(gatewayAmount) ||
-        Math.abs(gatewayAmount - PRICE_USD) > 0.000001 ||
-        gatewayCurrency !== 'USD'
-      ) {
-        return null;
-      }
-
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + DURATION_MS);
-
-      await this.firestore.subscriptionPayment.update({
-        where: { id: pendingPayment.id },
-        data: {
-          status: 'SUCCEEDED',
-          gatewayTxnRef: gatewayTrackId,
-          eventId: gatewayTrackId,
-          completedAt: now,
-        },
-      });
-      await this.firestore.subscription.update({
-        where: { id: subscription.id },
-        data: { status: 'ACTIVE', startedAt: now, expiresAt },
-      });
-      await this.markReferralValid(userId, subscription.id);
-
-      return {
-        subscription: { ...subscription, status: 'ACTIVE', startedAt: now, expiresAt },
-        payment: { ...pendingPayment, status: 'SUCCEEDED', gatewayTxnRef: gatewayTrackId, eventId: gatewayTrackId, completedAt: now },
-        expiresAt,
-        gatewayTxnRef: gatewayTrackId,
-      };
+      gateway = await this.oxapay.getPaymentInfo(String(pendingPayment.gatewayTxnRef));
     } catch {
-      // A temporary OxaPay/API problem must not make a stored subscription
-      // disappear from the UI. The next request can retry the recovery.
       return null;
+    }
+
+    const gatewayStatus = String(gateway?.status || '').toLowerCase();
+    const gatewayAmount = Number(gateway?.amount);
+    const gatewayCurrency = String(gateway?.currency || '').toUpperCase();
+    const gatewayOrderId = String(gateway?.order_id ?? gateway?.orderId ?? '');
+    const gatewayTrackId = String(gateway?.track_id ?? gateway?.trackId ?? pendingPayment.gatewayTxnRef);
+
+    if (
+      !['paid', 'manual_accept'].includes(gatewayStatus) ||
+      gatewayOrderId !== String(subscription.basketId) ||
+      gatewayTrackId !== String(pendingPayment.gatewayTxnRef) ||
+      !Number.isFinite(gatewayAmount) ||
+      Math.abs(gatewayAmount - PRICE_USD) > 0.000001 ||
+      gatewayCurrency !== 'USD'
+    ) {
+      return null;
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + DURATION_MS);
+
+    await this.firestore.subscriptionPayment.update({
+      where: { id: pendingPayment.id },
+      data: {
+        status: 'SUCCEEDED',
+        gatewayTxnRef: gatewayTrackId,
+        eventId: gatewayTrackId,
+        completedAt: now,
+      },
+    });
+    await this.firestore.subscription.update({
+      where: { id: subscription.id },
+      data: { status: 'ACTIVE', startedAt: now, expiresAt },
+    });
+    try {
+      await this.markReferralValid(userId, subscription.id);
+    } catch {
+      // Referral qualification is secondary; a verified payment must still
+      // activate the subscription even when referral storage is temporarily unavailable.
+    }
+
+    return {
+      subscription: { ...subscription, status: 'ACTIVE', startedAt: now, expiresAt },
+      payment: { ...pendingPayment, status: 'SUCCEEDED', gatewayTxnRef: gatewayTrackId, eventId: gatewayTrackId, completedAt: now },
+      expiresAt,
+      gatewayTxnRef: gatewayTrackId,
+    };
     }
   }
 
