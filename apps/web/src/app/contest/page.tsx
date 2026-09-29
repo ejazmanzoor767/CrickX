@@ -199,7 +199,7 @@ function ContestContent() {
     <div className="card" style={{ marginTop: 14 }}>
       <p className="eyebrow">PRIZE FUNDING & SETTLEMENT</p>
       <p className="section-subtitle">
-        Each successful join adds 10 CRX to the persistent database prize pool. No CRX leaves the funding wallet during joining. When the match starts, CrickX transfers the full accumulated pool to the on-chain prize pool in one transaction; settlement then pays winners from that funded pool.
+        Each successful join adds 10 CRX to the prize pool. No CRX is deducted from the participant wallet during joining. When the match starts, CrickX transfers the accumulated pool to the on-chain prize pool in one transaction; settlement then pays winners from that funded pool.
       </p>
       <Link className="secondary-button" href={`/leaderboard?fixtureId=${fixtureId}`}>View Leaderboard</Link>
     </div>
