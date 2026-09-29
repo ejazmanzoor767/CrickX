@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth-context';
 import { api } from '../../lib/api';
-import { connectWallet, getCurrentWallet, readCrxWallet, sendCrx, shortAddress } from '../../lib/web3';
+import { connectWallet, getConnectedWalletName, getCurrentWallet, readCrxWallet, sendCrx, shortAddress } from '../../lib/web3';
 
 export default function WalletPage() {
   const { user, loading: authLoading } = useAuth();
   const [address, setAddress] = useState<string | null>(null);
   const [wallet, setWallet] = useState<any>(null);
+  const [walletName, setWalletName] = useState('Wallet');
   const [sendTo, setSendTo] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [buyUsd, setBuyUsd] = useState('1.00');
@@ -21,6 +22,7 @@ export default function WalletPage() {
   async function refresh(addr = address) {
     if (!addr) return;
     setWallet(await readCrxWallet(addr as any));
+    setWalletName(await getConnectedWalletName());
   }
 
   useEffect(() => {
@@ -29,6 +31,7 @@ export default function WalletPage() {
       const current = await getCurrentWallet();
       if (!active || !current) return;
       setAddress(current);
+      setWalletName(await getConnectedWalletName());
       try {
         setWallet(await readCrxWallet(current));
       } catch (e) {
@@ -46,22 +49,23 @@ export default function WalletPage() {
       const next = await connectWallet();
       setAddress(next);
       setWallet(await readCrxWallet(next));
-      setMessage('MetaMask connected on Polygon.');
+      setWalletName(await getConnectedWalletName());
+      setMessage(`${await getConnectedWalletName()} connected on Polygon.`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to connect MetaMask.');
+      setError(e instanceof Error ? e.message : 'Unable to connect wallet.');
     } finally {
       setBusy(false);
     }
   }
 
   async function send() {
-    if (!address) return setError('Connect MetaMask first.');
+    if (!address) return setError('Connect a wallet first.');
     if (!sendTo || !sendAmount || Number(sendAmount) <= 0) {
       return setError('Enter a recipient and a positive CRX amount.');
     }
     setBusy(true);
     setError('');
-    setMessage('Confirm the CRX transfer in MetaMask.');
+    setMessage(`Confirm the CRX transfer in ${walletName}.`);
     try {
       const tx = await sendCrx(sendTo, sendAmount, wallet?.decimals ?? 18);
       setMessage('CRX sent. Transaction: ' + tx);
@@ -78,7 +82,7 @@ export default function WalletPage() {
   const buyCrxAmount = Math.max(0, Number(buyUsd) || 0) * 500;
 
   async function buyCrx() {
-    if (!address) return setError('Connect MetaMask first.');
+    if (!address) return setError('Connect a wallet first.');
     const amount = Number(buyUsd);
     if (!Number.isFinite(amount) || amount < 1) return setError('Minimum early-buy amount is $1 USD.');
     if (Math.abs(amount * 100 - Math.round(amount * 100)) > 0.000001) {
@@ -174,8 +178,8 @@ export default function WalletPage() {
     {!address ? (
       <div className="card" style={{ padding: 28 }}>
         <h2>Connect your wallet</h2>
-        <p className="section-subtitle">Use MetaMask to view your real CRX balance and send CRX to any Polygon-compatible wallet. Contest entry is free.</p>
-        <button className="primary-button" onClick={connect} disabled={busy}>{busy ? 'Connecting…' : 'Connect MetaMask'}</button>
+        <p className="section-subtitle">Connect a supported Polygon wallet to view your real CRX balance, send CRX, and approve blockchain signatures when required. Contest entry is free.</p>
+        <button className="primary-button" onClick={connect} disabled={busy}>{busy ? 'Connecting…' : 'Connect wallet'}</button>
       </div>
     ) : <>
       <div className="panel-grid" style={{ marginBottom: 14 }}>
@@ -184,12 +188,15 @@ export default function WalletPage() {
           <div style={{ fontFamily: 'Barlow Condensed', fontSize: 58, fontWeight: 900 }}>
             {wallet ? wallet.balance.toLocaleString(undefined, { maximumFractionDigits: 6 }) : '—'} <span style={{ fontSize: 24 }}>CRX</span>
           </div>
-          <div className="section-subtitle">{shortAddress(address)}</div>
-          <button className="secondary-button" style={{ marginTop: 16 }} onClick={() => refresh()} disabled={busy}>Refresh balance</button>
+          <div className="section-subtitle">{walletName} · {shortAddress(address)}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
+            <button className="secondary-button" onClick={() => refresh()} disabled={busy}>Refresh balance</button>
+            <button className="secondary-button" onClick={connect} disabled={busy}>{busy ? 'Connecting…' : 'Change wallet'}</button>
+          </div>
         </div>
         <div className="card" style={{ padding: 28 }}>
-          <p className="eyebrow">WALLET</p>
-          <h2>{user?.displayName || 'CrickX Player'}</h2>
+          <p className="eyebrow">CONNECTED WALLET</p>
+          <h2>{walletName}</h2>
           <p className="section-subtitle" style={{ wordBreak: 'break-all' }}>{address}</p>
           <p className="section-subtitle">Network: Polygon Mainnet</p>
         </div>

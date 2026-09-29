@@ -1,7 +1,8 @@
 'use client';
 
 import { createPublicClient, createWalletClient, custom, formatUnits, http, isAddress, parseUnits, type Address } from 'viem';
-import { createEVMClient } from '@metamask/connect-evm';
+import { getAccount, getWalletClient, switchChain } from '@wagmi/core';
+import { appKit, MULTI_WALLET_ENABLED, wagmiAdapter } from './appkit';
 import { polygon } from 'viem/chains';
 
 export const CRX_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_CRX_TOKEN_ADDRESS || '') as Address;
@@ -33,90 +34,171 @@ type EthereumProvider = {
   removeListener?: Function;
 };
 
-type EvmClient = Awaited<ReturnType<typeof createEVMClient>>;
-let metamaskClientPromise: Promise<EvmClient> | null = null;
-
-async function getMetaMaskClient(): Promise<EvmClient> {
-  if (typeof window === 'undefined') throw new Error('Wallet connection is only available in the browser.');
-  if (!metamaskClientPromise) {
-    metamaskClientPromise = createEVMClient({
-      dapp: { name: 'CrickX', url: window.location.origin, iconUrl: `${window.location.origin}/crickx-app-logo.svg` },
-      api: { supportedNetworks: { '0x89': DEFAULT_RPC_URL, '0x1': 'https://ethereum-rpc.publicnode.com' } },
-      // Keep the SDK provider hidden until connect() establishes a session.
-      // MetaMask Connect then selects the proper desktop extension or mobile
-      // deeplink + relay transport automatically.
-      skipAutoAnnounce: true,
-      mobile: {
-        preferredOpenLink: (deeplink: string) => {
-          window.location.href = deeplink;
-        },
-      },
-      analytics: { enabled: false },
-    });
+function getBrowserEthereumProvider(): EthereumProvider {
+  if (typeof window === 'undefined') {
+    throw new Error('Wallet connection is only available in the browser.');
   }
-  return metamaskClientPromise;
+
+  const provider = (window as typeof window & { ethereum?: EthereumProvider }).ethereum;
+  if (!provider) {
+    throw new Error('No compatible Polygon wallet extension was found. Use the wallet picker to connect a supported wallet.');
+  }
+
+  return provider;
 }
 
 async function getEthereumProvider(connect = false): Promise<EthereumProvider> {
-  const client = await getMetaMaskClient();
-  if (connect && client.status !== 'connected') await client.connect({ chainIds: ['0x89', '0x1'] });
-  if (client.status !== 'connected') throw new Error('MetaMask connection was not established. Please try again.');
-  return client.getProvider() as EthereumProvider;
+  const provider = getBrowserEthereumProvider();
+  if (connect) await provider.request({ method: 'eth_requestAccounts' });
+  return provider;
+}
+
+function getWagmiConfig() {
+  if (!MULTI_WALLET_ENABLED || !wagmiAdapter) return null;
+  return wagmiAdapter.wagmiConfig;
+}
+
+async function waitForWalletConnection() {
+  const config = getWagmiConfig();
+  if (!config) throw new Error('Multi-wallet connection is not configured.');
+
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    const account = getAccount(config);
+    if (account.isConnected && account.address) return account;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+
+  throw new Error('Wallet connection was not completed. Please select a wallet and try again.');
+}
+
+async function getConnectedWalletClient() {
+  const config = getWagmiConfig();
+
+  if (config) {
+    const account = getAccount(config);
+    if (!account.isConnected || !account.address) throw new Error('Connect a wallet first.');
+
+    if (account.chainId !== POLYGON_CHAIN_ID) await switchToPolygon();
+
+    const walletClient = await getWalletClient(config);
+    if (!walletClient?.account) throw new Error('The connected wallet is unavailable. Please reconnect your wallet.');
+    return walletClient;
+  }
+
+  const ethereum = await getEthereumProvider(true);
+  const baseWalletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
+  const [account] = await baseWalletClient.requestAddresses();
+  if (!account) throw new Error('No wallet account was selected.');
+  return createWalletClient({
+    account,
+    chain: polygon,
+    transport: custom(ethereum as any),
+  });
 }
 
 export function shortAddress(address?: string | null) { return address ? `${address.slice(0, 6)}…${address.slice(-4)}` : ''; }
 
 export async function switchToPolygon() {
-  const client = await getMetaMaskClient();
-  if (client.status !== 'connected') await client.connect({ chainIds: ['0x89', '0x1'] });
-  if (client.getChainId() === '0x89') return;
-  await client.switchChain({
-    chainId: '0x89',
-    chainConfiguration: {
-      chainId: '0x89', chainName: 'Polygon Mainnet',
-      nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
-      rpcUrls: [DEFAULT_RPC_URL], blockExplorerUrls: ['https://polygonscan.com'],
-    },
-  });
+  const config = getWagmiConfig();
+
+  if (config) {
+    const account = getAccount(config);
+    if (!account.isConnected || !account.address) throw new Error('Connect a wallet first.');
+    if (account.chainId === POLYGON_CHAIN_ID) return;
+    await switchChain(config, { chainId: POLYGON_CHAIN_ID });
+    return;
+  }
+
+  const provider = await getEthereumProvider(true);
+  const chainId = await provider.request({ method: 'eth_chainId' });
+  if (chainId === '0x89') return;
+  try {
+    await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
+  } catch (error) {
+    const code = typeof error === 'object' && error && 'code' in error ? (error as { code?: number }).code : undefined;
+    if (code !== 4902) throw error;
+    await provider.request({
+      method: 'wallet_addEthereumChain',
+      params: [{
+        chainId: '0x89',
+        chainName: 'Polygon Mainnet',
+        nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
+        rpcUrls: [DEFAULT_RPC_URL],
+        blockExplorerUrls: ['https://polygonscan.com'],
+      }],
+    });
+  }
 }
 
 export async function connectWallet() {
-  // Let MetaMask Connect detect the platform and choose:
-  // desktop extension -> direct transport
-  // mobile native browser -> MetaMask Mobile deeplink + relay
-  const client = await getMetaMaskClient();
-  const result = await client.connect({ chainIds: ['0x89', '0x1'] });
-  if (client.getChainId() !== '0x89') {
-    await client.switchChain({
-      chainId: '0x89',
-      chainConfiguration: {
-        chainId: '0x89', chainName: 'Polygon Mainnet',
-        nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
-        rpcUrls: [DEFAULT_RPC_URL], blockExplorerUrls: ['https://polygonscan.com'],
-      },
-    });
+  const config = getWagmiConfig();
+
+  if (config && appKit) {
+    const current = getAccount(config);
+    if (!current.isConnected || !current.address) {
+      await appKit.open({ view: 'Connect' });
+    }
+
+    const account = await waitForWalletConnection();
+    if (account.chainId !== POLYGON_CHAIN_ID) await switchToPolygon();
+    return account.address as Address;
   }
-  const address = result.accounts?.[0] ?? client.getAccount();
-  if (!address || !isAddress(address)) throw new Error('No wallet account was selected.');
+
+  const provider = await getEthereumProvider(true);
+  if ((await provider.request({ method: 'eth_chainId' })) !== '0x89') await switchToPolygon();
+  const accounts = await provider.request({ method: 'eth_accounts' }) as unknown;
+  const address = Array.isArray(accounts) ? accounts[0] : undefined;
+  if (typeof address !== 'string' || !isAddress(address)) throw new Error('No wallet account was selected.');
   return address as Address;
 }
 
 export async function signContestJoinMessage(message: string) {
-  const ethereum = await getEthereumProvider(true);
-  const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
-  const [account] = await walletClient.requestAddresses();
+  const walletClient = await getConnectedWalletClient();
+  const account = walletClient.account;
+  if (!account) throw new Error('The connected wallet is unavailable. Please reconnect your wallet.');
+
   const signature = await walletClient.signMessage({ account, message });
-  return { account, signature };
+  return { account: account.address, signature };
 }
 
 export async function getCurrentWallet() {
   if (typeof window === 'undefined') return null;
+
+  const config = getWagmiConfig();
+  if (config) {
+    try {
+      const account = getAccount(config);
+      return account.isConnected && account.address && isAddress(account.address)
+        ? account.address as Address
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   try {
-    const client = await getMetaMaskClient();
-    if (client.status !== 'connected') return null;
-    const address = client.getAccount();
-    return address && isAddress(address) ? address as Address : null;
-  } catch { return null; }
+    const provider = getBrowserEthereumProvider();
+    const accounts = await provider.request({ method: 'eth_accounts' }) as unknown;
+    const address = Array.isArray(accounts) ? accounts[0] : undefined;
+    return typeof address === 'string' && isAddress(address) ? address as Address : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getConnectedWalletName() {
+  const config = getWagmiConfig();
+  if (config) {
+    try {
+      const account = getAccount(config);
+      return account.connector?.name || 'Wallet';
+    } catch {
+      return 'Wallet';
+    }
+  }
+
+  return 'Browser wallet';
 }
 
 export async function readCrxWallet(address: Address) {
@@ -134,10 +216,20 @@ export async function joinOnchainContest(_contestId: number) { throw new Error('
 export async function sendCrx(to: string, amount: string, decimals = 18) {
   if (!CRX_TOKEN_ADDRESS) throw new Error('CRX token address is not configured.');
   if (!isAddress(to)) throw new Error('Enter a valid wallet address.');
-  const ethereum = await getEthereumProvider(true);
-  const walletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
-  const [account] = await walletClient.requestAddresses();
-  const hash = await walletClient.writeContract({ account, chain: polygon, address: CRX_TOKEN_ADDRESS, abi: CRX_ABI, functionName: 'transfer', args: [to as Address, parseUnits(amount, decimals)] });
+
+  const walletClient = await getConnectedWalletClient();
+  const account = walletClient.account;
+  if (!account) throw new Error('The connected wallet is unavailable. Please reconnect your wallet.');
+
+  const hash = await walletClient.writeContract({
+    account,
+    chain: polygon,
+    address: CRX_TOKEN_ADDRESS,
+    abi: CRX_ABI,
+    functionName: 'transfer',
+    args: [to as Address, parseUnits(amount, decimals)],
+  });
+
   await publicClient.waitForTransactionReceipt({ hash });
   return hash;
 }

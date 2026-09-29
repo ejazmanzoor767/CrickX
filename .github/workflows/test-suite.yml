@@ -104,4 +104,5 @@ jobs:
           NEXT_PUBLIC_POLYGON_RPC_URL: ${{ secrets.NEXT_PUBLIC_POLYGON_RPC_URL }}
           NEXT_PUBLIC_CRX_TOKEN_ADDRESS: ${{ secrets.NEXT_PUBLIC_CRX_TOKEN_ADDRESS }}
           NEXT_PUBLIC_CRX_CONTEST_POOL_ADDRESS: ${{ secrets.NEXT_PUBLIC_CRX_CONTEST_POOL_ADDRESS }}
+          NEXT_PUBLIC_REOWN_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_REOWN_PROJECT_ID }}
         run: npm run build --workspace @fantasy-cricket/web
