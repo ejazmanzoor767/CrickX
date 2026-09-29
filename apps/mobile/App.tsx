@@ -18,11 +18,11 @@ const START_URL = WEB_URL.replace(/\/$/, '') + '/matches';
 const ALLOWED_HOSTS = new Set(['crickx-3d806.web.app', 'crickx-3d806.firebaseapp.com']);
 
 const TABS = [
-  { path: '/matches', label: 'Matches', icon: '◉' },
+  { path: '/matches', label: 'Matches', icon: '🏏' },
   { path: '/fantasy-home', label: 'Fantasy', icon: '✦' },
-  { path: '/wallet', label: 'Wallet', icon: '◈' },
+  { path: '/wallet', label: 'Wallet', icon: '▣' },
   { path: '/subscription', label: 'Subscribe', icon: '＋' },
-  { path: '/profile', label: 'Profile', icon: '◎' },
+  { path: '/profile', label: 'Profile', icon: '👤' },
 ] as const;
 
 const NATIVE_SHELL_CSS = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}html.crickx-native-app .page-shell,html.crickx-native-app .app-page,html.crickx-native-app .profile-page{padding:0 10px !important;min-height:100vh !important;}html.crickx-native-app .card{box-shadow:none !important;transform:none !important;}";
