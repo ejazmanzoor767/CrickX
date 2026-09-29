@@ -577,3 +577,245 @@ html.crickx-native-app .mobile-only-hidden{display:none !important}
   outline:2px solid rgba(155,255,71,.78);
   outline-offset:3px;
 }
+
+
+/* =========================================================
+   Android mobile UX — final phone-first usability layer
+   ========================================================= */
+html.crickx-native-app body{
+  overscroll-behavior-y:none;
+  -webkit-font-smoothing:antialiased;
+}
+html.crickx-native-app .page-shell{
+  padding:0 12px 20px !important;
+}
+html.crickx-native-app .card{
+  border-radius:16px !important;
+  border-color:rgba(255,255,255,.07) !important;
+  background:linear-gradient(180deg,rgba(18,23,33,.94),rgba(10,14,21,.94)) !important;
+}
+html.crickx-native-app .section-subtitle{
+  font-size:12px !important;
+  line-height:1.48 !important;
+}
+html.crickx-native-app h1,
+html.crickx-native-app h2,
+html.crickx-native-app h3{
+  text-wrap:balance;
+}
+html.crickx-native-app h2{font-size:20px;}
+html.crickx-native-app .eyebrow{
+  font-size:9px !important;
+  margin-bottom:7px !important;
+  letter-spacing:.16em !important;
+}
+html.crickx-native-app input,
+html.crickx-native-app select,
+html.crickx-native-app textarea{
+  min-height:46px;
+  border-radius:12px !important;
+  padding:11px 12px !important;
+  background:rgba(255,255,255,.035) !important;
+  border:1px solid rgba(255,255,255,.09) !important;
+}
+html.crickx-native-app input:focus,
+html.crickx-native-app select:focus,
+html.crickx-native-app textarea:focus{
+  outline:none;
+  border-color:rgba(155,255,71,.35) !important;
+  box-shadow:0 0 0 3px rgba(155,255,71,.08);
+}
+html.crickx-native-app .primary-button,
+html.crickx-native-app .secondary-button{
+  min-height:46px !important;
+  padding:11px 14px !important;
+  border-radius:13px !important;
+  font-size:12px !important;
+}
+html.crickx-native-app .match-list{
+  gap:9px !important;
+}
+html.crickx-native-app .match-list-card{
+  padding:14px !important;
+  overflow:hidden;
+}
+html.crickx-native-app .match-topline{
+  gap:8px !important;
+  margin-bottom:8px !important;
+}
+html.crickx-native-app .match-meta,
+html.crickx-native-app .match-date{
+  font-size:10px !important;
+}
+html.crickx-native-app .match-teams{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr) !important;
+  align-items:center;
+  gap:5px !important;
+  text-align:center;
+}
+html.crickx-native-app .match-teams .team-home,
+html.crickx-native-app .match-teams .team-away{
+  min-width:0;
+}
+html.crickx-native-app .match-teams strong{
+  display:block;
+  width:100%;
+  font-size:14px !important;
+  line-height:1.18;
+  overflow-wrap:anywhere;
+}
+html.crickx-native-app .match-teams small{
+  font-size:9px !important;
+}
+html.crickx-native-app .vs-badge{
+  width:30px !important;
+  height:30px !important;
+  margin:auto;
+  display:grid;
+  place-items:center;
+  font-size:9px !important;
+}
+html.crickx-native-app .match-footer{
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:8px !important;
+  margin-top:11px !important;
+  padding-top:11px !important;
+}
+html.crickx-native-app .match-footer>div{
+  display:contents !important;
+}
+html.crickx-native-app .match-footer a,
+html.crickx-native-app .match-footer button{
+  width:100%;
+  min-width:0;
+  justify-content:center;
+  text-align:center;
+}
+html.crickx-native-app .match-footer span{
+  grid-column:1/-1;
+  font-size:10px !important;
+  line-height:1.4 !important;
+}
+html.crickx-native-app .live-score-strip{
+  margin-top:10px !important;
+  border-radius:14px !important;
+}
+html.crickx-native-app .live-score-strip>div{
+  padding:8px 0 !important;
+}
+html.crickx-native-app .live-score-strip strong{font-size:15px !important;}
+html.crickx-native-app .live-score-strip span{font-size:10px !important;}
+
+/* Fantasy: make the primary action obvious and keep the player list compact. */
+html.crickx-native-app .fantasy-home-page .section-title,
+html.crickx-native-app .predictions-page .section-title{
+  font-size:28px !important;
+}
+html.crickx-native-app .fantasy-builder-page{
+  padding-bottom:10px !important;
+}
+html.crickx-native-app .fantasy-builder-page .primary-button{
+  min-height:48px !important;
+}
+html.crickx-native-app .fantasy-builder-page .card button{
+  min-height:42px !important;
+}
+html.crickx-native-app .fantasy-builder-page .section-mini-row{
+  gap:7px;
+}
+html.crickx-native-app .fantasy-builder-page .section-mini-row h2{
+  font-size:19px !important;
+}
+
+/* Predictions: one question at a time visually, with large answer targets. */
+html.crickx-native-app .predictions-page article.card{
+  padding:14px !important;
+}
+html.crickx-native-app .predictions-page article.card h2{
+  font-size:17px !important;
+  line-height:1.22 !important;
+}
+html.crickx-native-app .predictions-page article.card button{
+  min-height:48px !important;
+  padding:10px 12px !important;
+  text-align:left;
+}
+
+/* Wallet: show the balance and next action first; avoid oversized desktop blocks. */
+html.crickx-native-app .wallet-page{
+  padding-bottom:14px !important;
+}
+html.crickx-native-app .wallet-page>.panel-grid .card:first-child{
+  padding:16px !important;
+}
+html.crickx-native-app .wallet-page .wallet-balance,
+html.crickx-native-app .wallet-page [style*="font-size: 58px"]{
+  font-size:42px !important;
+  line-height:.95 !important;
+}
+html.crickx-native-app .wallet-page .early-buy-card{
+  padding:16px !important;
+}
+html.crickx-native-app .wallet-page .secondary-button{
+  min-height:42px !important;
+}
+
+/* Subscription: make the price, status and action immediately scannable. */
+html.crickx-native-app .subscription-page .section-title{
+  font-size:28px !important;
+}
+html.crickx-native-app .subscription-page h2{
+  font-size:30px !important;
+}
+html.crickx-native-app .subscription-page .notice{
+  padding:13px !important;
+}
+
+/* Profile: readable identity rows and single-column controls. */
+html.crickx-native-app .profile-page .profile-hero{
+  border-radius:18px !important;
+}
+html.crickx-native-app .profile-page .profile-badges{
+  gap:6px !important;
+  flex-wrap:wrap;
+}
+html.crickx-native-app .profile-page .profile-badges span{
+  font-size:8px !important;
+  padding:6px 8px !important;
+}
+html.crickx-native-app .profile-page .card{
+  padding:14px !important;
+}
+html.crickx-native-app .profile-page .section-mini-row h2{
+  font-size:19px !important;
+}
+
+/* Tables/scorecards must scroll horizontally instead of squeezing text. */
+html.crickx-native-app .table-card,
+html.crickx-native-app .match-detail-page table{
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+html.crickx-native-app .table-card table{
+  min-width:520px;
+}
+
+/* Keep toast/notice/error messages compact and readable on small screens. */
+html.crickx-native-app .notice,
+html.crickx-native-app .error-text,
+html.crickx-native-app .success-text{
+  font-size:11px !important;
+  line-height:1.5 !important;
+}
+
+/* Prevent accidental text selection while using the app like a native UI. */
+html.crickx-native-app button,
+html.crickx-native-app .primary-button,
+html.crickx-native-app .secondary-button,
+html.crickx-native-app .match-list-card,
+html.crickx-native-app .match-centre-card{
+  user-select:none;
+  -webkit-user-select:none;
+}

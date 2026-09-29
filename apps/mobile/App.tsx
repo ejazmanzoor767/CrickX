@@ -18,9 +18,9 @@ const START_URL = WEB_URL.replace(/\/$/, '') + '/matches';
 const ALLOWED_HOSTS = new Set(['crickx-3d806.web.app', 'crickx-3d806.firebaseapp.com']);
 
 const TABS = [
-  { path: '/matches', label: 'Matches', icon: '▤' },
+  { path: '/matches', label: 'Matches', icon: '◉' },
   { path: '/fantasy-home', label: 'Fantasy', icon: '✦' },
-  { path: '/wallet', label: 'Wallet', icon: '◆' },
+  { path: '/wallet', label: 'Wallet', icon: '◈' },
   { path: '/subscription', label: 'Subscribe', icon: '＋' },
   { path: '/profile', label: 'Profile', icon: '◎' },
 ] as const;
@@ -48,22 +48,38 @@ export default function App() {
   const [canGoBack, setCanGoBack] = useState(false);
   const [currentUrl, setCurrentUrl] = useState(START_URL);
   const [activeTab, setActiveTab] = useState<string | null>('/matches');
+  const [exitHintVisible, setExitHintVisible] = useState(false);
   const initialLoadComplete = useRef(false);
+  const exitHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (canGoBack) {
         webViewRef.current?.goBack();
+        setExitHintVisible(false);
         return true;
       }
-      return false;
+
+      if (exitHintVisible) {
+        return false;
+      }
+
+      setExitHintVisible(true);
+      if (exitHintTimer.current) clearTimeout(exitHintTimer.current);
+      exitHintTimer.current = setTimeout(() => setExitHintVisible(false), 1800);
+      return true;
     });
-    return () => subscription.remove();
-  }, [canGoBack]);
+
+    return () => {
+      subscription.remove();
+      if (exitHintTimer.current) clearTimeout(exitHintTimer.current);
+    };
+  }, [canGoBack, exitHintVisible]);
 
   function navigate(path: string) {
     const target = WEB_URL.replace(/\/$/, '') + path;
     setActiveTab(path);
+    setExitHintVisible(false);
     setLoading(true);
     webViewRef.current?.injectJavaScript(
       `window.location.href = ${JSON.stringify(target)}; true;`,
@@ -142,15 +158,28 @@ export default function App() {
         {isCrickXPage && (
           <View style={styles.topBar}>
             <View style={styles.topBarLeft}>
+              {canGoBack && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Go back"
+                  onPress={() => {
+                    setExitHintVisible(false);
+                    webViewRef.current?.goBack();
+                  }}
+                  style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}
+                >
+                  <Text style={styles.backIcon}>‹</Text>
+                </Pressable>
+              )}
               <Image source={require('./assets/crickx-original-icon.png')} style={styles.logo} />
-              <View>
+              <View style={styles.headerCopy}>
                 <Text style={styles.brand}>CRICKX</Text>
-                <Text style={styles.sectionTitle}>{screenTitle}</Text>
+                <Text style={styles.sectionTitle} numberOfLines={1}>{screenTitle}</Text>
               </View>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Refresh"
+              accessibilityLabel="Refresh current page"
               onPress={refresh}
               style={({ pressed }) => [styles.refreshButton, pressed && styles.buttonPressed]}
             >
@@ -253,6 +282,12 @@ export default function App() {
           )}
         </View>
 
+        {exitHintVisible && isCrickXPage && (
+          <View style={styles.exitHint} pointerEvents="none">
+            <Text style={styles.exitHintText}>Press back again to exit CrickX</Text>
+          </View>
+        )}
+
         {isCrickXPage && (
           <View style={styles.bottomBar}>
             {TABS.map((tab) => {
@@ -302,6 +337,19 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   topBarLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
+  headerCopy: { minWidth: 0, flex: 1 },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#111721',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,.08)',
+    marginRight: 8,
+  },
+  backIcon: { color: '#f1f5f9', fontSize: 31, lineHeight: 32, fontWeight: '500', marginTop: -2 },
   logo: {
     width: 38,
     height: 38,
@@ -328,7 +376,7 @@ const styles = StyleSheet.create({
   webContainer: { flex: 1, backgroundColor: '#080b10' },
   web: { flex: 1, backgroundColor: '#080b10' },
   bottomBar: {
-    minHeight: 72,
+    minHeight: 76,
     paddingHorizontal: 7,
     paddingTop: 7,
     paddingBottom: 8,
@@ -344,7 +392,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    minHeight: 58,
+    minHeight: 60,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
@@ -356,6 +404,29 @@ const styles = StyleSheet.create({
   tabIconActive: { color: '#9bf34a' },
   tabLabel: { color: '#7f8999', fontSize: 10, fontWeight: '800', marginTop: 4, letterSpacing: 0.1 },
   tabLabelActive: { color: '#9bf34a' },
+  exitHint: {
+    position: 'absolute',
+    zIndex: 30,
+    left: 24,
+    right: 24,
+    bottom: 87,
+    alignItems: 'center',
+  },
+  exitHintText: {
+    color: '#eef3f8',
+    backgroundColor: 'rgba(18,23,32,.96)',
+    borderColor: 'rgba(255,255,255,.10)',
+    borderWidth: 1,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 14,
+    fontSize: 12,
+    fontWeight: '800',
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    elevation: 8,
+  },
   loading: {
     ...StyleSheet.absoluteFill,
     backgroundColor: '#080b10',
