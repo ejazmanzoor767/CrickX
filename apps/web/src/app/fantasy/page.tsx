@@ -61,6 +61,7 @@ function FantasyBuilder() {
   const [squadData, setSquadData] = useState<any>(null);
   const [fixtureData, setFixtureData] = useState<any>(null);
   const [selected, setSelected] = useState<number[]>([]);
+  const [locked, setLocked] = useState(false);
   const [category, setCategory] = useState<Category>('WICKET KEEPER');
   const [loading, setLoading] = useState(true);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -75,14 +76,27 @@ function FantasyBuilder() {
     let active = true;
     (async () => {
       try {
-        const [squadResult, draftResult, matchResult] = await Promise.all([
+        const matchResult = await api.matchDetail(fixtureId);
+        if (!active) return;
+        const match = unwrap(matchResult);
+        setFixtureData(match);
+        const state = String(match?.applicationState ?? '').toUpperCase();
+        const status = String(match?.status ?? '').toLowerCase();
+        const startMs = new Date(match?.starting_at ?? '').getTime();
+        const terminal = ['finish', 'complete', 'aband', 'cancel', 'no result', 'no-result', 'washout']
+          .some((value) => status.includes(value)) || Boolean(match?.draw_noresult);
+        const matchStarted = (Number.isFinite(startMs) && startMs <= Date.now()) || state === 'LIVE' || state === 'COMPLETED' || terminal;
+        if (matchStarted) {
+          setLocked(true);
+          setLoading(false);
+          return;
+        }
+        const [squadResult, draftResult] = await Promise.all([
           api.fixtureSquads(fixtureId),
           api.fantasyDraft(fixtureId),
-          api.matchDetail(fixtureId),
         ]);
         if (!active) return;
         setSquadData(unwrap(squadResult));
-        setFixtureData(unwrap(matchResult));
         const draft = unwrap(draftResult);
         const ids = Array.isArray(draft?.sportmonksPlayerIds) ? draft.sportmonksPlayerIds.map(Number).filter(Number.isFinite) : [];
         setSelected(ids);
@@ -201,6 +215,16 @@ function FantasyBuilder() {
 
   if (!hasFixture) return <section className="app-page"><div className="card empty-state"><strong>Choose a match first.</strong><span>Open an upcoming match and choose Create Team.</span><Link className="primary-button" href="/matches">Go to matches</Link></div></section>;
   if (loading) return <section className="app-page"><div className="card skeleton-card">Loading XI builder from Sportmonks…</div></section>;
+  if (locked) return <section className="app-page"><div className="card empty-state">
+    <strong>Fantasy team selection is locked.</strong>
+    <span>This match has already started. Your saved XI is view-only and cannot be created or edited now.</span>
+    <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:12}}>
+      <Link className="primary-button" href={'/fantasy/view?fixtureId=' + fixtureId}>View Team</Link>
+      <Link className="secondary-button" href={'/predictions?fixtureId=' + fixtureId}>Predictions</Link>
+      <Link className="secondary-button" href={'/leaderboard?fixtureId=' + fixtureId}>Leaderboard</Link>
+      <Link className="secondary-button" href="/matches">Back to Matches</Link>
+    </div>
+  </div></section>;
   if (teams.length < 2) return <section className="app-page"><div className="card empty-state"><strong>Match teams are not available yet.</strong><span>Sportmonks has not returned both teams for this fixture.</span></div></section>;
 
   const teamA = teams[0];
