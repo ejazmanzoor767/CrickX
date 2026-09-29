@@ -819,3 +819,88 @@ html.crickx-native-app .match-centre-card{
   user-select:none;
   -webkit-user-select:none;
 }
+
+
+/* =========================================================
+   Android premium polish
+   More immediate actions, calmer spacing and native touch feel.
+   ========================================================= */
+html.crickx-native-app{
+  -webkit-tap-highlight-color:transparent;
+  scroll-behavior:smooth;
+}
+html.crickx-native-app body{
+  overscroll-behavior-y:none;
+}
+html.crickx-native-app a,
+html.crickx-native-app button{
+  touch-action:manipulation;
+}
+html.crickx-native-app input,
+html.crickx-native-app select,
+html.crickx-native-app textarea{
+  font-size:16px !important;
+  min-height:46px;
+  border-radius:12px !important;
+}
+html.crickx-native-app .match-list-card{
+  transition:transform .16s ease,border-color .16s ease,background .16s ease;
+}
+html.crickx-native-app .match-list-card:active{
+  transform:scale(.992);
+}
+html.crickx-native-app .match-footer{
+  position:relative;
+}
+html.crickx-native-app .match-footer .primary-button,
+html.crickx-native-app .match-footer .secondary-button{
+  min-height:44px !important;
+}
+html.crickx-native-app .fantasy-home-page .match-footer,
+html.crickx-native-app .match-centre-card .match-footer{
+  position:sticky;
+  bottom:0;
+  z-index:3;
+  margin-left:-14px !important;
+  margin-right:-14px !important;
+  margin-bottom:-14px !important;
+  padding:10px 14px !important;
+  border-top:1px solid rgba(255,255,255,.06);
+  background:rgba(10,14,21,.94);
+  backdrop-filter:blur(14px);
+}
+html.crickx-native-app .fantasy-builder-page .card:last-of-type{
+  scroll-margin-bottom:18px;
+}
+html.crickx-native-app .fantasy-builder-page .primary-button,
+html.crickx-native-app .predictions-page .primary-button,
+html.crickx-native-app .wallet-page .primary-button,
+html.crickx-native-app .subscription-page .primary-button{
+  box-shadow:0 8px 22px rgba(155,255,71,.10);
+}
+html.crickx-native-app .empty-state{
+  border-style:solid;
+  border-color:rgba(255,255,255,.075);
+}
+html.crickx-native-app .skeleton-card{
+  min-height:120px;
+  display:grid;
+  place-items:center;
+  color:#b0bac9;
+}
+html.crickx-native-app .profile-page .profile-hero>button{
+  min-height:46px !important;
+}
+@media (max-width:430px){
+  html.crickx-native-app .match-centre-card .match-footer,
+  html.crickx-native-app .fantasy-home-page .match-footer{
+    grid-template-columns:1fr 1fr;
+    gap:7px !important;
+  }
+  html.crickx-native-app .match-centre-card .match-footer a{
+    font-size:10px !important;
+  }
+  html.crickx-native-app .profile-page .profile-hero-copy h1{
+    font-size:23px !important;
+  }
+}
