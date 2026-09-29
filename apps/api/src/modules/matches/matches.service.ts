@@ -240,7 +240,7 @@ export class MatchesService {
     const fallbackData = scheduledRows
       .filter((fixture: SportmonksFixture) => !liveById.has(Number(fixture?.id)))
       .filter((fixture: SportmonksFixture) => applicationState(fixture) === 'LIVE')
-      .map((fixture) => normalize(fixture));
+      .map((fixture: SportmonksFixture) => normalize(fixture));
 
     const byId = new Map<number, SportmonksFixture>();
     for (const fixture of [...liveData, ...fallbackData]) {
