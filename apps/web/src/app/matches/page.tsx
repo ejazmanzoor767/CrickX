@@ -15,7 +15,18 @@ const scoreText = (r: any) => `${r?.score ?? 0}/${r?.wickets ?? 0} (${r?.overs ?
 const isVoidFixture = (fixture: any) => fixture?.draw_noresult === true || ['abandoned', 'cancelled', 'canceled', 'no result', 'no-result', 'washout'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part));
 const isStaleNotStarted = (fixture: any) => { const start = new Date(fixture?.starting_at ?? '').getTime(); const status = String(fixture?.status ?? '').toLowerCase(); const ageExpired = Number.isFinite(start) && Date.now() - start >= 6 * 60 * 60 * 1000; const scheduledBeforeToday = Number.isFinite(start) && new Date(start).toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10); return (ageExpired || scheduledBeforeToday) && ['ns','scheduled','not started','upcoming'].some((value) => status === value || status.includes(value)); };
 const isCompletedFixture = (fixture: any) => String(fixture?.applicationState ?? '').toUpperCase() === 'COMPLETED' || isVoidFixture(fixture) || isStaleNotStarted(fixture);
-const isLiveFixture = (fixture: any) => !isCompletedFixture(fixture) && (String(fixture?.applicationState ?? '').toUpperCase() === 'LIVE' || Number(fixture?.live) === 1 || (hasStarted(fixture) && ['live', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part))));
+const isLiveFixture = (fixture: any) => {
+  if (isCompletedFixture(fixture)) return false;
+  const state = String(fixture?.applicationState ?? '').toUpperCase();
+  // Backend applicationState is authoritative. Do not promote a fixture from
+  // the raw Sportmonks live flag because /livescores may contain stale live=1.
+  if (state) return state === 'LIVE';
+  const status = String(fixture?.status ?? '').toLowerCase();
+  const notStartedStatus = ['ns', 'scheduled', 'not started', 'upcoming', 'postponed']
+    .some((value) => status === value || status.includes(value));
+  return hasStarted(fixture) && !notStartedStatus &&
+    (Number(fixture?.live) === 1 || ['live', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => status.includes(part)));
+};
 
 function MatchCard({ fixture, live, completed, fantasyFixture, teamSaved }: { fixture: any; live?: boolean; completed?: boolean; fantasyFixture?: boolean; teamSaved?: boolean }) {
   const runs = fixture.runs ?? fixture.scoreboards ?? [];
