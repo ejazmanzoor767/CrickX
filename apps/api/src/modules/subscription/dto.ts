@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateSubscriptionCheckoutDto {
   // Checkout currently needs no required fields, but the DTO must contain
@@ -9,6 +9,10 @@ export class CreateSubscriptionCheckoutDto {
   @MinLength(1)
   @MaxLength(40)
   customerMobile?: string;
+
+  @IsOptional()
+  @IsIn(['WEEKLY', 'MONTHLY'])
+  plan?: 'WEEKLY' | 'MONTHLY';
 }
 
 export class ApplyReferralDto {

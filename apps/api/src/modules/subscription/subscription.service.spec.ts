@@ -78,6 +78,53 @@ describe('SubscriptionService payment recovery', () => {
     );
   });
 
+  it('activates a monthly pending subscription for 30 days at $0.60', async () => {
+    const createdAt = new Date(Date.now() - 60_000);
+    const subscription = {
+      id: 'sub-monthly',
+      userId: 'user-monthly',
+      plan: 'MONTHLY',
+      amount: 0.60,
+      currency: 'USD',
+      status: 'PENDING',
+      basketId: 'CRX-SUB-MONTHLY',
+      createdAt,
+    };
+    const payment = {
+      id: 'pay-monthly',
+      userId: 'user-monthly',
+      subscriptionId: 'sub-monthly',
+      basketId: subscription.basketId,
+      provider: 'OXAPAY',
+      status: 'INITIATED',
+      amount: 0.60,
+      currency: 'USD',
+      gatewayTxnRef: 'track-monthly',
+      createdAt,
+    };
+    const { service, firestore, oxapay } = buildService();
+    firestore.subscription.findMany.mockResolvedValue([subscription]);
+    firestore.subscriptionPayment.findFirst.mockResolvedValue(payment);
+    oxapay.getPaymentInfo.mockResolvedValue({
+      status: 'Paid',
+      order_id: subscription.basketId,
+      track_id: 'track-monthly',
+      amount: 0.60,
+      currency: 'USD',
+    });
+
+    const before = Date.now();
+    const result = await service.status('user-monthly');
+
+    expect(result.active).toBe(true);
+    expect(result.plan).toBe('MONTHLY');
+    expect(result.amount).toBe(0.6);
+    expect(result.durationDays).toBe(30);
+    expect(new Date(String(result.expiresAt)).getTime()).toBeGreaterThanOrEqual(
+      before + 29 * 24 * 60 * 60 * 1000,
+    );
+  });
+
   it('does not activate a pending subscription when the gateway order does not match', async () => {
     const createdAt = new Date(Date.now() - 60_000);
     const subscription = {

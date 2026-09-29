@@ -54,7 +54,7 @@ export class OxaPayService {
           ...(input.customerEmail ? { email: input.customerEmail } : {}),
           order_id: input.orderId,
           thanks_message: input.thanksMessage || 'Thank you for subscribing to CrickX.',
-          description: input.description || 'CrickX weekly subscription — $0.18 for 7 days.',
+          description: input.description || 'CrickX subscription.',
           sandbox: this.sandbox,
         },
         {
