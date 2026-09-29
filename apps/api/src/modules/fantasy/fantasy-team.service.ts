@@ -16,13 +16,16 @@ export class FantasyTeamService {
   ) {}
 
   private async assertSquadEligible(fixtureId: number, playerIds: number[]) {
+    // The scheduled start is the hard fantasy lock. Do not trust raw provider
+    // live=1/status values here because livescore feeds can temporarily be stale.
+    const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: false });
+    const startingAt = new Date((fixture as any)?.starting_at ?? '').getTime();
+    if (Number.isFinite(startingAt) && startingAt <= Date.now()) {
+      throw new ForbiddenException('Team creation is locked because this match has started.');
+    }
+
     const squadData = await this.sportmonks.getFixtureSquads(fixtureId);
     const status = String((squadData as any)?.status ?? '').toLowerCase();
-    const startingAt = (squadData as any)?.startingAt ? new Date((squadData as any).startingAt).getTime() : NaN;
-    const started = Number.isFinite(startingAt) && startingAt <= Date.now();
-    if (started && (status.includes('finish') || status.includes('aband') || status.includes('cancel') || status.includes('live'))) {
-      throw new ForbiddenException('Team creation is locked because this match has entered its live/completed state.');
-    }
     const squadTeams = Array.isArray((squadData as any)?.teams) ? (squadData as any).teams : [];
     if (squadTeams.length < 2) throw new BadRequestException('The match squad is not available yet.');
     const squadPlayers = squadTeams.flatMap((team: any) => (Array.isArray(team.players) ? team.players : []).map((player: any) => ({

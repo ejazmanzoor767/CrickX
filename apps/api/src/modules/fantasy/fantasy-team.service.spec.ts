@@ -22,6 +22,11 @@ describe('FantasyTeamService.createTeam', () => {
       return teams;
     }, []);
     const sportmonks = {
+      getFixture: jest.fn().mockResolvedValue({
+        starting_at: futureStart,
+        status: 'upcoming',
+        live: 0,
+      }),
       getFixtureSquads: jest.fn().mockResolvedValue({
         status: 'upcoming',
         startingAt: futureStart,
@@ -131,8 +136,13 @@ describe('FantasyTeamService.createTeam', () => {
       return teams;
     }, []);
     const sportmonks = {
+      getFixture: jest.fn().mockResolvedValue({
+        starting_at: new Date(Date.now() - 1000).toISOString(),
+        status: 'ns',
+        live: 1,
+      }),
       getFixtureSquads: jest.fn().mockResolvedValue({
-        status: 'live',
+        status: 'ns',
         startingAt: new Date(Date.now() - 1000).toISOString(),
         teams: squadPlayers,
       }),
@@ -149,5 +159,40 @@ describe('FantasyTeamService.createTeam', () => {
         viceCaptainSportmonksPlayerId: 101,
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects a started NS fixture even when the provider live flag is stale', async () => {
+    const lineup = buildLineup(fixtureId);
+    const squadPlayers = lineup.reduce((teams: any[], player: any) => {
+      const team = teams.find((item) => item.id === player.team_id);
+      if (team) team.players.push({ player_id: player.player_id, team_id: player.team_id });
+      else teams.push({ id: player.team_id, players: [{ player_id: player.player_id, team_id: player.team_id }] });
+      return teams;
+    }, []);
+    const sportmonks = {
+      getFixture: jest.fn().mockResolvedValue({
+        starting_at: new Date(Date.now() - 1000).toISOString(),
+        status: 'NS',
+        live: 1,
+      }),
+      getFixtureSquads: jest.fn().mockResolvedValue({
+        status: 'NS',
+        startingAt: new Date(Date.now() - 1000).toISOString(),
+        teams: squadPlayers,
+      }),
+    };
+    const prisma = {
+      playerFixtureCredit: { findMany: jest.fn() },
+      fantasyTeam: { findUnique: jest.fn() },
+    } as any;
+    const service = new FantasyTeamService(prisma, sportmonks as any);
+
+    await expect(service.createTeam('user1', {
+      sportmonksFixtureId: fixtureId,
+      name: 'Late NS',
+      sportmonksPlayerIds: [1,2,3,4,5,6,101,102,103,104,105],
+      captainSportmonksPlayerId: 1,
+      viceCaptainSportmonksPlayerId: 101,
+    })).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

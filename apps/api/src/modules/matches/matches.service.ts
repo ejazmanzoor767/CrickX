@@ -43,12 +43,17 @@ export function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE
   // Sportmonks /livescores can retain a stale live=1 flag on fixtures that
   // have not actually entered play. When the status still says NS/scheduled,
   // require positive scoring evidence before promoting it to LIVE.
+  const runs = Array.isArray((fixture as any).runs) ? (fixture as any).runs : [];
+  const scoreboards = Array.isArray((fixture as any).scoreboards) ? (fixture as any).scoreboards : [];
+  const batting = Array.isArray((fixture as any).batting) ? (fixture as any).batting : [];
+  const bowling = Array.isArray((fixture as any).bowling) ? (fixture as any).bowling : [];
+  const balls = Array.isArray((fixture as any).balls) ? (fixture as any).balls : [];
   const hasLivePayload =
-    (Array.isArray((fixture as any).runs) && (fixture as any).runs.length > 0) ||
-    (Array.isArray((fixture as any).scoreboards) && (fixture as any).scoreboards.length > 0) ||
-    (Array.isArray((fixture as any).batting) && (fixture as any).batting.length > 0) ||
-    (Array.isArray((fixture as any).bowling) && (fixture as any).bowling.length > 0) ||
-    (Array.isArray((fixture as any).balls) && (fixture as any).balls.length > 0);
+    balls.length > 0 ||
+    runs.some((row: any) => Number(row?.score ?? row?.runs ?? row?.total ?? 0) > 0) ||
+    scoreboards.some((row: any) => Number(row?.score ?? row?.total ?? row?.runs ?? 0) > 0) ||
+    batting.some((row: any) => Number(row?.score ?? row?.runs ?? row?.runs_scored ?? 0) > 0) ||
+    bowling.some((row: any) => Number(row?.wickets ?? row?.wicket ?? row?.total_wickets ?? 0) > 0);
 
   if (liveStatus) return 'LIVE';
   if (fixture.live === 1 && (!notStartedStatus || hasLivePayload)) return 'LIVE';
