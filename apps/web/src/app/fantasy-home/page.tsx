@@ -11,7 +11,19 @@ const hasStarted = (m:any) => { const start = new Date(m?.starting_at ?? '').get
 const isVoid = (m:any) => m?.draw_noresult === true || ['abandoned','cancelled','canceled','no result','no-result','washout'].some((part)=>String(m?.status??'').toLowerCase().includes(part));
 const isStaleNotStarted = (m:any) => { const start = new Date(m?.starting_at ?? '').getTime(); const status = String(m?.status ?? '').toLowerCase(); const ageExpired = Number.isFinite(start) && Date.now() - start >= 6 * 60 * 60 * 1000; const scheduledBeforeToday = Number.isFinite(start) && new Date(start).toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10); return (ageExpired || scheduledBeforeToday) && ['ns','scheduled','not started','upcoming'].some((value) => status === value || status.includes(value)); };
 const isCompleted = (m:any) => String(m?.applicationState??'').toUpperCase()==='COMPLETED' || isVoid(m) || isStaleNotStarted(m);
-const isLive = (m:any) => !isCompleted(m) && (String(m?.applicationState??'').toUpperCase()==='LIVE' || Number(m?.live)===1 || (hasStarted(m) && ['live','innings break','lunch','tea','stumps'].some((part)=>String(m?.status??'').toLowerCase().includes(part))));
+const isLive = (m:any) => {
+  if (isCompleted(m)) return false;
+  const state = String(m?.applicationState ?? '').toUpperCase();
+  // Backend applicationState is authoritative. Never promote a raw live=1
+  // flag because provider livescore feeds can contain stale LIVE flags.
+  if (state) return state === 'LIVE';
+  const status = String(m?.status ?? '').toLowerCase();
+  const notStartedStatus = ['ns', 'scheduled', 'not started', 'upcoming', 'postponed']
+    .some((value) => status === value || status.includes(value));
+  return hasStarted(m) && !notStartedStatus &&
+    (Number(m?.live) === 1 || ['live', 'innings break', 'lunch', 'tea', 'stumps']
+      .some((part) => status.includes(part)));
+};
 
 export default function FantasyHomePage() {
   const { user } = useAuth();
@@ -30,8 +42,7 @@ export default function FantasyHomePage() {
         if(!active)return;
         const savedTeams=list(mine);
         const byId=new Map<number,any>();
-        // Merge /livescores over the schedule feed so a started match is
-        // promoted to LIVE as soon as the provider exposes it.
+        // Merge schedule/live snapshots, but trust only the normalized backend state.
         for(const raw of [...list(todayFeed), ...list(upcoming), ...list(liveFeed)]){
           const id=Number(raw?.id);
           if(Number.isFinite(id)) byId.set(id,raw);
