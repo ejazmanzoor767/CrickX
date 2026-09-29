@@ -163,7 +163,7 @@ export class MatchesService {
 
   async listUpcomingAndRecent(page = 1) {
     const result = await this.sportmonks.listFixtures({ page, include: 'localteam,visitorteam,venue,league,season,stage,tosswon' });
-    return { ...result, data: Array.isArray(result.data) ? result.data.map(normalize) : [] };
+    return { ...result, data: Array.isArray(result.data) ? result.data.map((fixture) => normalize(fixture)) : [] };
   }
   async listLeagues() { return this.sportmonks.listLeagues(); }
   async listToday() {
@@ -197,7 +197,7 @@ export class MatchesService {
         return Number.isFinite(timestamp) && timestamp >= start.getTime() && timestamp < end.getTime();
       })
       .sort((a, b) => new Date(a.starting_at).getTime() - new Date(b.starting_at).getTime())
-      .map(normalize);
+      .map((fixture) => normalize(fixture));
 
     return { data, meta: { pagination: { total: data.length, count: data.length, per_page: data.length, current_page: 1, total_pages: 1 } } };
   }
@@ -240,7 +240,7 @@ export class MatchesService {
     const fallbackData = scheduledRows
       .filter((fixture: SportmonksFixture) => !liveById.has(Number(fixture?.id)))
       .filter((fixture: SportmonksFixture) => applicationState(fixture) === 'LIVE')
-      .map(normalize);
+      .map((fixture) => normalize(fixture));
 
     const byId = new Map<number, SportmonksFixture>();
     for (const fixture of [...liveData, ...fallbackData]) {
@@ -267,7 +267,7 @@ export class MatchesService {
       fixtures.push(...(Array.isArray(envelope.data) ? envelope.data : []));
       totalPages = Math.max(1, Number(envelope.meta?.pagination?.total_pages ?? page)); page += 1;
     } while (page <= totalPages);
-    const data = fixtures.filter((f) => applicationState(f) === 'UPCOMING' && new Date(f.starting_at).getTime() > now.getTime()).sort((a,b)=>new Date(a.starting_at).getTime()-new Date(b.starting_at).getTime()).map(normalize);
+    const data = fixtures.filter((f) => applicationState(f) === 'UPCOMING' && new Date(f.starting_at).getTime() > now.getTime()).sort((a,b)=>new Date(a.starting_at).getTime()-new Date(b.starting_at).getTime()).map((fixture) => normalize(fixture));
     return { data, meta: { pagination: { total:data.length,count:data.length,per_page:data.length,current_page:1,total_pages:1 } } };
   }
 
@@ -281,7 +281,7 @@ export class MatchesService {
       fixtures.push(...(Array.isArray(envelope.data) ? envelope.data : []));
       totalPages = Math.max(1, Number(envelope.meta?.pagination?.total_pages ?? page)); page += 1;
     } while (page <= totalPages);
-    const data = fixtures.filter((f) => applicationState(f) === 'COMPLETED').sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime()).map(normalize);
+    const data = fixtures.filter((f) => applicationState(f) === 'COMPLETED').sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime()).map((fixture) => normalize(fixture));
     return { data, meta: { pagination: { total:data.length,count:data.length,per_page:data.length,current_page:1,total_pages:1 } } };
   }
 
