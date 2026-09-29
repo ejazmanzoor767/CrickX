@@ -13,7 +13,7 @@ export function isTerminalFixture(fixture: Partial<SportmonksFixture>): boolean 
   ].some((value) => status.includes(value)) || fixture.draw_noresult === true;
 }
 
-export function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE' | 'COMPLETED' {
+export function applicationState(fixture: SportmonksFixture, options: { providerLiveFeed?: boolean } = {}): 'UPCOMING' | 'LIVE' | 'COMPLETED' {
   const status = String(fixture.status ?? '').trim().toLowerCase();
   const startingAt = fixture.starting_at ? new Date(fixture.starting_at).getTime() : NaN;
   const started = Number.isFinite(startingAt) && startingAt <= Date.now();
@@ -40,12 +40,11 @@ export function applicationState(fixture: SportmonksFixture): 'UPCOMING' | 'LIVE
   const liveStatus = ['live', 'innings break', 'lunch', 'tea', 'stumps']
     .some((part) => status.includes(part));
 
-  // Once a fixture has reached its scheduled start, Sportmonks' live flag is
-  // sufficient to enter LIVE even before the first scoring payload arrives.
-  // This avoids a kickoff dead-zone where a real match remains UPCOMING until
-  // the first run/wicket is published. Future fixtures are still protected by
-  // the started check above, and stale NS fixtures are handled by the 6-hour
-  // terminal safeguard.
+  // A fixture returned by Sportmonks' dedicated live feed is positive
+  // evidence that the provider considers it part of the current live set.
+  // Trust that source once the scheduled start time has passed, even when the
+  // payload is briefly still marked NS/live=0 during kickoff.
+  if (options.providerLiveFeed && started) return 'LIVE';
   if (liveStatus) return 'LIVE';
   if (fixture.live === 1) return 'LIVE';
   if (notStartedStatus) return 'UPCOMING';
@@ -206,15 +205,26 @@ export class MatchesService {
     const liveResult = await this.sportmonks.listLiveFixtures();
     const liveRows = Array.isArray(liveResult.data) ? liveResult.data : [];
 
-    // Sportmonks can briefly omit a match from /livescores during the
-    // kickoff transition. Merge the current day's fixture feed as a fallback
-    // so a started live fixture is not invisible to the app.
+    // /livescores is the primary source for Live Matches. During kickoff,
+    // Sportmonks can briefly return an NS/live=0 snapshot even though the
+    // fixture is already present in its dedicated live feed. Treat that feed
+    // membership as authoritative once the scheduled start has passed.
+    const liveById = new Map<number, SportmonksFixture>();
+    for (const fixture of liveRows) {
+      const id = Number(fixture?.id);
+      if (Number.isFinite(id) && id > 0) liveById.set(id, fixture);
+    }
+
+    // The schedule feed is only a fallback for fixtures temporarily omitted
+    // from /livescores. Fetch all pages for today's fixtures so a live match
+    // cannot disappear simply because it is beyond the first provider page.
     const now = new Date();
     const startOfDay = new Date(now);
     startOfDay.setUTCHours(0, 0, 0, 0);
     const endOfDay = new Date(startOfDay);
     endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
-    const scheduledResult = await this.sportmonks.listFixtures({
+
+    const scheduledResult = await this.sportmonks.listFixturesPaginated({
       startsBetween: {
         start: sportmonksDate(startOfDay),
         end: sportmonksDate(endOfDay),
@@ -223,15 +233,22 @@ export class MatchesService {
     });
     const scheduledRows = Array.isArray(scheduledResult.data) ? scheduledResult.data : [];
 
+    const liveData = [...liveById.values()]
+      .filter((fixture) => applicationState(fixture, { providerLiveFeed: true }) === 'LIVE')
+      .map(normalize);
+
+    const fallbackData = scheduledRows
+      .filter((fixture) => !liveById.has(Number(fixture?.id)))
+      .filter((fixture) => applicationState(fixture) === 'LIVE')
+      .map(normalize);
+
     const byId = new Map<number, SportmonksFixture>();
-    for (const fixture of [...scheduledRows, ...liveRows]) {
+    for (const fixture of [...liveData, ...fallbackData]) {
       const id = Number(fixture?.id);
       if (Number.isFinite(id) && id > 0) byId.set(id, fixture);
     }
 
-    const data = [...byId.values()]
-      .filter((fixture) => applicationState(fixture) === 'LIVE')
-      .map(normalize);
+    const data = [...byId.values()];
 
     return {
       ...liveResult,

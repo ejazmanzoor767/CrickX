@@ -30,6 +30,24 @@ describe('applicationState', () => {
     } as any)).toBe('UPCOMING');
   });
 
+  it('treats a started fixture from the dedicated live feed as LIVE during kickoff', () => {
+    expect(applicationState({
+      id: 9,
+      status: 'NS',
+      live: 0,
+      starting_at: new Date(now - 60_000).toISOString(),
+    } as any, { providerLiveFeed: true })).toBe('LIVE');
+  });
+
+  it('never promotes a future fixture to LIVE just because it came from the live feed', () => {
+    expect(applicationState({
+      id: 10,
+      status: 'NS',
+      live: 0,
+      starting_at: new Date(now + 60_000).toISOString(),
+    } as any, { providerLiveFeed: true })).toBe('UPCOMING');
+  });
+
   it('allows a started NS fixture LIVE when live=1 has scoring evidence', () => {
     expect(applicationState({
       id: 6,
