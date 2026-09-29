@@ -102,8 +102,11 @@ export class PredictionService implements OnModuleInit,OnModuleDestroy{
   const live=liveNow(f);
   const now=Date.now();
   const startMs=start.getTime();
-  if(!live && startMs < now){
-    throw new ForbiddenException('Predictions are unavailable because this match has already started.');
+  const notStartedStatus=['ns','scheduled','not started','upcoming','postponed']
+    .some((value)=>providerStatus===value||providerStatus.includes(value));
+  const staleNotStarted=Number.isFinite(startMs) && startMs<=now && now-startMs>=6*60*60*1000 && notStartedStatus;
+  if(staleNotStarted){
+    throw new ForbiddenException('Predictions are unavailable for this stale fixture.');
   }
   if(startMs > now + PREDICTION_HORIZON_MS){
     throw new BadRequestException('Predictions are not available for this match yet.');
