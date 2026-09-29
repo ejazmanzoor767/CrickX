@@ -89,14 +89,23 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       // contests collection in memory. Query only the small set of fields needed
       // for the sweep, then process fixtures sequentially so one sweep cannot
       // exhaust the Render instance.
-      const snapshot = await this.prisma.db
-        .collection('contests')
-        .where('status', 'in', ['UPCOMING', 'LIVE'])
-        .select('sportmonksFixtureId', 'lineupLockAt')
-        .get();
-
       const now = Date.now();
-      const contests = snapshot.docs
+      const [liveSnapshot, startedSnapshot] = await Promise.all([
+        this.prisma.db
+          .collection('contests')
+          .where('status', '==', 'LIVE')
+          .select('sportmonksFixtureId', 'lineupLockAt')
+          .limit(100)
+          .get(),
+        this.prisma.db
+          .collection('contests')
+          .where('status', '==', 'UPCOMING')
+          .select('sportmonksFixtureId', 'lineupLockAt')
+          .limit(100)
+          .get(),
+      ]);
+
+      const contests = [...liveSnapshot.docs, ...startedSnapshot.docs]
         .map((doc) => {
           const data = doc.data() as any;
           const lockValue = data.lineupLockAt;
@@ -764,15 +773,25 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     // Contest documents are the source of truth for fantasy scoring.
     // Do not scan the entire fantasyTeams collection every 30 seconds just to
     // discover fixture IDs; score only contests that are actually UPCOMING/LIVE.
-    const contestSnapshot = await this.prisma.db
-      .collection('contests')
-      .where('status', 'in', ['UPCOMING', 'LIVE'])
-      .select('sportmonksFixtureId', 'lineupLockAt')
-      .get();
-
     const now = Date.now();
+    const [liveSnapshot, startedSnapshot] = await Promise.all([
+      this.prisma.db
+        .collection('contests')
+        .where('status', '==', 'LIVE')
+        .select('sportmonksFixtureId', 'lineupLockAt')
+        .limit(100)
+        .get(),
+      this.prisma.db
+        .collection('contests')
+        .where('status', '==', 'UPCOMING')
+        .select('sportmonksFixtureId', 'lineupLockAt')
+        .limit(100)
+        .get(),
+    ]);
+
+    const contestDocs = [...liveSnapshot.docs, ...startedSnapshot.docs];
     const fixtureIds = new Set<number>();
-    for (const doc of contestSnapshot.docs) {
+    for (const doc of contestDocs) {
       const data = doc.data() as any;
       const lockValue = data.lineupLockAt;
       const lockMs =

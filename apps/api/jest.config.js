@@ -4,4 +4,5 @@ module.exports = {
   rootDir: 'src',
   testRegex: '.*\\.spec\\.ts$',
   moduleFileExtensions: ['js', 'json', 'ts'],
+  setupFiles: ['reflect-metadata'],
 };
