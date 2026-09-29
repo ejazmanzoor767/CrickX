@@ -4,6 +4,7 @@ import '../components/structure.css';
 import { AuthProvider } from '../lib/auth-context';
 import Nav from '../components/nav';
 import Footer from '../components/footer';
+import Web3Provider from './web3-provider';
 
 export const viewport = {
   width: 'device-width',
@@ -21,11 +22,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
-          <Nav />
+        <Web3Provider>
+          <AuthProvider>
+            <Nav />
           <main className="page-shell">{children}</main>
           <Footer />
-        </AuthProvider>
+          </AuthProvider>
+        </Web3Provider>
       </body>
     </html>
   );
