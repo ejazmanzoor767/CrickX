@@ -38,23 +38,23 @@ describe('CRXPredictionPool - company-funded prediction pool', function () {
     const summary = await pool.getPredictionSummary(1);
     await moveTo(Number(summary[0]));
 
-    await pool.fundPrediction(1, 2, ethers.parseEther('25'));
+    await pool.fundPrediction(1, 2, ethers.parseEther('50'));
     const funded = await pool.getPredictionSummary(1);
 
     expect(funded[1]).to.equal(1n);
     expect(funded[2]).to.equal(2n);
-    expect(funded[3]).to.equal(ethers.parseEther('100'));
+    expect(funded[3]).to.equal(ethers.parseEther('50'));
     expect(funded[6]).to.equal(true);
-    expect(await pool.totalEscrowed()).to.equal(ethers.parseEther('100'));
-    expect(await pool.availableFunding()).to.equal(ethers.parseEther('50'));
+    expect(await pool.totalEscrowed()).to.equal(ethers.parseEther('50'));
+    expect(await pool.availableFunding()).to.equal(ethers.parseEther('25'));
   });
 
   it('rejects payout totals that do not exactly match the funded pool', async function () {
     const { token, pool, a, b } = await deployFixture();
-    await token.mint(await pool.getAddress(), ethers.parseEther('100'));
+    await token.mint(await pool.getAddress(), ethers.parseEther('50'));
     const summary = await pool.getPredictionSummary(1);
     await moveTo(Number(summary[0]));
-    await pool.fundPrediction(1, 2, ethers.parseEther('100'));
+    await pool.fundPrediction(1, 2, ethers.parseEther('50'));
 
     await expect(
       pool.finalizePayouts(
@@ -76,14 +76,14 @@ describe('CRXPredictionPool - company-funded prediction pool', function () {
       pool.finalizePayouts(
         1,
         [a.address, a.address],
-        [ethers.parseEther('50'), ethers.parseEther('50')],
+        [ethers.parseEther('25'), ethers.parseEther('25')],
       ),
     ).to.be.revertedWith('duplicate winner');
 
     await pool.finalizePayouts(
       1,
       [a.address, b.address],
-      [ethers.parseEther('60'), ethers.parseEther('40')],
+      [ethers.parseEther('30'), ethers.parseEther('20')],
     );
 
     expect((await pool.getPredictionSummary(1))[1]).to.equal(2n);
@@ -98,19 +98,19 @@ describe('CRXPredictionPool - company-funded prediction pool', function () {
 
     const after = await pool.getPredictionSummary(1);
     expect(after[1]).to.equal(3n);
-    expect(after[4]).to.equal(ethers.parseEther('100'));
+    expect(after[4]).to.equal(ethers.parseEther('50'));
     expect(after[5]).to.equal(2n);
-    expect(await token.balanceOf(a.address) - beforeA).to.equal(ethers.parseEther('60'));
-    expect(await token.balanceOf(b.address) - beforeB).to.equal(ethers.parseEther('40'));
+    expect(await token.balanceOf(a.address) - beforeA).to.equal(ethers.parseEther('30'));
+    expect(await token.balanceOf(b.address) - beforeB).to.equal(ethers.parseEther('20'));
     expect(await token.balanceOf(await pool.getAddress())).to.equal(0n);
   });
 
   it('refunds a funded prediction exactly once', async function () {
     const { owner, token, pool } = await deployFixture();
-    await token.mint(await pool.getAddress(), ethers.parseEther('50'));
+    await token.mint(await pool.getAddress(), ethers.parseEther('25'));
     const summary = await pool.getPredictionSummary(1);
     await moveTo(Number(summary[0]));
-    await pool.fundPrediction(1, 1, ethers.parseEther('50'));
+    await pool.fundPrediction(1, 1, ethers.parseEther('25'));
 
     const before = await token.balanceOf(owner.address);
     await pool.refundPrediction(1);
@@ -118,7 +118,7 @@ describe('CRXPredictionPool - company-funded prediction pool', function () {
     expect((await pool.getPredictionSummary(1))[1]).to.equal(4n);
     expect(await pool.totalEscrowed()).to.equal(0n);
     expect(await token.balanceOf(await pool.getAddress())).to.equal(0n);
-    expect(await token.balanceOf(owner.address) - before).to.equal(ethers.parseEther('50'));
+    expect(await token.balanceOf(owner.address) - before).to.equal(ethers.parseEther('25'));
 
     await expect(pool.refundPrediction(1)).to.be.revertedWith('prediction already settled');
   });
