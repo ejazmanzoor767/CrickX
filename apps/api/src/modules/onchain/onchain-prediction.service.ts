@@ -248,7 +248,7 @@ export class OnchainPredictionService {
         total += amounts[i];
       }
 
-      const expected = BigInt(currentBefore.participantCount) * parseUnits('50', currentBefore.tokenDecimals);
+      const expected = BigInt(currentBefore.participantCount) * parseUnits('25', currentBefore.tokenDecimals);
       if (total !== expected) throw new BadRequestException('Prediction payout total does not match the funded pool.');
 
       const hash = await this.walletClient!.writeContract({
