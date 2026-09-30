@@ -19,7 +19,7 @@ export default function GameRulesPage() {
       <div className="card"><h2>6. Live scoring</h2><p className="section-subtitle">Sportmonks match data feeds the fantasy scoring engine. Captain points are multiplied by 2× and vice-captain points by 1.5×.</p></div>
       <div className="card"><h2>7. Fantasy prize pool</h2><p className="section-subtitle">CrickX allocates 10 CRX per joined fantasy-contest participant. The pool is funded for on-chain settlement after the match starts and the smart contract distributes the configured pool after final ranking.</p></div>
       <div className="card"><h2>8. Predictions</h2><p className="section-subtitle">Each eligible match has 5 prediction questions. Voting closes when the match goes live. At least 3 correct answers are required to qualify for a prize.</p></div>
-      <div className="card"><h2>9. Prediction prizes</h2><p className="section-subtitle">CrickX allocates 50 CRX per prediction participant. The current correctness tiers are 50% for 5 correct, 30% for 4 correct and 20% for 3 correct, shared among qualifying users in each tier.</p></div>
+      <div className="card"><h2>9. Prediction prizes</h2><p className="section-subtitle">CrickX allocates 25 CRX per prediction participant. The current correctness tiers are 50% for 5 correct, 30% for 4 correct and 20% for 3 correct, shared among qualifying users in each tier.</p></div>
       <div className="card"><h2>10. Wallet security</h2><p className="section-subtitle">CrickX never asks for a wallet seed phrase or private key. Users are responsible for checking wallet addresses, token amounts and Polygon network confirmations before approving transactions.</p></div>
     </div>
   </section>;
