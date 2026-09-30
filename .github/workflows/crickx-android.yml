@@ -260,18 +260,6 @@ jobs:
           file "$hermes"
           "$hermes" --version >/dev/null
 
-      - name: Build release APK
-        working-directory: apps/mobile
-        env:
-          NODE_ENV: production
-          EXPO_PUBLIC_API_BASE_URL: https://crickx-api.onrender.com/api/v1
-          EXPO_PUBLIC_WEB_URL: https://crickxfantasy.site
-          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx5g
-        run: |
-          cd android
-          ./gradlew assembleRelease --no-daemon --stacktrace -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64
-
       - name: Configure reliable native library packaging
         working-directory: apps/mobile
         shell: bash
@@ -283,38 +271,26 @@ jobs:
           path = Path("android/app/build.gradle")
           text = path.read_text()
 
-          # Prefer compressed JNI libraries for broad package-install compatibility
-          # on 4 KB and 16 KB Android devices. This avoids depending on a
-          # post-build zipalign/re-sign step for prebuilt React Native/Expo .so files.
           if "useLegacyPackaging true" not in text:
               marker = "    packagingOptions {"
               if marker in text:
-                  block = (
-                      marker + "
-"
-                      "        jniLibs {
-"
-                      "            useLegacyPackaging true
-"
-                      "        }
-"
+                  insertion = (
+                      marker + "\n"
+                      "        jniLibs {\n"
+                      "            useLegacyPackaging true\n"
+                      "        }\n"
                   )
-                  text = text.replace(marker, block, 1)
+                  text = text.replace(marker, insertion, 1)
               else:
                   android_marker = "android {"
                   if android_marker not in text:
                       raise SystemExit("Could not find android block in generated Gradle file")
                   block = (
-                      android_marker + "
-"
-                      "    packagingOptions {
-"
-                      "        jniLibs {
-"
-                      "            useLegacyPackaging true
-"
-                      "        }
-"
+                      android_marker + "\n"
+                      "    packagingOptions {\n"
+                      "        jniLibs {\n"
+                      "            useLegacyPackaging true\n"
+                      "        }\n"
                       "    }"
                   )
                   text = text.replace(android_marker, block, 1)
@@ -322,6 +298,18 @@ jobs:
           path.write_text(text)
           print("JNI libraries configured for compressed APK packaging.")
           PY
+
+      - name: Build release APK
+        working-directory: apps/mobile
+        env:
+          NODE_ENV: production
+          EXPO_PUBLIC_API_BASE_URL: https://crickx-api.onrender.com/api/v1
+          EXPO_PUBLIC_WEB_URL: https://crickxfantasy.site
+          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx5g
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon --stacktrace -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64
 
       - name: Validate APK package and signature
         working-directory: apps/mobile
