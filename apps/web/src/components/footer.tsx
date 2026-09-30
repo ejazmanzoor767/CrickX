@@ -26,6 +26,7 @@ export default function Footer() {
         <div className="footer-meta" style={{ alignItems: 'flex-end' }}>
           <div style={{ width: '100%', marginTop: 10, marginBottom: 6 }}>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <Link href="/whitepaper">Whitepaper</Link>
               <Link href="/subscription">Weekly Subscription</Link>
               <Link href="/profile/game-rules">Game Rules</Link>
               <Link href="/profile/scoring">Fantasy Point Calculation</Link>
