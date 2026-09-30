@@ -57,7 +57,7 @@ const NATIVE_SHELL_CSS = [
   "#crickx-native-profile-resources .crx-res-foot{padding:12px 16px 16px;color:#7e899d;font-size:10px;line-height:1.55;text-align:center;}"
 ].join("");
 
-const script = String.raw\`
+const script = String.raw`
 (function() {
   function addProfileResources() {
     try {
