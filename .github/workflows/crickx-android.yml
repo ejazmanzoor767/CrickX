@@ -256,7 +256,7 @@ jobs:
           GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx5g
         run: |
           cd android
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew assembleRelease --no-daemon --stacktrace -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64
 
       - name: Validate APK package and signature
         working-directory: apps/mobile
@@ -274,7 +274,12 @@ jobs:
           test -x "$aapt2"
           "$apksigner" verify --verbose "$apk"
           "$aapt2" dump badging "$apk" | grep -E "^package: name='com\.crickx\.app'"
-          echo "APK package, ZIP structure, and Android signature verified."
+          echo "Native ABIs packaged in APK:"
+          unzip -Z1 "$apk" | grep -E '^lib/(armeabi-v7a|arm64-v8a|x86|x86_64)/' | cut -d/ -f2 | sort -u
+          for abi in armeabi-v7a arm64-v8a; do
+            unzip -Z1 "$apk" | grep -q "^lib/${abi}/" || { echo "Missing required phone ABI: ${abi}"; exit 1; }
+          done
+          echo "APK package, ZIP structure, signature, and ARM phone ABIs verified."
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
