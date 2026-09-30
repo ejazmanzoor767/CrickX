@@ -30,14 +30,12 @@ export default function Footer() {
               <Link href="/subscription">Subscription Plans</Link>
               <Link href="/profile/game-rules">Game Rules</Link>
               <Link href="/profile/scoring">Fantasy Point Calculation</Link>
-              <Link href="/business-information">Business Information</Link>
               <Link href="/payment-and-checkout">Payment &amp; Checkout</Link>
               <Link href="/profile/privacy">Privacy Policy</Link>
               <Link href="/profile/terms">Terms &amp; Conditions</Link>
               <Link href="/profile/refund">Refund Policy</Link>
               <Link href="/profile/shipping">Shipping Policy</Link>
               <Link href="/profile/metamask">CRX in MetaMask</Link>
-              <a href="https://crickxfantasy.site" target="_blank" rel="noreferrer">Web App</a>
               <a href="https://github.com/ejazmanzoor767/CrickX/releases/latest/download/CrickX.apk">Download Android APK</a>
             </div>
           </div>
