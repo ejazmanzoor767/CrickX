@@ -26,7 +26,7 @@ export default function WhitepaperPage() {
           <p className="section-subtitle">Version 1.0 · September 30, 2026 · Product and technical overview.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <a className="secondary-button" href="/WHITEPAPER.md">Markdown</a>
+          <a className="secondary-button" href="/whitepaper.md">Markdown</a>
           <a className="secondary-button" href="https://github.com/ejazmanzoor767/CrickX/blob/main/WHITEPAPER.md" target="_blank" rel="noreferrer">GitHub</a>
         </div>
       </div>
