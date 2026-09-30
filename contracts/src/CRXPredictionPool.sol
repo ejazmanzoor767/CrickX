@@ -10,7 +10,7 @@ contract CRXPredictionPool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     IERC20 public immutable crxToken;
     address public fundingWallet;
-    uint256 public constant POOL_PER_ENTRY=50 ether;
+    uint256 public constant POOL_PER_ENTRY=25 ether;
 
     enum Stage { Open, Funded, Ranked, Distributed, Cancelled }
     struct Prediction {
