@@ -201,6 +201,20 @@ jobs:
               "signingConfig signingConfigs.crickxRelease",
           )
 
+          # Keep the release APK broadly installable across Android package
+          # installers by explicitly enabling legacy V1 plus modern V2/V3 signing.
+          if "enableV1Signing true" not in text:
+              marker = '            keyPassword System.getenv("ANDROID_KEY_PASSWORD")\n'
+              signing_lines = (
+                  marker
+                  + "            enableV1Signing true\n"
+                  + "            enableV2Signing true\n"
+                  + "            enableV3Signing true\n"
+              )
+              if marker not in text:
+                  raise SystemExit("Could not find crickxRelease keyPassword line for APK signing flags")
+              text = text.replace(marker, signing_lines, 1)
+
           path.write_text(text)
           print("Gradle release signing configured:", store)
           PY
