@@ -16,7 +16,7 @@ export default function PaymentAndCheckoutPage() {
       <h2>Early Buy CRX</h2>
       <p>The CrickX Wallet currently provides an Early Buy flow through OxaPay. The minimum purchase is $1 USD and the displayed rate is <strong>1 CRX = $0.002</strong>. After payment confirmation, the backend fulfills the purchased CRX directly to the connected Polygon wallet.</p>
       <h2>Blockchain prizes are separate</h2>
-      <p>Fantasy contest joining does not require a blockchain payment. CrickX allocates 10 CRX per joined fantasy participant and 50 CRX per prediction participant. These pools are settled through the appropriate CrickX smart contracts.</p>
+      <p>Fantasy contest joining does not require a blockchain payment. CrickX allocates 10 CRX per joined fantasy participant and 25 CRX per prediction participant. These pools are settled through the appropriate CrickX smart contracts.</p>
       <h2>What customers should check</h2>
       <p>Before confirming payment, review the plan, amount, service description and wallet address where applicable. For blockchain transfers or CRX fulfillment, verify the Polygon network and recipient wallet carefully.</p>
       <h2>Payment records</h2>
