@@ -36,7 +36,7 @@ export default function BusinessInformationPage() {
         <li><strong>Checkout:</strong> Customer is redirected to OxaPay's hosted checkout and reviews the amount before payment.</li>
         <li><strong>Confirmation:</strong> CrickX activates access only after the backend verifies the successful OxaPay payment webhook.</li>
         <li><strong>Fantasy:</strong> Active subscribers can build an XI and join eligible fantasy contests for 0 CRX. CrickX allocates 10 CRX per joined participant to the fantasy prize pool.</li>
-        <li><strong>Predictions:</strong> Active subscribers can answer 5 match predictions before the fixture goes live. CrickX allocates 50 CRX per prediction participant to the prediction pool.</li>
+        <li><strong>Predictions:</strong> Active subscribers can answer 5 match predictions before the fixture goes live. CrickX allocates 25 CRX per prediction participant to the prediction pool.</li>
         <li><strong>Wallet:</strong> Users can connect a compatible Polygon wallet, view CRX, transfer CRX, and use the Early Buy feature where available.</li>
       </ol>
       <h2>Early Buy CRX</h2>
