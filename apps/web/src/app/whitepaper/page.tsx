@@ -11,7 +11,7 @@ const sections = [
   ['CRX Wallet & Early Buy', 'Users can view and transfer CRX on Polygon. Early Buy currently starts at $1 at the displayed rate of 1 CRX = $0.002 through OxaPay.'],
   ['Fantasy Cricket', 'Users build an 11-player XI within a 100-credit budget and a maximum of 7 players from one real team.'],
   ['Contest Model', 'Contest entry is free. The platform allocates 10 CRX per participant and funds the prize pool for on-chain settlement.'],
-  ['Predictions', 'Each eligible match has five prediction questions. Voting locks when the match goes live, and the current pool allocation is 50 CRX per participant.'],
+  ['Predictions', 'Each eligible match has five prediction questions. Voting locks when the match goes live, and the current pool allocation is 25 CRX per participant.'],
   ['Security Model', 'Application controls, payment verification, wallet signatures and smart-contract operations are separated by responsibility.'],
   ['Roadmap', 'The roadmap covers core fantasy, payments and growth, prediction expansion, and scaling.'],
   ['Risks', 'Users should consider token, smart-contract, wallet, data-provider, payment, regulatory and operational risks.'],
