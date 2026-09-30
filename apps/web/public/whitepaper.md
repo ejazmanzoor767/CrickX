@@ -259,6 +259,10 @@ An active CrickX subscription is required.
 
 Predictions open before the match, lock when the match goes live, cannot be changed after locking, and are settled after the match result and statistics are available.
 
+### Pool allocation
+
+CrickX allocates **25 CRX per prediction participant** to the prediction pool. The five questions therefore correspond to a 5 CRX allocation per question.
+
 ### Qualification and prizes
 
 A participant needs at least **3 correct answers** to qualify for a CRX prize.
