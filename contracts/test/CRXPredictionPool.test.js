@@ -33,7 +33,7 @@ describe('CRXPredictionPool - company-funded prediction pool', function () {
 
   it('funds exactly 25 CRX per participant after the lock time', async function () {
     const { owner, token, pool } = await deployFixture();
-    await token.mint(await pool.getAddress(), ethers.parseEther('150'));
+    await token.mint(await pool.getAddress(), ethers.parseEther('75'));
 
     const summary = await pool.getPredictionSummary(1);
     await moveTo(Number(summary[0]));
