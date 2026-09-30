@@ -113,7 +113,7 @@ const script = `
         </div>
 
         <div class="crx-res-foot">CrickX official support, documentation and service information.</div>
-`;
+      \`;
 
       if (accountCard && accountCard.parentElement) {
         accountCard.parentElement.insertBefore(wrap, accountCard);
@@ -133,7 +133,7 @@ const script = `
   }
 })();
 true;
-\`;
+`;
 
 function tabForUrl(url: string) {
   try {
