@@ -67,7 +67,24 @@ const NATIVE_SHELL_CSS = [
   "html.crickx-native-app .match-live-card .match-footer{flex-direction:row !important;gap:7px !important;padding-top:8px !important;}",
   "html.crickx-native-app .match-live-card .match-footer > div:first-child{display:none !important;}",
   "html.crickx-native-app .match-live-card .match-footer > div:last-child{width:100% !important;display:grid !important;grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;gap:7px !important;}",
-  "html.crickx-native-app .match-live-card .match-footer .primary-button,html.crickx-native-app .match-live-card .match-footer .secondary-button{min-height:38px !important;padding:8px 9px !important;font-size:11px !important;}"
+  "html.crickx-native-app .match-live-card .match-footer .primary-button,html.crickx-native-app .match-live-card .match-footer .secondary-button{min-height:38px !important;padding:8px 9px !important;font-size:11px !important;}",
+  "html.crickx-native-app .match-centre-intro{margin-bottom:6px !important;}",
+  "html.crickx-native-app .match-centre-tabs{margin-bottom:6px !important;padding:5px !important;}",
+  "html.crickx-native-app .match-centre-tabs button{min-height:40px !important;padding:8px 6px !important;font-size:10.5px !important;}",
+  "html.crickx-native-app .match-list{gap:7px !important;margin-top:0 !important;}",
+  "html.crickx-native-app .match-list-card.match-live-card{min-height:0 !important;height:auto !important;padding:10px !important;margin:0 !important;}",
+  "html.crickx-native-app .match-live-card .match-topline{margin:0 !important;padding:0 !important;min-height:18px !important;}",
+  "html.crickx-native-app .match-live-card .match-teams{margin:7px 0 !important;gap:6px !important;}",
+  "html.crickx-native-app .match-live-card .match-teams strong{font-size:18px !important;line-height:.95 !important;}",
+  "html.crickx-native-app .match-live-card .match-teams small{font-size:7.5px !important;margin-bottom:3px !important;}",
+  "html.crickx-native-app .match-live-card .match-teams img{width:20px !important;height:20px !important;margin-top:3px !important;}",
+  "html.crickx-native-app .match-live-card .vs-badge{width:28px !important;height:28px !important;font-size:8px !important;}",
+  "html.crickx-native-app .match-live-card .live-score-strip{margin:0 !important;padding:0 8px !important;}",
+  "html.crickx-native-app .match-live-card .live-score-strip > div{padding:4px 0 !important;gap:7px !important;}",
+  "html.crickx-native-app .match-live-card .live-score-strip strong{font-size:15px !important;}",
+  "html.crickx-native-app .match-live-card .match-footer{padding-top:6px !important;margin-top:6px !important;gap:5px !important;}",
+  "html.crickx-native-app .match-live-card .match-footer > div:last-child{gap:5px !important;}",
+  "html.crickx-native-app .match-live-card .match-footer .primary-button,html.crickx-native-app .match-live-card .match-footer .secondary-button{min-height:34px !important;padding:7px 6px !important;font-size:10.5px !important;border-radius:10px !important;}"
 ].join("");
 
 const script = `
