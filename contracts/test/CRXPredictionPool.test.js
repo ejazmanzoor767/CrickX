@@ -38,7 +38,7 @@ describe('CRXPredictionPool - company-funded prediction pool', function () {
     const summary = await pool.getPredictionSummary(1);
     await moveTo(Number(summary[0]));
 
-    await pool.fundPrediction(1, 2, ethers.parseEther('100'));
+    await pool.fundPrediction(1, 2, ethers.parseEther('50'));
     const funded = await pool.getPredictionSummary(1);
 
     expect(funded[1]).to.equal(1n);
