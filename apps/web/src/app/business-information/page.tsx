@@ -30,6 +30,14 @@ export default function BusinessInformationPage() {
       <h2>International and Pakistan customers</h2>
       <p>CrickX is an online service intended for customers inside and outside Pakistan. Prices for PKR checkout are displayed in Pakistani Rupees where applicable.</p>
       <h2>Business contact</h2>
-      <p><strong>Email:</strong> <a href="mailto:contact@crickxfantasy.site">ejazchouhan27@gmail.com</a><br/><strong>Phone:</strong> 03197789243<br/><strong>Business:</strong> CrickX<br/><strong>Address:</strong> chah bakshay wala p/o pakka shahnawaz tehsil & District Dera ghazi khan, chah bakshay wala p/o pakka shahnawaz tehsil & District Dera ghazi khan, dera ghazi khan</p>
-    </div></section>;
+      <p>
+        <strong>Contact:</strong> <a href="mailto:contact@crickxfantasy.com">contact@crickxfantasy.com</a><br/>
+        <strong>Info:</strong> <a href="mailto:info@crickxfantasy.com">info@crickxfantasy.com</a><br/>
+        <strong>Support:</strong> <a href="mailto:support@crickxfantasy.com">support@crickxfantasy.com</a><br/>
+        <strong>Phone:</strong> 03197789243<br/>
+        <strong>Business:</strong> CrickX<br/>
+        <strong>Address:</strong> chah bakshay wala p/o pakka shahnawaz tehsil &amp; District Dera ghazi khan, dera ghazi khan
+      </p>
+    </div>
+  </section>;
 }
