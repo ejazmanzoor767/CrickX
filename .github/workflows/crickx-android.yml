@@ -142,7 +142,6 @@ jobs:
           root = Path("android")
 
           # NDK r30 produces 16 KB ELF-aligned native libraries by default.
-          old = "27.1.12297006"
           new = "30.0.16248370"
           changed = []
           for path in root.rglob("*"):
@@ -151,12 +150,51 @@ jobs:
                       text = path.read_text()
                   except UnicodeDecodeError:
                       continue
-                  if old in text:
-                      path.write_text(text.replace(old, new))
+                  updated = text
+                  # Handle an explicitly generated ndkVersion regardless of which
+                  # Expo/React Native template revision produced the project.
+                  import re
+                  updated = re.sub(
+                      r'(ndkVersion\s*[=:]?\s*[\\"\\\' ])27\.1\.12297006([\\"\\\' ])',
+                      r'\\g<1>' + new + r'\\g<2>',
+                      updated,
+                  )
+                  updated = updated.replace("27.1.12297006", new)
+                  if updated != text:
+                      path.write_text(updated)
                       changed.append(str(path))
-          if not changed:
-              raise SystemExit("Generated Android project did not contain the expected NDK version to replace")
-          print("Updated generated Android NDK references:", ", ".join(changed))
+
+          # If the generated template no longer contains an explicit NDK version,
+          # add one to the app module so the build uses the installed r30 toolchain.
+          app_gradle = root / "app/build.gradle"
+          app_text = app_gradle.read_text()
+          if "ndkVersion" not in app_text:
+              marker = "android {"
+              if marker not in app_text:
+                  raise SystemExit("Generated android/app/build.gradle has no android block")
+              app_text = app_text.replace(
+                  marker,
+                  marker + '\n    ndkVersion "' + new + '"',
+                  1,
+              )
+              app_gradle.write_text(app_text)
+              changed.append(str(app_gradle) + " (added ndkVersion)")
+
+          print("Configured Android NDK references:", ", ".join(changed) if changed else "generated project already configured")
+
+          # Verify the app module resolves to NDK r30.
+          verify = app_gradle.read_text()
+          if new not in verify:
+              matches = []
+              for path in root.rglob("*"):
+                  if path.is_file() and path.suffix in {".gradle", ".kts", ".properties"}:
+                      try:
+                          t = path.read_text()
+                      except UnicodeDecodeError:
+                          continue
+                      if "ndkVersion" in t:
+                          matches.append(str(path))
+              raise SystemExit("Could not configure NDK r30 in generated Android project. ndkVersion files: " + ", ".join(matches))
 
           manifest = root / "app/src/main/AndroidManifest.xml"
           text = manifest.read_text()
