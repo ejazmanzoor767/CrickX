@@ -57,7 +57,7 @@ const NATIVE_SHELL_CSS = [
   "#crickx-native-profile-resources .crx-res-foot{padding:12px 16px 16px;color:#7e899d;font-size:10px;line-height:1.55;text-align:center;}"
 ].join("");
 
-const script = String.raw`
+const script = `
 (function() {
   function addProfileResources() {
     try {
@@ -113,7 +113,7 @@ const script = String.raw`
         </div>
 
         <div class="crx-res-foot">CrickX official support, documentation and service information.</div>
-      \`;
+`;
 
       if (accountCard && accountCard.parentElement) {
         accountCard.parentElement.insertBefore(wrap, accountCard);
