@@ -1,6 +1,6 @@
 # CrickX Whitepaper
 
-**Version 1.0 · September 30, 2026**
+**Version 1.1 · September 30, 2026**
 
 **Project:** CrickX  
 **Website:** https://crickxfantasy.site  
@@ -25,6 +25,7 @@ The platform is designed around a simple product loop:
 6. Live cricket information from Sportmonks feeds fantasy scoring and match status.
 7. When a contest is completed, final rankings are calculated and the smart contract distributes the CRX prize pool to participant wallets.
 8. Eligible matches can also offer five prediction questions, with CRX prizes based on prediction performance.
+9. The Wallet includes a self-custody CRX view, direct CRX transfers, and an Early Buy flow through OxaPay.
 
 CrickX is intended to make fantasy cricket accessible through a web application and an Android application while using blockchain where it provides a clear operational benefit: transparent CRX prize custody and settlement.
 
@@ -138,6 +139,8 @@ The subscription is separate from contest prize funding.
 CrickX currently uses OxaPay-hosted checkout and activates a subscription only after the backend receives and verifies the payment provider's successful webhook.
 
 The platform does not require a user to spend CRX to purchase the subscription.
+
+The current customer-facing app displays a token-launch countdown to October 17, 2027. The displayed date is a product schedule and may change.
 
 ---
 
@@ -298,6 +301,10 @@ CRX is held and transferred on Polygon.
 
 The user's MetaMask wallet is used for blockchain identity and prize receipt.
 
+The Wallet section is self-custody oriented: the connected Polygon wallet is used to view the on-chain CRX balance and make direct CRX transfers. CrickX does not hold a user's CRX in an internal account balance.
+
+The current Early Buy flow accepts a minimum of **$1 USD** at the displayed rate of **1 CRX = $0.002** through OxaPay. After verified payment, the backend fulfills the purchased CRX to the connected Polygon wallet.
+
 The separation means a user does not need to make a CRX transfer merely to join an eligible fantasy contest.
 
 ---
@@ -352,7 +359,7 @@ CrickX stores application-owned data such as accounts, fantasy teams, subscripti
 
 On-chain contest settlement provides a public ledger for CRX movements made by the smart contract.
 
-The project repository is public so the implementation can be inspected and the published architecture can be compared with the deployed product.
+The project repository is maintained as the project's technical source repository. The public website and published documentation remain the primary user-facing reference points.
 
 ---
 
@@ -483,6 +490,7 @@ Users should participate only where the product and relevant laws permit.
 ## 22. Official Links and Contacts
 
 **Website:** https://crickxfantasy.site  
+**Whitepaper:** https://crickxfantasy.site/whitepaper/  
 **CRX token logo:** https://crickxfantasy.site/crx.svg  
 **GitHub:** https://github.com/ejazmanzoor767/CrickX
 
