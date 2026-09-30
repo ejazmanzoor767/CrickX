@@ -67,10 +67,10 @@ describe('CRXPredictionPool - company-funded prediction pool', function () {
 
   it('prevents duplicate winners and distributes payouts in batches', async function () {
     const { token, pool, a, b } = await deployFixture();
-    await token.mint(await pool.getAddress(), ethers.parseEther('100'));
+    await token.mint(await pool.getAddress(), ethers.parseEther('50'));
     const summary = await pool.getPredictionSummary(1);
     await moveTo(Number(summary[0]));
-    await pool.fundPrediction(1, 2, ethers.parseEther('100'));
+    await pool.fundPrediction(1, 2, ethers.parseEther('50'));
 
     await expect(
       pool.finalizePayouts(
