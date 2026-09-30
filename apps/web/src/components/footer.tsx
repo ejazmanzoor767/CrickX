@@ -8,7 +8,7 @@ export default function Footer() {
           <div className="footer-brand-column">
             <div className="footer-brand">
               <img
-                src="/crx.svg"
+                src="/crickx-bold-logo.png"
                 alt="CrickX"
                 width="40"
                 height="40"
