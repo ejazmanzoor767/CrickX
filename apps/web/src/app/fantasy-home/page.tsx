@@ -93,7 +93,7 @@ export default function FantasyHomePage() {
         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
         {!live&&<Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${m.id}`}>{team?'Edit Team':'Create Team'}</Link>}
         <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${m.id}`}>Predictions</Link>
-        {live&&<Link className="primary-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/leaderboard?fixtureId=${m.id}`}>Leaderboard</Link>}
+        {live&&<Link className="primary-button live-leaderboard-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/leaderboard?fixtureId=${m.id}`}>Leaderboard</Link>}
         </div>
         </div>
       </article>;
