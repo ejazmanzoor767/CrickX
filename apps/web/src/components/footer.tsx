@@ -40,7 +40,7 @@ export default function Footer() {
 
           <div className="footer-link-group">
             <div className="footer-heading">App &amp; Contact</div>
-            <a href="https://github.com/ejazmanzoor767/CrickX/releases/latest/download/CrickX.apk">
+            <a href="https://github.com/ejazmanzoor767/CrickX/releases/latest/download/app-release.apk">
               Download Android APK
             </a>
             <a href="mailto:contact@crickxfantasy.com">✉ Contact</a>
