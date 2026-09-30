@@ -137,7 +137,7 @@ export default function SubscriptionPage() {
         <div>
           <p className="eyebrow">CRICKX MEMBERSHIP</p>
           <h1 className="section-title">Subscription</h1>
-          <p className="section-subtitle">Choose weekly or monthly access and follow the CRX token launch countdown.</p>
+          <p className="section-subtitle">Choose weekly or monthly access and follow the CRX token launch countdown.</p><p className="section-subtitle" style={{ fontSize: 11, marginTop: 6 }}>Last updated: September 30, 2026.</p>
         </div>
         <Link className="secondary-button" href="/profile">Profile</Link>
       </div>
