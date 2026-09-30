@@ -36,16 +36,12 @@ export default function Footer() {
             <Link href="/profile/privacy">Privacy Policy</Link>
             <Link href="/profile/terms">Terms &amp; Conditions</Link>
             <Link href="/profile/refund">Refund Policy</Link>
-            <Link href="/profile/shipping">Shipping Policy</Link>
           </div>
 
           <div className="footer-link-group">
             <div className="footer-heading">App &amp; Contact</div>
             <a href="https://github.com/ejazmanzoor767/CrickX/releases/latest/download/CrickX.apk">
               Download Android APK
-            </a>
-            <a href="https://crickxfantasy.site" target="_blank" rel="noreferrer">
-              Web App
             </a>
             <a href="mailto:contact@crickxfantasy.com">✉ Contact</a>
             <a href="mailto:info@crickxfantasy.com">✉ Info</a>
