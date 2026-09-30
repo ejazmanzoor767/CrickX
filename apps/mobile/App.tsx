@@ -57,6 +57,84 @@ const NATIVE_SHELL_CSS = [
   "#crickx-native-profile-resources .crx-res-foot{padding:12px 16px 16px;color:#7e899d;font-size:10px;line-height:1.55;text-align:center;}"
 ].join("");
 
+const script = String.raw\`
+(function() {
+  function addProfileResources() {
+    try {
+      if (!location.pathname.replace(/\\/+$/, '').endsWith('/profile')) return;
+      if (document.getElementById('crickx-native-profile-resources')) return;
+
+      const accountCard = Array.from(document.querySelectorAll('.card')).find((el) => {
+        const text = (el.textContent || '').toLowerCase();
+        return text.includes('account') && text.includes('session');
+      });
+
+      const wrap = document.createElement('section');
+      wrap.id = 'crickx-native-profile-resources';
+      wrap.innerHTML = \`
+        <div class="crx-res-head">
+          <p class="crx-res-eyebrow">CRICKX HELP &amp; RESOURCES</p>
+          <h2 class="crx-res-title">Contact &amp; information</h2>
+          <p class="crx-res-sub">Quick access to CrickX support, rules, policies and the official web experience.</p>
+        </div>
+
+        <div class="crx-res-section">
+          <span class="crx-res-label">Contact</span>
+          <div class="crx-res-list">
+            <a class="crx-res-row" href="mailto:contact@crickxfantasy.com">
+              <span class="crx-res-icon">✉</span>
+              <span class="crx-res-copy"><span class="crx-res-name">Contact</span><span class="crx-res-value">contact@crickxfantasy.com</span></span>
+              <span class="crx-res-arrow">›</span>
+            </a>
+            <a class="crx-res-row" href="mailto:info@crickxfantasy.com">
+              <span class="crx-res-icon">✉</span>
+              <span class="crx-res-copy"><span class="crx-res-name">Info</span><span class="crx-res-value">info@crickxfantasy.com</span></span>
+              <span class="crx-res-arrow">›</span>
+            </a>
+            <a class="crx-res-row" href="mailto:support@crickxfantasy.com">
+              <span class="crx-res-icon">✉</span>
+              <span class="crx-res-copy"><span class="crx-res-name">Support</span><span class="crx-res-value">support@crickxfantasy.com</span></span>
+              <span class="crx-res-arrow">›</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="crx-res-section">
+          <span class="crx-res-label">Information</span>
+          <div class="crx-res-list">
+            <a class="crx-res-row" href="/whitepaper/"><span class="crx-res-icon">📄</span><span class="crx-res-copy"><span class="crx-res-name">Whitepaper</span><span class="crx-res-value">Product and technical overview</span></span><span class="crx-res-arrow">›</span></a>
+            <a class="crx-res-row" href="/profile/game-rules/"><span class="crx-res-icon">📘</span><span class="crx-res-copy"><span class="crx-res-name">Game Rules</span><span class="crx-res-value">Fantasy and prediction rules</span></span><span class="crx-res-arrow">›</span></a>
+            <a class="crx-res-row" href="/profile/scoring/"><span class="crx-res-icon">⭐</span><span class="crx-res-copy"><span class="crx-res-name">Fantasy Point Calculation</span><span class="crx-res-value">Scoring tables and multipliers</span></span><span class="crx-res-arrow">›</span></a>
+            <a class="crx-res-row" href="/profile/privacy/"><span class="crx-res-icon">🔒</span><span class="crx-res-copy"><span class="crx-res-name">Privacy Policy</span><span class="crx-res-value">Data and privacy information</span></span><span class="crx-res-arrow">›</span></a>
+            <a class="crx-res-row" href="/profile/terms/"><span class="crx-res-icon">✓</span><span class="crx-res-copy"><span class="crx-res-name">Terms &amp; Conditions</span><span class="crx-res-value">Platform terms of use</span></span><span class="crx-res-arrow">›</span></a>
+            <a class="crx-res-row" href="/profile/refund/"><span class="crx-res-icon">↩</span><span class="crx-res-copy"><span class="crx-res-name">Refund Policy</span><span class="crx-res-value">Payment and CRX refund rules</span></span><span class="crx-res-arrow">›</span></a>
+            <a class="crx-res-row" href="https://crickxfantasy.site/"><span class="crx-res-icon">🌐</span><span class="crx-res-copy"><span class="crx-res-name">Web App</span><span class="crx-res-value">Open the full CrickX web experience</span></span><span class="crx-res-arrow">›</span></a>
+          </div>
+        </div>
+
+        <div class="crx-res-foot">CrickX official support, documentation and service information.</div>
+      \`;
+
+      if (accountCard && accountCard.parentElement) {
+        accountCard.parentElement.insertBefore(wrap, accountCard);
+      } else {
+        const profilePage = document.querySelector('.profile-page') || document.querySelector('.app-page');
+        if (profilePage) profilePage.appendChild(wrap);
+      }
+    } catch (e) {}
+  }
+
+  addProfileResources();
+
+  if (!window.__crickxProfileResourcesObserver) {
+    const observer = new MutationObserver(addProfileResources);
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    window.__crickxProfileResourcesObserver = observer;
+  }
+})();
+true;
+\`;
+
 function tabForUrl(url: string) {
   try {
     const pathname = new URL(url).pathname;
