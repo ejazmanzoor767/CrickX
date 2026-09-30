@@ -121,7 +121,8 @@ const NATIVE_SHELL_CSS = [
   "html.crickx-native-app .match-detail-page table{min-width:590px !important;width:max-content !important;}",
   "html.crickx-native-app .match-detail-page th,html.crickx-native-app .match-detail-page td{padding:9px 8px !important;font-size:11px !important;}",
   "html.crickx-native-app .match-detail-page th:nth-child(4),html.crickx-native-app .match-detail-page td:nth-child(4),html.crickx-native-app .match-detail-page th:nth-child(5),html.crickx-native-app .match-detail-page td:nth-child(5){display:table-cell !important;}",
-  "html.crickx-native-app .match-detail-page>div:first-child{margin-bottom:6px !important;}"
+  "html.crickx-native-app .match-detail-page>div:first-child{margin-bottom:6px !important;}",
+"html.crickx-native-app .live-scorecard-button,html.crickx-native-app .live-leaderboard-button{width:100% !important;min-width:0 !important;height:42px !important;min-height:42px !important;padding:0 12px !important;margin:0 !important;display:flex !important;align-items:center !important;justify-content:center !important;box-sizing:border-box !important;border-radius:11px !important;font-size:11px !important;font-weight:900 !important;line-height:1 !important;white-space:nowrap !important;text-align:center !important;flex:1 1 0 !important;}"
 ].join("");
 
 const script = `
