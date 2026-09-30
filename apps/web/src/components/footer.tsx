@@ -20,8 +20,7 @@ export default function Footer() {
             <strong>Contact:</strong> <a href="mailto:contact@crickxfantasy.com">contact@crickxfantasy.com</a><br />
             <strong>Info:</strong> <a href="mailto:info@crickxfantasy.com">info@crickxfantasy.com</a><br />
             <strong>Support:</strong> <a href="mailto:support@crickxfantasy.com">support@crickxfantasy.com</a><br />
-            <strong>Owner:</strong> <a href="mailto:ejazchouhan27@gmail.com">ejazchouhan27@gmail.com</a><br />
-            <strong>Phone:</strong> <a href="tel:03197789243">03197789243</a>
+            <strong>Owner:</strong> <a href="mailto:ejazchouhan27@gmail.com">ejazchouhan27@gmail.com</a>
           </p>
         </div>
         <div className="footer-meta" style={{ alignItems: 'flex-end' }}>
