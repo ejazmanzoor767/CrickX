@@ -106,6 +106,55 @@ jobs:
           print("React Native Gradle paths stabilized.")
           PY
 
+      - name: Configure 16 KB Android native compatibility
+        working-directory: apps/mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sdkmanager "ndk;30.0.16248370" >/dev/null
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("android")
+
+          # NDK r30 produces 16 KB ELF-aligned native libraries by default.
+          old = "27.1.12297006"
+          new = "30.0.16248370"
+          changed = []
+          for path in root.rglob("*"):
+              if path.is_file() and path.suffix in {".gradle", ".kts", ".properties"}:
+                  try:
+                      text = path.read_text()
+                  except UnicodeDecodeError:
+                      continue
+                  if old in text:
+                      path.write_text(text.replace(old, new))
+                      changed.append(str(path))
+          if not changed:
+              raise SystemExit("Generated Android project did not contain the expected NDK version to replace")
+          print("Updated generated Android NDK references:", ", ".join(changed))
+
+          manifest = root / "app/src/main/AndroidManifest.xml"
+          text = manifest.read_text()
+          if "android:pageSizeCompat=" not in text:
+              marker = "<application "
+              if marker not in text:
+                  raise SystemExit("AndroidManifest.xml application element not found")
+              text = text.replace(
+                  marker,
+                  '<application android:pageSizeCompat="enabled" ',
+                  1,
+              )
+              manifest.write_text(text)
+          print("Enabled Android 16 KB page-size compatibility fallback.")
+          PY
+
+          grep -R "30.0.16248370" android --include='*.gradle' --include='*.kts' >/dev/null
+          grep -q 'android:pageSizeCompat="enabled"' android/app/src/main/AndroidManifest.xml
+
       - name: Configure CI or production signing
         working-directory: apps/mobile
         env:
