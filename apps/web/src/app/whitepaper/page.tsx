@@ -8,12 +8,14 @@ const sections = [
   ['Architecture', 'Web and Android clients use the CrickX API, while Sportmonks supplies cricket data and Polygon handles CRX token and prize settlement.'],
   ['CRX Token', 'CRX is an ERC-20 utility token on Polygon. Current contract: 0x6A7BeF6Bff1CE03C14D25bC97b1AF7097894b05E.'],
   ['Subscription', 'Current access plans are $0.18 for 7 days or $0.60 for 30 days.'],
+  ['CRX Wallet & Early Buy', 'Users can view and transfer CRX on Polygon. Early Buy currently starts at $1 at the displayed rate of 1 CRX = $0.002 through OxaPay.'],
   ['Fantasy Cricket', 'Users build an 11-player XI within a 100-credit budget and a maximum of 7 players from one real team.'],
   ['Contest Model', 'Contest entry is free. The platform allocates 10 CRX per participant and funds the prize pool for on-chain settlement.'],
-  ['Predictions', 'Each eligible match has five prediction questions. Voting locks when the match goes live.'],
+  ['Predictions', 'Each eligible match has five prediction questions. Voting locks when the match goes live, and the current pool allocation is 50 CRX per participant.'],
   ['Security Model', 'Application controls, payment verification, wallet signatures and smart-contract operations are separated by responsibility.'],
   ['Roadmap', 'The roadmap covers core fantasy, payments and growth, prediction expansion, and scaling.'],
   ['Risks', 'Users should consider token, smart-contract, wallet, data-provider, payment, regulatory and operational risks.'],
+  ['Current release', 'The app includes web and Android access, self-custody CRX wallet tools, referrals, subscription plans and on-chain fantasy/prediction settlement.'],
 ];
 
 export default function WhitepaperPage() {
@@ -23,7 +25,7 @@ export default function WhitepaperPage() {
         <div>
           <p className="eyebrow">CRICKX DOCUMENTATION</p>
           <h1 className="section-title">Whitepaper</h1>
-          <p className="section-subtitle">Version 1.0 · September 30, 2026 · Product and technical overview.</p>
+          <p className="section-subtitle">Version 1.1 · September 30, 2026 · Updated for the current product release · Product and technical overview.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <a className="secondary-button" href="/whitepaper.md">Markdown</a>
@@ -68,8 +70,8 @@ export default function WhitepaperPage() {
 
       <article className="card" style={{ lineHeight: 1.75 }}>
         <Section n={1} title="Executive Summary">
-          <p>CrickX is a fantasy-cricket platform that combines live cricket data, fantasy team building, competition, prediction games, digital payments, and the CRX utility token.</p>
-          <p>The platform connects match discovery, fantasy selection, predictions, scoring, rankings and CRX settlement in one match-centered experience.</p>
+          <p>CrickX is a fantasy-cricket platform that combines live cricket data, fantasy team building, contests, prediction games, digital payments, wallet tools and the CRX utility token.</p>
+          <p>The platform connects match discovery, fantasy selection, predictions, scoring, rankings and CRX settlement in one match-centered experience. The current release also provides self-custody CRX wallet features and an Early Buy flow.</p>
         </Section>
 
         <Section n={2} title="Problem">
@@ -108,6 +110,7 @@ export default function WhitepaperPage() {
         <Section n={6} title="Fantasy Cricket">
           <p>Users select exactly 11 players within a 100-credit budget and may select a maximum of 7 players from one real team. Each team also requires a captain and vice-captain.</p>
           <p>Fantasy selection locks when the match starts. Captain scoring uses a 2× multiplier and vice-captain scoring uses a 1.5× multiplier.</p>
+          <p>Each fantasy-contest participant corresponds to a 10 CRX prize-pool allocation funded by CrickX for on-chain settlement.</p>
         </Section>
 
         <Section n={7} title="Contest Model">
@@ -123,11 +126,12 @@ export default function WhitepaperPage() {
 
         <Section n={8} title="Prediction System">
           <p>Each eligible match has five prediction questions. The current formats cover the match winner, a featured bowler, a featured batter, a powerplay threshold and the total number of match sixes.</p>
-          <p>Voting closes when the match goes live. An active subscription is required. Users need at least 3 correct answers to qualify for a prize, with the current correctness tiers using 50% / 30% / 20% allocation for 5 / 4 / 3 correct answers.</p>
+          <p>Voting closes when the match goes live. An active subscription is required. Users need at least 3 correct answers to qualify for a prize. The current prediction pool allocation is 50 CRX per participant, with 50% / 30% / 20% correctness tiers for 5 / 4 / 3 correct answers.</p>
         </Section>
 
         <Section n={9} title="Security Model">
           <p>CrickX separates frontend code from private credentials, verifies payment-provider webhooks on the backend, verifies wallet signatures before associating a wallet with a contest or prediction entry, and uses smart-contract checks for pool accounting and settlement.</p>
+          <p>The current Wallet section is self-custody oriented: users view and transfer CRX from their connected Polygon wallet. CrickX does not ask for seed phrases or private keys.</p>
           <p>The current contest contract is owner-operated for lifecycle actions. This is a deliberate operational model and means the platform is not presented as a fully permissionless protocol.</p>
           <p><strong>Audit disclosure:</strong> this whitepaper does not claim an independent security audit unless a separate public audit report is published.</p>
         </Section>
@@ -153,16 +157,21 @@ export default function WhitepaperPage() {
           <p>Users are responsible for securing their wallet credentials and for complying with laws applicable to their jurisdiction. Nothing on this page is investment advice or a guarantee of token value or prize earnings.</p>
         </Section>
 
-        <Section n={12} title="Official Links">
+        <Section n={12} title="Wallet and Early Buy">
+          <p>The current CrickX Wallet reads the real CRX balance on Polygon and supports direct CRX transfers. The Early Buy flow uses OxaPay with a minimum purchase of $1 USD at the displayed rate of 1 CRX = $0.002. After payment confirmation, the purchased CRX is fulfilled to the connected Polygon wallet.</p>
+        </Section>
+
+        <Section n={13} title="Official Links">
           <InfoTable rows={[
             ['Website', 'https://crickxfantasy.site'],
+            ['Whitepaper', 'https://crickxfantasy.site/whitepaper/'],
             ['GitHub', 'https://github.com/ejazmanzoor767/CrickX'],
             ['CRX logo', 'https://crickxfantasy.site/crx.svg'],
             ['Contact', 'contact@crickxfantasy.com'],
             ['Info', 'info@crickxfantasy.com'],
             ['Support', 'support@crickxfantasy.com'],
           ]} />
-          <p style={{ marginBottom: 0 }}>The full technical whitepaper is maintained in the project repository as <strong>WHITEPAPER.md</strong>.</p>
+          <p style={{ marginBottom: 0 }}>The full technical whitepaper is maintained in the project repository as <strong>WHITEPAPER.md</strong> and is publicly readable through the Whitepaper page.</p>
         </Section>
       </article>
     </section>
