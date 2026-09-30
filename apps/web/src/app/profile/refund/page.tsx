@@ -12,6 +12,6 @@ export default function RefundPage() {
       <h2>Blockchain transactions</h2>
       <p>Blockchain transactions, including external-wallet CRX transfers, are processed on-chain and cannot be reversed by CrickX. Customers should verify the amount, wallet and network before confirming a blockchain transaction.</p>
       <h2>How to request help</h2>
-      <p>Contact <a href="mailto:ejazchouhan27@gmail.com">ejazchouhan27@gmail.com</a> with your name, registered email, transaction/order reference and a description of the issue. We will review the request and respond through the support contact.</p>
+      <p>Contact <a href="mailto:support@crickxfantasy.com">support@crickxfantasy.com</a> with your name, registered email, transaction/order reference and a description of the issue. We will review the request and respond through the support contact.</p>
     </div></section>;
 }
