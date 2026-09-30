@@ -438,3 +438,112 @@ html.crickx-native-app .notice{border-radius:14px !important;font-size:12px !imp
   html.crickx-native-app .match-teams strong{font-size:21px !important}
 }
 @media (prefers-reduced-motion:reduce){html.crickx-native-app body::before{animation:none !important}}
+
+
+/* =========================================================
+   CRICKX WEB FOOTER — ORGANIZED NAVIGATION
+   ========================================================= */
+.site-footer{
+  margin-top:24px;
+  border-top:1px solid rgba(255,255,255,.065);
+  background:
+    radial-gradient(circle at 18% 0%,rgba(155,255,71,.045),transparent 28%),
+    rgba(4,6,10,.72);
+}
+.footer-shell{
+  width:min(1200px,calc(100% - 32px));
+  margin:0 auto;
+  padding:42px 0 20px;
+}
+.footer-main{
+  display:grid;
+  grid-template-columns:minmax(1.25fr,1.6fr) repeat(3,minmax(0,1fr));
+  gap:34px;
+  align-items:start;
+}
+.footer-brand-column{
+  max-width:390px;
+}
+.footer-brand{
+  display:inline-flex;
+  align-items:center;
+  gap:11px;
+  font-size:19px;
+  letter-spacing:-.03em;
+}
+.footer-brand img{
+  box-shadow:0 0 0 1px rgba(255,255,255,.06),0 10px 26px rgba(155,255,71,.12);
+}
+.footer-copy{
+  margin:15px 0 0;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.7;
+  max-width:360px;
+}
+.footer-link-group{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:9px;
+  min-width:0;
+}
+.footer-heading{
+  margin-bottom:3px;
+  color:#f3f5f9;
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+.footer-link-group a{
+  color:#a8b0bf;
+  text-decoration:none;
+  font-size:12px;
+  line-height:1.45;
+  transition:color .18s ease,transform .18s ease;
+}
+.footer-link-group a:hover{
+  color:var(--accent);
+  transform:translateX(2px);
+}
+.footer-bottom{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:15px;
+  margin-top:34px;
+  padding-top:15px;
+  border-top:1px solid rgba(255,255,255,.055);
+  color:#7f8898;
+  font-size:11px;
+}
+@media(max-width:900px){
+  .footer-main{
+    grid-template-columns:1.2fr 1fr 1fr;
+  }
+  .footer-brand-column{
+    grid-column:1 / -1;
+    max-width:600px;
+    padding-bottom:6px;
+  }
+}
+@media(max-width:620px){
+  .footer-shell{
+    width:min(100% - 20px,1200px);
+    padding:32px 0 18px;
+  }
+  .footer-main{
+    grid-template-columns:1fr 1fr;
+    gap:26px 22px;
+  }
+  .footer-brand-column{
+    grid-column:1 / -1;
+  }
+  .footer-bottom{
+    align-items:flex-start;
+    flex-direction:column;
+    gap:5px;
+    line-height:1.45;
+  }
+}
