@@ -5,12 +5,13 @@ import {
   Image,
   Linking,
   Pressable,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
 
 const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://crickxfantasy.site';
@@ -27,7 +28,7 @@ function isAllowedCrickXUrl(value: string) {
 }
 
 const TABS = [
-  { path: '/matches', label: 'Matches', icon: '🏏' },
+  { path: '/matches', label: 'Home', icon: '🏏' },
   { path: '/fantasy-home', label: 'Fantasy', icon: '✦' },
   { path: '/wallet', label: 'Wallet', icon: '▣' },
   { path: '/subscription', label: 'Subscribe', icon: '＋' },
@@ -36,8 +37,11 @@ const TABS = [
 
 const NATIVE_SHELL_CSS = [
   ".site-header,.mobile-bottom-nav,footer{display:none !important;}",
-  "html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}",
-  "html.crickx-native-app .page-shell,html.crickx-native-app .app-page,html.crickx-native-app .profile-page{padding:0 10px !important;min-height:100vh !important;}",
+  "html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;max-width:100% !important;}",
+  "html.crickx-native-app .page-shell,html.crickx-native-app .app-page,html.crickx-native-app .profile-page{padding:0 12px 16px !important;min-height:100% !important;max-width:100% !important;box-sizing:border-box !important;}",
+  "html.crickx-native-app button,html.crickx-native-app .primary-button,html.crickx-native-app .secondary-button{min-width:0 !important;max-width:100% !important;box-sizing:border-box !important;touch-action:manipulation !important;}",
+  "html.crickx-native-app input,html.crickx-native-app select,html.crickx-native-app textarea{max-width:100% !important;box-sizing:border-box !important;}",
+  "html.crickx-native-app a{-webkit-tap-highlight-color:transparent !important;}",
   "html.crickx-native-app .card{box-shadow:none !important;transform:none !important;}",
   "#crickx-native-profile-resources{margin:16px 0 12px !important;padding:0 !important;overflow:hidden !important;border:1px solid rgba(155,243,74,.14) !important;background:linear-gradient(145deg,rgba(155,243,74,.07),rgba(18,23,34,.98)) !important;border-radius:20px !important;}",
   "#crickx-native-profile-resources .crx-res-head{padding:20px 18px 15px;border-bottom:1px solid rgba(255,255,255,.07);}",
@@ -179,8 +183,11 @@ function titleForTab(path: string | null) {
   return TABS.find((tab) => tab.path === path)?.label ?? 'CrickX';
 }
 
-export default function App() {
+function AppContent() {
   const webViewRef = useRef<WebView>(null);
+  const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const compactLayout = screenWidth < 390;
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -249,7 +256,7 @@ export default function App() {
 
   if (failed) {
     return (
-      <SafeAreaView style={styles.root}>
+      <SafeAreaView edges={["top", "left", "right"]} style={styles.root}>
         <StatusBar barStyle="light-content" backgroundColor="#080b10" />
         <View style={styles.errorShell}>
           <Image source={require('./assets/crickx-original-icon.png')} style={styles.errorLogo} />
@@ -277,7 +284,7 @@ export default function App() {
   const screenTitle = titleForTab(activeTab);
 
   return (
-    <SafeAreaView style={styles.root}>
+    <SafeAreaView edges={["top", "left", "right"]} style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="#080b10" />
       <View style={styles.appShell}>
         {isCrickXPage && (
@@ -407,7 +414,7 @@ export default function App() {
         )}
 
         {isCrickXPage && (
-          <View style={styles.bottomBar}>
+          <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
             {TABS.map((tab) => {
               const active = activeTab === tab.path;
               return (
@@ -423,8 +430,8 @@ export default function App() {
                     pressed && styles.buttonPressed,
                   ]}
                 >
-                  <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{tab.icon}</Text>
-                  <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{tab.label}</Text>
+                  <Text style={[styles.tabIcon, active && styles.tabIconActive, compactLayout && styles.tabIconCompact]}>{tab.icon}</Text>
+                  <Text style={[styles.tabLabel, active && styles.tabLabelActive, compactLayout && styles.tabLabelCompact]}>{tab.label}</Text>
                   {active && <View style={styles.tabIndicator} />}
                 </Pressable>
               );
@@ -436,14 +443,22 @@ export default function App() {
   );
 }
 
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#080b10' },
   appShell: { flex: 1, backgroundColor: '#080b10' },
   topBar: {
-    minHeight: 62,
-    paddingHorizontal: 13,
-    paddingTop: 9,
-    paddingBottom: 9,
+    minHeight: 56,
+    paddingHorizontal: 10,
+    paddingTop: 7,
+    paddingBottom: 7,
     backgroundColor: '#0b0f16',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,.075)',
@@ -459,8 +474,8 @@ const styles = StyleSheet.create({
   topBarLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
   headerCopy: { minWidth: 0, flex: 1 },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -471,25 +486,25 @@ const styles = StyleSheet.create({
   },
   backIcon: { color: '#f1f5f9', fontSize: 31, lineHeight: 32, fontWeight: '500', marginTop: -2 },
   logo: {
-    width: 38,
-    height: 38,
+    width: 34,
+    height: 34,
     borderRadius: 11,
     marginRight: 11,
     backgroundColor: '#121822',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,.08)',
   },
-  brand: { color: '#9bf34a', fontWeight: '900', letterSpacing: 2.8, fontSize: 11 },
+  brand: { color: '#9bf34a', fontWeight: '900', letterSpacing: 2.4, fontSize: 10 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
-  sectionTitle: { color: '#f3f6fb', fontWeight: '900', fontSize: 16, marginTop: 1, letterSpacing: 0.05, flexShrink: 1 },
+  sectionTitle: { color: '#f3f6fb', fontWeight: '900', fontSize: 15, marginTop: 1, letterSpacing: 0.05, flexShrink: 1 },
   sectionDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#9bf34a', marginLeft: 7, marginTop: 3 },
   webContainer: { flex: 1, backgroundColor: '#080b10' },
   web: { flex: 1, backgroundColor: '#080b10' },
   bottomBar: {
-    minHeight: 76,
-    paddingHorizontal: 7,
-    paddingTop: 7,
-    paddingBottom: 8,
+    minHeight: 70,
+    paddingHorizontal: 5,
+    paddingTop: 5,
+    paddingBottom: 10,
     flexDirection: 'row',
     backgroundColor: '#0a0e15',
     borderTopWidth: 1,
@@ -502,8 +517,9 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    minHeight: 60,
-    borderRadius: 14,
+    minWidth: 0,
+    minHeight: 58,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 2,
@@ -511,9 +527,11 @@ const styles = StyleSheet.create({
   },
   tabActive: { backgroundColor: 'rgba(155,243,74,.10)', borderWidth: 1, borderColor: 'rgba(155,243,74,.08)' },
   tabIndicator: { position: 'absolute', top: 4, left: '50%', marginLeft: -10, width: 20, height: 2, borderRadius: 2, backgroundColor: '#9bf34a' },
-  tabIcon: { color: '#7f8999', fontSize: 18, lineHeight: 21, fontWeight: '900' },
+  tabIcon: { color: '#7f8999', fontSize: 18, lineHeight: 21, fontWeight: '900', includeFontPadding: false },
+  tabIconCompact: { fontSize: 17, lineHeight: 20 },
   tabIconActive: { color: '#9bf34a' },
-  tabLabel: { color: '#7f8999', fontSize: 10, fontWeight: '800', marginTop: 4, letterSpacing: 0.1 },
+  tabLabel: { color: '#7f8999', fontSize: 10, fontWeight: '800', marginTop: 3, letterSpacing: 0.05, includeFontPadding: false },
+  tabLabelCompact: { fontSize: 9, marginTop: 3 },
   tabLabelActive: { color: '#9bf34a' },
   exitHint: {
     position: 'absolute',
