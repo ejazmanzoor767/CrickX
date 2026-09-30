@@ -7,7 +7,7 @@ import { SubscriptionService } from '../subscription/subscription.service';
 import { OnchainPredictionService } from '../onchain/onchain-prediction.service';
 import { SubmitPredictionDto } from './prediction.dto';
 
-const FIVE=5, TEN=10, TOTAL=50, WINDOW=300, PREDICTION_HORIZON_MS=7*24*60*60*1000;
+const FIVE=5, PER_PREDICTION=5, TOTAL=25, WINDOW=300, PREDICTION_HORIZON_MS=7*24*60*60*1000;
 const SHARES:Record<number,number>={5:50,4:30,3:20};
 const BATTERS=['babar azam','mohammad rizwan','virat kohli','rohit sharma','shubman gill','yashasvi jaiswal','kl rahul','suryakumar yadav','jos buttler','travis head','steve smith','kane williamson','rachin ravindra','david warner','glenn maxwell','phil salt','harry brook','joe root','quinton de kock','heinrich klaasen','aiden markram','fakhar zaman','imam-ul-haq','saim ayub','shai hope','litton das','pathum nissanka','kusal mendis','devon conway','marnus labuschagne'];
 const BOWLERS=['shaheen afridi','jasprit bumrah','mohammed siraj','mitchell starc','pat cummins','josh hazlewood','trent boult','tim southee','rashid khan','kagiso rabada','anrich nortje','keshav maharaj','mustafizur rahman','taskin ahmed','wanindu hasaranga','mark wood','jofra archer','adil rashid','haris rauf','naseem shah','shaheen','bumrah','starc','rabada'];
