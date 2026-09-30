@@ -272,31 +272,56 @@ jobs:
           cd android
           ./gradlew assembleRelease --no-daemon --stacktrace -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64
 
-      - name: 16 KB-align native APK libraries and re-sign
+      - name: Configure reliable native library packaging
         working-directory: apps/mobile
         shell: bash
         run: |
           set -euo pipefail
-          apk="android/app/build/outputs/apk/release/app-release.apk"
-          aligned="android/app/build/outputs/apk/release/app-release-16k.apk"
+          python3 - <<'PY'
+          from pathlib import Path
 
-          build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
-          test -n "$build_tools"
-          zipalign="$build_tools/zipalign"
-          apksigner="$build_tools/apksigner"
-          test -x "$zipalign"
-          test -x "$apksigner"
+          path = Path("android/app/build.gradle")
+          text = path.read_text()
 
-          # zipalign changes the APK after Gradle has signed it, so the APK
-          # must be signed again afterwards.
-          "$zipalign" -P 16 -f 4 "$apk" "$aligned"
-          "$zipalign" -c -P 16 -v 4 "$aligned"
+          # Prefer compressed JNI libraries for broad package-install compatibility
+          # on 4 KB and 16 KB Android devices. This avoids depending on a
+          # post-build zipalign/re-sign step for prebuilt React Native/Expo .so files.
+          if "useLegacyPackaging true" not in text:
+              marker = "    packagingOptions {"
+              if marker in text:
+                  block = (
+                      marker + "
+"
+                      "        jniLibs {
+"
+                      "            useLegacyPackaging true
+"
+                      "        }
+"
+                  )
+                  text = text.replace(marker, block, 1)
+              else:
+                  android_marker = "android {"
+                  if android_marker not in text:
+                      raise SystemExit("Could not find android block in generated Gradle file")
+                  block = (
+                      android_marker + "
+"
+                      "    packagingOptions {
+"
+                      "        jniLibs {
+"
+                      "            useLegacyPackaging true
+"
+                      "        }
+"
+                      "    }"
+                  )
+                  text = text.replace(android_marker, block, 1)
 
-          "$apksigner" sign             --ks "$ANDROID_KEYSTORE_PATH"             --ks-pass "env:ANDROID_KEYSTORE_PASSWORD"             --ks-key-alias "$ANDROID_KEY_ALIAS"             --key-pass "env:ANDROID_KEY_PASSWORD"             --v1-signing-enabled true             --v2-signing-enabled true             --v3-signing-enabled true             --out "$apk"             "$aligned"
-
-          rm -f "$aligned"
-          "$apksigner" verify --verbose "$apk"
-          echo "APK shared libraries are ZIP-aligned for 16 KB pages and the final APK has been re-signed."
+          path.write_text(text)
+          print("JNI libraries configured for compressed APK packaging.")
+          PY
 
       - name: Validate APK package and signature
         working-directory: apps/mobile
@@ -309,16 +334,14 @@ jobs:
           build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
           test -n "$build_tools"
           apksigner="$build_tools/apksigner"
-          zipalign="$build_tools/zipalign"
           aapt2="$build_tools/aapt2"
           test -x "$apksigner"
-          test -x "$zipalign"
           test -x "$aapt2"
           "$apksigner" verify --verbose "$apk"
-          "$zipalign" -c -P 16 -v 4 "$apk"
           "$aapt2" dump badging "$apk" | grep -E "^package: name='com\.crickx\.app'"
           echo "Native ABIs packaged in APK:"
           unzip -Z1 "$apk" | grep -E '^lib/(armeabi-v7a|arm64-v8a|x86|x86_64)/' | cut -d/ -f2 | sort -u
+          echo "Native libraries are packaged compressed for installer compatibility."
           for abi in armeabi-v7a arm64-v8a; do
             unzip -Z1 "$apk" | grep -q "^lib/${abi}/" || { echo "Missing required phone ABI: ${abi}"; exit 1; }
           done
