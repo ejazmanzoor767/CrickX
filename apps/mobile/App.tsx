@@ -34,7 +34,28 @@ const TABS = [
   { path: '/profile', label: 'Profile', icon: '👤' },
 ] as const;
 
-const NATIVE_SHELL_CSS = ".site-header,.mobile-bottom-nav,footer{display:none !important;}html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}html.crickx-native-app .page-shell,html.crickx-native-app .app-page,html.crickx-native-app .profile-page{padding:0 10px !important;min-height:100vh !important;}html.crickx-native-app .card{box-shadow:none !important;transform:none !important;}";
+const NATIVE_SHELL_CSS = [
+  ".site-header,.mobile-bottom-nav,footer{display:none !important;}",
+  "html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;}",
+  "html.crickx-native-app .page-shell,html.crickx-native-app .app-page,html.crickx-native-app .profile-page{padding:0 10px !important;min-height:100vh !important;}",
+  "html.crickx-native-app .card{box-shadow:none !important;transform:none !important;}",
+  "#crickx-native-profile-resources{margin:16px 0 12px !important;padding:0 !important;overflow:hidden !important;border:1px solid rgba(155,243,74,.14) !important;background:linear-gradient(145deg,rgba(155,243,74,.07),rgba(18,23,34,.98)) !important;border-radius:20px !important;}",
+  "#crickx-native-profile-resources .crx-res-head{padding:20px 18px 15px;border-bottom:1px solid rgba(255,255,255,.07);}",
+  "#crickx-native-profile-resources .crx-res-eyebrow{margin:0 0 6px;color:#9bf34a;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;}",
+  "#crickx-native-profile-resources .crx-res-title{margin:0;color:#f5f7fb;font-size:22px;font-weight:900;}",
+  "#crickx-native-profile-resources .crx-res-sub{margin:6px 0 0;color:#98a2b4;font-size:12px;line-height:1.55;}",
+  "#crickx-native-profile-resources .crx-res-section{padding:14px 12px 4px;}",
+  "#crickx-native-profile-resources .crx-res-label{display:block;padding:0 4px 7px;color:#8892a5;font-size:9px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;}",
+  "#crickx-native-profile-resources .crx-res-list{display:grid;gap:7px;}",
+  "#crickx-native-profile-resources .crx-res-row{display:flex;align-items:center;gap:11px;width:100%;box-sizing:border-box;padding:12px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.022);color:#edf2f7;text-decoration:none;}",
+  "#crickx-native-profile-resources .crx-res-row:active{opacity:.78;}",
+  "#crickx-native-profile-resources .crx-res-icon{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;border-radius:11px;background:rgba(155,243,74,.09);border:1px solid rgba(155,243,74,.12);font-size:16px;}",
+  "#crickx-native-profile-resources .crx-res-copy{min-width:0;flex:1;}",
+  "#crickx-native-profile-resources .crx-res-name{display:block;font-size:13px;font-weight:900;color:#f4f7fb;}",
+  "#crickx-native-profile-resources .crx-res-value{display:block;margin-top:2px;font-size:11px;color:#98a2b4;overflow-wrap:anywhere;}",
+  "#crickx-native-profile-resources .crx-res-arrow{color:#778297;font-size:18px;font-weight:800;padding-left:4px;}",
+  "#crickx-native-profile-resources .crx-res-foot{padding:12px 16px 16px;color:#7e899d;font-size:10px;line-height:1.55;text-align:center;}"
+].join("");
 
 function tabForUrl(url: string) {
   try {
@@ -200,7 +221,7 @@ export default function App() {
                 style.innerHTML = ${JSON.stringify(NATIVE_SHELL_CSS)};
                 document.documentElement.appendChild(style);
               })();
-              true;
+              ${JSON.stringify(script)}
             `}
             injectedJavaScript={`
               (function() {
@@ -213,7 +234,7 @@ export default function App() {
                   document.documentElement.appendChild(style);
                 }
               })();
-              true;
+              ${JSON.stringify(script)}
             `}
             onNavigationStateChange={(state) => {
               const nextUrl = state.url || WEB_URL;
