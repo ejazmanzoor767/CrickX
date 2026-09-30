@@ -112,8 +112,29 @@ jobs:
         run: |
           set -euo pipefail
 
-          sdkmanager "ndk;30.0.16248370" >/dev/null
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          # GitHub-hosted Ubuntu images include the Android SDK, but sdkmanager is
+          # not always on PATH. Resolve it from ANDROID_HOME explicitly.
+          sdkmanager_bin=""
+          for candidate in \
+            "${ANDROID_HOME:-}/cmdline-tools/latest/bin/sdkmanager" \
+            "${ANDROID_HOME:-}/cmdline-tools/bin/sdkmanager" \
+            "${ANDROID_HOME:-}/tools/bin/sdkmanager"; do
+            if [[ -n "$candidate" && -x "$candidate" ]]; then
+              sdkmanager_bin="$candidate"
+              break
+            fi
+          done
+          if [[ -z "$sdkmanager_bin" ]]; then
+            sdkmanager_bin="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" -type f -path '*/cmdline-tools/*/bin/sdkmanager' -perm -111 2>/dev/null | head -n 1 || true)"
+          fi
+          if [[ -z "$sdkmanager_bin" || ! -x "$sdkmanager_bin" ]]; then
+            echo "sdkmanager not found. ANDROID_HOME=${ANDROID_HOME:-<unset>}" >&2
+            find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" -maxdepth 5 -name sdkmanager -type f -print 2>/dev/null || true
+            exit 1
+          fi
+
+          "$sdkmanager_bin" "ndk;30.0.16248370" >/dev/null
+          yes | "$sdkmanager_bin" --licenses >/dev/null 2>&1 || true
 
           python3 - <<'PY'
           from pathlib import Path
