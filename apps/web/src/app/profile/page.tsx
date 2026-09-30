@@ -377,6 +377,20 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      <div className="card" style={{ marginTop: 16, padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', background: 'linear-gradient(135deg, rgba(155,255,71,.08), rgba(18,23,34,.96))' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 46, height: 46, borderRadius: 14, display: 'grid', placeItems: 'center', background: 'rgba(155,255,71,.12)', border: '1px solid rgba(155,255,71,.14)', fontSize: 22 }}>📄</div>
+            <div>
+              <p className="eyebrow" style={{ marginBottom: 5 }}>CRICKX DOCUMENTATION</p>
+              <h2 style={{ margin: 0 }}>Whitepaper</h2>
+              <p className="section-subtitle" style={{ margin: '5px 0 0' }}>Read the official CrickX product, token and technical overview.</p>
+            </div>
+          </div>
+          <Link className="primary-button" href="/whitepaper/">Read Whitepaper →</Link>
+        </div>
+      </div>
+
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
