@@ -126,7 +126,7 @@ export default function WhitepaperPage() {
 
         <Section n={8} title="Prediction System">
           <p>Each eligible match has five prediction questions. The current formats cover the match winner, a featured bowler, a featured batter, a powerplay threshold and the total number of match sixes.</p>
-          <p>Voting closes when the match goes live. An active subscription is required. Users need at least 3 correct answers to qualify for a prize. The current prediction pool allocation is 50 CRX per participant, with 50% / 30% / 20% correctness tiers for 5 / 4 / 3 correct answers.</p>
+          <p>Voting closes when the match goes live. An active subscription is required. Users need at least 3 correct answers to qualify for a prize. The current prediction pool allocation is 25 CRX per participant, with 50% / 30% / 20% correctness tiers for 5 / 4 / 3 correct answers.</p>
         </Section>
 
         <Section n={9} title="Security Model">
