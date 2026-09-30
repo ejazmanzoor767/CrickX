@@ -138,77 +138,57 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           root = Path("android")
-
-          # NDK r30 produces 16 KB ELF-aligned native libraries by default.
           new = "30.0.16248370"
-          changed = []
-          for path in root.rglob("*"):
-              if path.is_file() and path.suffix in {".gradle", ".kts", ".properties"}:
-                  try:
-                      text = path.read_text()
-                  except UnicodeDecodeError:
-                      continue
-                  updated = text
-                  # Handle an explicitly generated ndkVersion regardless of which
-                  # Expo/React Native template revision produced the project.
-                  import re
-                  updated = re.sub(
-                      r'(ndkVersion\s*[=:]?\s*[\\"\\\' ])27\.1\.12297006([\\"\\\' ])',
-                      r'\\g<1>' + new + r'\\g<2>',
-                      updated,
-                  )
-                  updated = updated.replace("27.1.12297006", new)
-                  if updated != text:
-                      path.write_text(updated)
-                      changed.append(str(path))
-
-          # If the generated template no longer contains an explicit NDK version,
-          # add one to the app module so the build uses the installed r30 toolchain.
           app_gradle = root / "app/build.gradle"
-          app_text = app_gradle.read_text()
-          if "ndkVersion" not in app_text:
+
+          if not app_gradle.exists():
+              raise SystemExit("Generated android/app/build.gradle not found")
+
+          text = app_gradle.read_text()
+
+          # Expo generates an ndkVersion entry, but its value can vary by template.
+          # Force the app module to the installed NDK r30 toolchain.
+          updated, count = re.subn(
+              r'(?m)^([ \t]*ndkVersion\s+).*$',
+              r'\g<1>"' + new + '"',
+              text,
+              count=1,
+          )
+          if count == 0:
               marker = "android {"
-              if marker not in app_text:
+              if marker not in text:
                   raise SystemExit("Generated android/app/build.gradle has no android block")
-              app_text = app_text.replace(
+              updated = text.replace(
                   marker,
                   marker + '\n    ndkVersion "' + new + '"',
                   1,
               )
-              app_gradle.write_text(app_text)
-              changed.append(str(app_gradle) + " (added ndkVersion)")
 
-          print("Configured Android NDK references:", ", ".join(changed) if changed else "generated project already configured")
+          app_gradle.write_text(updated)
 
-          # Verify the app module resolves to NDK r30.
+          # Verify the exact effective app-module NDK version.
           verify = app_gradle.read_text()
-          if new not in verify:
-              matches = []
-              for path in root.rglob("*"):
-                  if path.is_file() and path.suffix in {".gradle", ".kts", ".properties"}:
-                      try:
-                          t = path.read_text()
-                      except UnicodeDecodeError:
-                          continue
-                      if "ndkVersion" in t:
-                          matches.append(str(path))
-              raise SystemExit("Could not configure NDK r30 in generated Android project. ndkVersion files: " + ", ".join(matches))
+          if not re.search(r'(?m)^\s*ndkVersion\s+"' + re.escape(new) + r'"\s*$', verify):
+              raise SystemExit("Failed to set android/app/build.gradle ndkVersion to " + new)
 
           manifest = root / "app/src/main/AndroidManifest.xml"
-          text = manifest.read_text()
-          if "android:pageSizeCompat=" not in text:
+          manifest_text = manifest.read_text()
+          if "android:pageSizeCompat=" not in manifest_text:
               marker = "<application "
-              if marker not in text:
+              if marker not in manifest_text:
                   raise SystemExit("AndroidManifest.xml application element not found")
-              text = text.replace(
+              manifest_text = manifest_text.replace(
                   marker,
                   '<application android:pageSizeCompat="enabled" ',
                   1,
               )
-              manifest.write_text(text)
-          print("Enabled Android 16 KB page-size compatibility fallback.")
+              manifest.write_text(manifest_text)
+
+          print("Android app module configured for NDK r30:", new)
+          print("Android 16 KB page-size compatibility fallback enabled.")
           PY
 
           grep -R "30.0.16248370" android --include='*.gradle' --include='*.kts' >/dev/null
