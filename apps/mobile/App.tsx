@@ -221,7 +221,7 @@ export default function App() {
                 style.innerHTML = ${JSON.stringify(NATIVE_SHELL_CSS)};
                 document.documentElement.appendChild(style);
               })();
-              ${JSON.stringify(script)}
+              ${script}
             `}
             injectedJavaScript={`
               (function() {
@@ -234,7 +234,7 @@ export default function App() {
                   document.documentElement.appendChild(style);
                 }
               })();
-              ${JSON.stringify(script)}
+              ${script}
             `}
             onNavigationStateChange={(state) => {
               const nextUrl = state.url || WEB_URL;
