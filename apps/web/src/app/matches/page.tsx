@@ -52,7 +52,7 @@ function MatchCard({ fixture, live, completed, teamSaved }: { fixture: any; live
       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
         {!completed && !live && <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${fixture.id}`}>Predictions</Link>}
         {live && <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${fixture.id}`}>Predictions</Link>}
-        {live && <Link className="primary-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/matches/detail?fixtureId=${fixture.id}`}>Scorecard →</Link>}
+        {live && <Link className="primary-button live-scorecard-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/matches/detail?fixtureId=${fixture.id}`}>Scorecard →</Link>}
         {!completed && !live && <Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${fixture.id}`}>{hasSavedTeam ? 'View / Edit Team' : 'Create Team'}</Link>}
       </div>
     </div>
