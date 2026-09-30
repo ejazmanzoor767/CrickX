@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import WebView, { type WebViewNavigation } from 'react-native-webview';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';\nimport WebView, { type WebViewNavigation } from 'react-native-webview';
 
 const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://crickxfantasy.site';
 const START_URL = WEB_URL.replace(/\/$/, '') + '/matches';
@@ -27,7 +27,7 @@ function isAllowedCrickXUrl(value: string) {
 }
 
 const TABS = [
-  { path: '/matches', label: 'Matches', icon: '🏏' },
+  { path: '/matches', label: 'Home', icon: '🏏' },
   { path: '/fantasy-home', label: 'Fantasy', icon: '✦' },
   { path: '/wallet', label: 'Wallet', icon: '▣' },
   { path: '/subscription', label: 'Subscribe', icon: '＋' },
@@ -179,8 +179,8 @@ function titleForTab(path: string | null) {
   return TABS.find((tab) => tab.path === path)?.label ?? 'CrickX';
 }
 
-export default function App() {
-  const webViewRef = useRef<WebView>(null);
+function AppContent() {
+  const webViewRef = useRef<WebView>(null);\n  const insets = useSafeAreaInsets();\n  const { width: screenWidth } = useWindowDimensions();\n  const compactLayout = screenWidth < 390;
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -249,7 +249,7 @@ export default function App() {
 
   if (failed) {
     return (
-      <SafeAreaView style={styles.root}>
+      <SafeAreaView edges={["top", "left", "right"]} style={styles.root}>
         <StatusBar barStyle="light-content" backgroundColor="#080b10" />
         <View style={styles.errorShell}>
           <Image source={require('./assets/crickx-original-icon.png')} style={styles.errorLogo} />
@@ -407,7 +407,7 @@ export default function App() {
         )}
 
         {isCrickXPage && (
-          <View style={styles.bottomBar}>
+          <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
             {TABS.map((tab) => {
               const active = activeTab === tab.path;
               return (
@@ -436,7 +436,7 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
+export default function App() {\n  return (\n    <SafeAreaProvider>\n      <AppContent />\n    </SafeAreaProvider>\n  );\n}\n\nconst styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#080b10' },
   appShell: { flex: 1, backgroundColor: '#080b10' },
   topBar: {
@@ -479,9 +479,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,.08)',
   },
-  brand: { color: '#9bf34a', fontWeight: '900', letterSpacing: 2.8, fontSize: 11 },
+  brand: { color: '#9bf34a', fontWeight: '900', letterSpacing: 2.4, fontSize: 10 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
-  sectionTitle: { color: '#f3f6fb', fontWeight: '900', fontSize: 16, marginTop: 1, letterSpacing: 0.05, flexShrink: 1 },
+  sectionTitle: { color: '#f3f6fb', fontWeight: '900', fontSize: 15, marginTop: 1, letterSpacing: 0.05, flexShrink: 1 },
   sectionDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#9bf34a', marginLeft: 7, marginTop: 3 },
   webContainer: { flex: 1, backgroundColor: '#080b10' },
   web: { flex: 1, backgroundColor: '#080b10' },
@@ -511,9 +511,9 @@ const styles = StyleSheet.create({
   },
   tabActive: { backgroundColor: 'rgba(155,243,74,.10)', borderWidth: 1, borderColor: 'rgba(155,243,74,.08)' },
   tabIndicator: { position: 'absolute', top: 4, left: '50%', marginLeft: -10, width: 20, height: 2, borderRadius: 2, backgroundColor: '#9bf34a' },
-  tabIcon: { color: '#7f8999', fontSize: 18, lineHeight: 21, fontWeight: '900' },
+  tabIcon: { color: '#7f8999', fontSize: 18, lineHeight: 21, fontWeight: '900', includeFontPadding: false },\n  tabIconCompact: { fontSize: 17, lineHeight: 20 },
   tabIconActive: { color: '#9bf34a' },
-  tabLabel: { color: '#7f8999', fontSize: 10, fontWeight: '800', marginTop: 4, letterSpacing: 0.1 },
+  tabLabel: { color: '#7f8999', fontSize: 10, fontWeight: '800', marginTop: 3, letterSpacing: 0.05, includeFontPadding: false },\n  tabLabelCompact: { fontSize: 9, marginTop: 3 },
   tabLabelActive: { color: '#9bf34a' },
   exitHint: {
     position: 'absolute',
