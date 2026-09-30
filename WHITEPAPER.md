@@ -319,7 +319,7 @@ The current prize-share model allocates:
 - 4 correct: 30% tier
 - 3 correct: 20% tier
 
-CrickX currently allocates **50 CRX per prediction participant** to the prediction pool.
+CrickX currently allocates **25 CRX per prediction participant** to the prediction pool.
 
 Where multiple users are in the same correctness tier, that tier's share is divided among qualifying participants. The current on-chain prediction funding model is based on the participant count and a 50 CRX allocation per participant.
 
