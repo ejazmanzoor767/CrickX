@@ -149,7 +149,7 @@ const script = `
         <div class="crx-res-section">
           <span class="crx-res-label">Contact</span>
           <div class="crx-res-list">
-            <a class="crx-res-row" class="crx-gmail-link crx-res-row" data-email="contact@crickxfantasy.site" href="mailto:contact@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">
+            <a class="crx-gmail-link crx-res-row" data-email="contact@crickxfantasy.site" href="mailto:contact@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">
               <span class="crx-res-icon">✉</span>
               <span class="crx-res-copy"><span class="crx-res-name">Contact</span><span class="crx-res-value">contact@crickxfantasy.site</span></span>
               <span class="crx-res-arrow">›</span>
