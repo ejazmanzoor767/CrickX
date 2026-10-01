@@ -28,6 +28,8 @@ export default function Footer() {
             <Link href="/profile/game-rules">Game Rules</Link>
             <Link href="/profile/scoring">Fantasy Point Calculation</Link>
             <Link href="/profile/metamask">CRX in MetaMask</Link>
+            <Link href="/token">CRX Token</Link>
+            <Link href="/business-information">Business Information</Link>
           </div>
 
           <div className="footer-link-group">
@@ -43,10 +45,10 @@ export default function Footer() {
             <a href="https://github.com/ejazmanzoor767/CrickX/releases/latest/download/app-release.apk">
               Download Android APK
             </a>
-            <a href="mailto:contact@crickxfantasy.com">✉ Contact</a>
-            <a href="mailto:info@crickxfantasy.com">✉ Info</a>
-            <a href="mailto:support@crickxfantasy.com">✉ Support</a>
-            <a href="mailto:ejazchouhan27@gmail.com">✉ Owner</a>
+            <a href="mailto:contact@crickxfantasy.site">✉ Contact</a>
+            <a href="mailto:info@crickxfantasy.site">✉ Info</a>
+            <a href="mailto:support@crickxfantasy.site">✉ Support</a>
+            <a href="mailto:contact@crickxfantasy.site">✉ Official Contact</a>
           </div>
         </div>
 
