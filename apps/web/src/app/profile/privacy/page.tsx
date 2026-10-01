@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <h2>CrickX and external providers</h2><p>CrickX uses external services such as Sportmonks for cricket data, OxaPay for supported payment checkout, Firebase/Google services for application infrastructure, and Polygon/EVM wallet infrastructure for blockchain functions.</p>
       <h2>Security</h2><p>Authentication, server-side authorization, payment webhook verification and application validation are used to protect account actions. Never share wallet private keys or seed phrases with CrickX or any third party.</p>
       <h2>Retention and updates</h2><p>Records may be retained for service operation, settlement, security, customer support, fraud prevention and legal/accounting requirements. This policy may be updated when the application's features or data practices change.</p>
-      <h2>Contact</h2><p>Privacy questions can be sent to <a href="mailto:contact@crickxfantasy.com">contact@crickxfantasy.com</a> or <a href="mailto:support@crickxfantasy.com">support@crickxfantasy.com</a>.</p>
+      <h2>Contact</h2><p>Privacy questions can be sent to <a href="mailto:contact@crickxfantasy.site">contact@crickxfantasy.site</a> or <a href="mailto:support@crickxfantasy.site">support@crickxfantasy.site</a>.</p>
     </div>
   </section>;
 }
