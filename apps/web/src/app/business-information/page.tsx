@@ -43,8 +43,10 @@ export default function BusinessInformationPage() {
       <p>The current wallet flow allows users to buy CRX through OxaPay with a minimum purchase of $1 USD at the displayed rate of 1 CRX = $0.002. After OxaPay confirms payment, the purchased CRX is fulfilled to the connected Polygon wallet by the CrickX backend.</p>
       <h2>International and Pakistan customers</h2>
       <p>CrickX is an online service. Subscription and CRX-purchase prices are displayed in USD in the current customer-facing application. Availability of services may depend on payment-provider and jurisdictional requirements.</p>
+      <h2>Founder</h2>
+      <p><strong>Ejaz Manzoor</strong><br/>Founder &amp; Developer, CrickX<br/><strong>GitHub:</strong> <a href="https://github.com/ejazmanzoor767" target="_blank" rel="noreferrer">github.com/ejazmanzoor767</a></p>
       <h2>Business contact</h2>
-      <p><strong>Contact:</strong> <a href="mailto:contact@crickxfantasy.com">contact@crickxfantasy.com</a><br/><strong>Info:</strong> <a href="mailto:info@crickxfantasy.com">info@crickxfantasy.com</a><br/><strong>Support:</strong> <a href="mailto:support@crickxfantasy.com">support@crickxfantasy.com</a><br/><strong>Owner:</strong> <a href="mailto:ejazchouhan27@gmail.com">ejazchouhan27@gmail.com</a><br/><strong>Phone:</strong> 03197789243<br/><strong>Business:</strong> CrickX<br/><strong>Address:</strong> chah bakshay wala p/o pakka shahnawaz tehsil &amp; District Dera ghazi khan, dera ghazi khan</p>
+      <p><strong>Contact:</strong> <a href="mailto:contact@crickxfantasy.site">contact@crickxfantasy.site</a><br/><strong>Info:</strong> <a href="mailto:info@crickxfantasy.site">info@crickxfantasy.site</a><br/><strong>Support:</strong> <a href="mailto:support@crickxfantasy.site">support@crickxfantasy.site</a><br/><strong>Phone:</strong> 03197789243<br/><strong>Business:</strong> CrickX<br/><strong>Website:</strong> <a href="https://crickxfantasy.site" target="_blank" rel="noreferrer">crickxfantasy.site</a><br/><strong>Address:</strong> chah bakshay wala p/o pakka shahnawaz tehsil &amp; District Dera ghazi khan, dera ghazi khan</p>
     </div>
   </section>;
 }
