@@ -584,3 +584,61 @@ html.crickx-native-app .notice{border-radius:14px !important;font-size:12px !imp
     line-height:1.45;
   }
 }
+
+
+/* Referral cards — mobile alignment */
+@media(max-width:620px){
+  html.crickx-native-app .referral-card{
+    width:100% !important;
+    padding:0 !important;
+    margin-left:0 !important;
+    margin-right:0 !important;
+    overflow:hidden !important;
+  }
+  html.crickx-native-app .referral-card > div{
+    max-width:100% !important;
+  }
+  html.crickx-native-app .referral-card .referral-stat-card{
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    padding:14px !important;
+  }
+  html.crickx-native-app .referral-card .referral-code-card{
+    width:100% !important;
+    min-width:0 !important;
+    overflow:hidden !important;
+  }
+  html.crickx-native-app .referral-card .referral-code-card > div{
+    min-width:0 !important;
+    flex-wrap:wrap !important;
+  }
+  html.crickx-native-app .referral-card .referral-code-card strong{
+    min-width:0 !important;
+    max-width:calc(100% - 78px) !important;
+    overflow-wrap:anywhere !important;
+  }
+  html.crickx-native-app .referral-card .referral-row-card{
+    width:100% !important;
+    min-width:0 !important;
+    align-items:flex-start !important;
+    flex-wrap:wrap !important;
+    gap:8px !important;
+  }
+  html.crickx-native-app .referral-card .referral-row-card > div{
+    flex:1 1 180px !important;
+    min-width:0 !important;
+  }
+  html.crickx-native-app .referral-card .referral-row-card .badge-live,
+  html.crickx-native-app .referral-card .referral-row-card .demo-pill{
+    margin-left:auto !important;
+  }
+  html.crickx-native-app .referral-card .referral-apply-row{
+    grid-template-columns:1fr !important;
+    gap:8px !important;
+  }
+  html.crickx-native-app .referral-card .referral-apply-row input,
+  html.crickx-native-app .referral-card .referral-apply-row button{
+    width:100% !important;
+  }
+}
