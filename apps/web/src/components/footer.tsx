@@ -48,7 +48,6 @@ export default function Footer() {
             <a href="mailto:contact@crickxfantasy.site">✉ Contact</a>
             <a href="mailto:info@crickxfantasy.site">✉ Info</a>
             <a href="mailto:support@crickxfantasy.site">✉ Support</a>
-            <a href="mailto:contact@crickxfantasy.site">✉ Official Contact</a>
           </div>
         </div>
 
