@@ -485,7 +485,7 @@ jobs:
           echo "APK package, production signature, arm64 ABI, ZIP alignment, and ELF alignment verified."
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: CrickX-Android-release-validation
           path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
