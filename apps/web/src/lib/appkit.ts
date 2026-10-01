@@ -36,8 +36,8 @@ export const appKit =
         metadata: {
           name: 'CrickX',
           description: 'Fantasy cricket powered by CrickX.',
-          url: 'https://crickx-3d806.web.app',
-          icons: ['https://crickx-3d806.web.app/crickx-app-logo.svg'],
+          url: 'https://crickxfantasy.site',
+          icons: ['https://crickxfantasy.site/crickx-app-logo.svg'],
         },
         features: {
           analytics: false,
