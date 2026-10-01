@@ -7,6 +7,31 @@ teams, contests) lives in Postgres — see `apps/api/prisma/schema.prisma`.
 
 Full architecture and design rationale: [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
+## Official CrickX project information
+
+**Official website:** https://crickxfantasy.site  
+**Whitepaper:** https://crickxfantasy.site/whitepaper/  
+**CRX token page:** https://crickxfantasy.site/token  
+**CRX logo:** https://crickxfantasy.site/crx.svg  
+**GitHub:** https://github.com/ejazmanzoor767/CrickX
+
+**Token name:** CrickX  
+**Symbol:** CRX  
+**Network:** Polygon  
+**Standard:** ERC-20  
+**Maximum supply:** 500,000,000 CRX  
+**Contract:** `0x6A7BeF6Bff1CE03C14D25bC97b1AF7097894b05E`
+
+**Project description:** CrickX is a fantasy-cricket platform that provides cricket match data, fantasy team management, scoring, and blockchain-based CRX utility features on the Polygon network.
+
+**Founder:** Ejaz Manzoor — Founder & Developer, CrickX  
+**Founder GitHub:** https://github.com/ejazmanzoor767
+
+**Official contacts:**  
+contact@crickxfantasy.site  
+info@crickxfantasy.site  
+support@crickxfantasy.site
+
 ## Layout
 ```
 apps/api/      NestJS backend — the only thing that talks to Sportmonks
