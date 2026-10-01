@@ -16,6 +16,7 @@ const sections = [
   ['Roadmap', 'The roadmap covers core fantasy, payments and growth, prediction expansion, and scaling.'],
   ['Risks', 'Users should consider token, smart-contract, wallet, data-provider, payment, regulatory and operational risks.'],
   ['Current release', 'The app includes web and Android access, self-custody CRX wallet tools, referrals, subscription plans and on-chain fantasy/prediction settlement.'],
+  ['Founder', 'Ejaz Manzoor is the Founder & Developer of CrickX. His public project identity is tied to the CrickX GitHub repository.'],
 ];
 
 export default function WhitepaperPage() {
@@ -25,7 +26,7 @@ export default function WhitepaperPage() {
         <div>
           <p className="eyebrow">CRICKX DOCUMENTATION</p>
           <h1 className="section-title">Whitepaper</h1>
-          <p className="section-subtitle">Version 1.1 · September 30, 2026 · Updated for the current product release · Product and technical overview.</p>
+          <p className="section-subtitle">Version 1.2 · October 1, 2026 · Updated for the current product release · Product and technical overview.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <a className="secondary-button" href="/whitepaper.md">Markdown</a>
@@ -166,12 +167,19 @@ export default function WhitepaperPage() {
             ['Website', 'https://crickxfantasy.site'],
             ['Whitepaper', 'https://crickxfantasy.site/whitepaper/'],
             ['GitHub', 'https://github.com/ejazmanzoor767/CrickX'],
+            ['CRX token page', 'https://crickxfantasy.site/token'],
             ['CRX logo', 'https://crickxfantasy.site/crx.svg'],
-            ['Contact', 'contact@crickxfantasy.com'],
-            ['Info', 'info@crickxfantasy.com'],
-            ['Support', 'support@crickxfantasy.com'],
+            ['Contact', 'contact@crickxfantasy.site'],
+            ['Info', 'info@crickxfantasy.site'],
+            ['Support', 'support@crickxfantasy.site'],
           ]} />
           <p style={{ marginBottom: 0 }}>The full technical whitepaper is maintained in the project repository as <strong>WHITEPAPER.md</strong> and is publicly readable through the Whitepaper page.</p>
+        </Section>
+
+        <Section n={14} title="Founder and Project Identity">
+          <p><strong>Ejaz Manzoor</strong> is the Founder &amp; Developer of CrickX.</p>
+          <p>GitHub: <a href="https://github.com/ejazmanzoor767" target="_blank" rel="noreferrer">https://github.com/ejazmanzoor767</a></p>
+          <p className="section-subtitle" style={{ marginBottom: 0 }}>A LinkedIn URL is not published in the project documentation until the founder's verified professional profile URL is confirmed.</p>
         </Section>
       </article>
     </section>
