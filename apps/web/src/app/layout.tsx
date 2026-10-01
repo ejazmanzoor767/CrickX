@@ -15,7 +15,7 @@ export const viewport = {
 export const metadata = {
   metadataBase: new URL('https://crickxfantasy.site'),
   title: 'CrickX — Fantasy Cricket',
-  description: 'Fantasy cricket powered by CrickX.',
+  description: 'CrickX is a fantasy-cricket platform that provides cricket match data, fantasy team management, scoring, and blockchain-based CRX utility features on the Polygon network.',
   alternates: { canonical: '/' },
   icons: { icon: '/crickx-app-logo.svg' },
 };
