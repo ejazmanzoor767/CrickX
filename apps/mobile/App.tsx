@@ -149,19 +149,19 @@ const script = `
         <div class="crx-res-section">
           <span class="crx-res-label">Contact</span>
           <div class="crx-res-list">
-            <a class="crx-res-row" href="mailto:contact@crickxfantasy.com">
+            <a class="crx-res-row" class="crx-gmail-link crx-res-row" data-email="contact@crickxfantasy.site" href="mailto:contact@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">
               <span class="crx-res-icon">✉</span>
-              <span class="crx-res-copy"><span class="crx-res-name">Contact</span><span class="crx-res-value">contact@crickxfantasy.com</span></span>
+              <span class="crx-res-copy"><span class="crx-res-name">Contact</span><span class="crx-res-value">contact@crickxfantasy.site</span></span>
               <span class="crx-res-arrow">›</span>
             </a>
-            <a class="crx-res-row" href="mailto:info@crickxfantasy.com">
+            <a class="crx-res-row" class="crx-gmail-link crx-res-row" data-email="info@crickxfantasy.site" href="mailto:info@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">
               <span class="crx-res-icon">✉</span>
-              <span class="crx-res-copy"><span class="crx-res-name">Info</span><span class="crx-res-value">info@crickxfantasy.com</span></span>
+              <span class="crx-res-copy"><span class="crx-res-name">Info</span><span class="crx-res-value">info@crickxfantasy.site</span></span>
               <span class="crx-res-arrow">›</span>
             </a>
-            <a class="crx-res-row" href="mailto:support@crickxfantasy.com">
+            <a class="crx-res-row" class="crx-gmail-link crx-res-row" data-email="support@crickxfantasy.site" href="mailto:support@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">
               <span class="crx-res-icon">✉</span>
-              <span class="crx-res-copy"><span class="crx-res-name">Support</span><span class="crx-res-value">support@crickxfantasy.com</span></span>
+              <span class="crx-res-copy"><span class="crx-res-name">Support</span><span class="crx-res-value">support@crickxfantasy.site</span></span>
               <span class="crx-res-arrow">›</span>
             </a>
           </div>
@@ -182,6 +182,18 @@ const script = `
 
         <div class="crx-res-foot">CrickX official support, documentation and service information.</div>
       \`;
+
+      wrap.querySelectorAll('.crx-gmail-link').forEach((anchor) => {
+        anchor.addEventListener('click', (event) => {
+          event.preventDefault();
+          const email = anchor.getAttribute('data-email') || '';
+          if (!email) return;
+          const subject = encodeURIComponent('CrickX Support');
+          const body = encodeURIComponent('Hello CrickX team,\\n\\n');
+          const gmailIntent = 'intent://compose?to=' + encodeURIComponent(email) + '&subject=' + subject + '&body=' + body + '#Intent;scheme=mailto;package=com.google.android.gm;end';
+          window.location.href = gmailIntent;
+        });
+      });
 
       if (accountCard && accountCard.parentElement) {
         accountCard.parentElement.insertBefore(wrap, accountCard);
@@ -276,9 +288,20 @@ function AppContent() {
 
       // Never render third-party web pages inside the app shell. Open only
       // explicitly allowed external destinations in the system/browser.
-      const allowedExternalProtocols = new Set(['https:', 'mailto:', 'tel:', 'metamask:', 'wc:']);
+      const allowedExternalProtocols = new Set(['https:', 'mailto:', 'tel:', 'metamask:', 'wc:', 'intent:']);
       if (allowedExternalProtocols.has(protocol)) {
-        void Linking.openURL(url).catch(() => undefined);
+        void Linking.openURL(url).catch(() => {
+          if (protocol === 'intent:') {
+            const match = url.match(/^intent:\/\/compose\?([^#]+)/i);
+            const params = match ? new URLSearchParams(match[1]) : null;
+            const email = params?.get('to') || '';
+            if (!email) return;
+            const subject = params?.get('subject') || encodeURIComponent('CrickX Support');
+            const body = params?.get('body') || encodeURIComponent('Hello CrickX team,\\n\\n');
+            const fallback = 'mailto:' + email + '?subject=' + subject + '&body=' + body;
+            void Linking.openURL(fallback).catch(() => undefined);
+          }
+        });
       }
     } catch {
       // Ignore malformed or unsupported navigation targets.
