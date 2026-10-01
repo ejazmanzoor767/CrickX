@@ -420,7 +420,10 @@ jobs:
           echo "Native ABIs packaged in APK:"
           abis="$(unzip -Z1 "$apk" | grep -E '^lib/[^/]+/[^/]+\.so$' | cut -d/ -f2 | sort -u || true)"
           printf '%s\n' "$abis"
-          echo "$abis" | grep -qx "arm64-v8a\|armeabi-v7a\|arm64-v8a"          echo "Checking 16 KB ZIP alignment..."
+          echo "Checking required ARM phone ABIs..."
+          echo "$abis" | grep -qx "arm64-v8a"
+          echo "$abis" | grep -qx "armeabi-v7a"
+          echo "Checking 16 KB ZIP alignment..."
           "$zipalign" -c -P 16 -v 4 "$apk" >/dev/null
           echo "Checking arm64 ELF LOAD-segment alignment..."
           python3 - "$apk" <<'PY'
