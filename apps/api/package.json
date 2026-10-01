@@ -12,7 +12,7 @@
     "start:prod": "node -e \"const fs=require('fs'),p=require('path');function f(d){for(const x of fs.readdirSync(d,{withFileTypes:true})){const q=p.join(d,x.name);if(x.isDirectory()){const r=f(q);if(r)return r;}else if(x.name==='main.js')return q;}}const q=f('dist');if(!q)throw new Error('Compiled main.js not found under dist');require('./'+q);\""
   },
   "dependencies": {
-    "@nestjs/common": "^11.2.6",
+    "@nestjs/common": "^12.1.0",
     "@nestjs/core": "^11.2.6",
     "@nestjs/platform-express": "^11.2.6",
     "@nestjs/config": "^4.0.4",
