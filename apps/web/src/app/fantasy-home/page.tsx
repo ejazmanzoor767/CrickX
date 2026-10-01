@@ -86,15 +86,18 @@ export default function FantasyHomePage() {
         <div className="match-topline"><span className="match-meta">{m.league?.name??m.type??'CRICKET'} · {live?'LIVE':'UPCOMING'}</span><span className={live?'badge-live':'match-date'}>{live?'● LIVE':fmtTime(m.starting_at)}</span></div>
         <div className="match-teams"><div><small>{m.localteam?.code??'HOME'}</small><strong>{m.localteam?.name??'TBD'}</strong>{m.localteam?.image_path&&<img src={m.localteam.image_path} alt="" style={{width:28,height:28,objectFit:'contain',marginTop:6}}/>}</div><span className="vs-badge">VS</span><div className="team-away"><small>{m.visitorteam?.code??'AWAY'}</small><strong>{m.visitorteam?.name??'TBD'}</strong>{m.visitorteam?.image_path&&<img src={m.visitorteam.image_path} alt="" style={{width:28,height:28,objectFit:'contain',marginTop:6}}/>}</div></div>
 
-        {live&&<div className="result-note">Match is live. Your saved team is view-only.</div>}
-        <div className="match-footer"><div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-          {team&&<Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/fantasy/view?fixtureId=${m.id}`}>View Team</Link>}
-        </div>
-        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
-        {!live&&<Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${m.id}`}>{team?'Edit Team':'Create Team'}</Link>}
-        <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${m.id}`}>Predictions</Link>
-        {live&&<Link className="primary-button live-leaderboard-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/leaderboard?fixtureId=${m.id}`}>Leaderboard</Link>}
-        </div>
+        {live ? <div className="match-footer live-fantasy-footer">
+          {team&&<Link className="secondary-button live-view-team-button" style={{padding:'9px 14px',fontSize:12}} href={`/fantasy/view?fixtureId=${m.id}`}>View Team</Link>}
+          <Link className="secondary-button live-predictions-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${m.id}`}>Predictions</Link>
+          <Link className="primary-button live-leaderboard-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/leaderboard?fixtureId=${m.id}`}>Leaderboard</Link>
+        </div> : <div className="match-footer">
+          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            {team&&<Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/fantasy/view?fixtureId=${m.id}`}>View Team</Link>}
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+            <Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${m.id}`}>{team?'Edit Team':'Create Team'}</Link>
+            <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${m.id}`}>Predictions</Link>
+          </div>
         </div>
       </article>;
     })}</div>}
