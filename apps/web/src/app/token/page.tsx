@@ -1,6 +1,13 @@
 import Link from 'next/link';
 
-const CRX_ADDRESS = '0x6A7BeF6Bff1CE03C14D25bC97b1AF7097894b05E';
+const CRX_ADDRESS =
+  process.env.NEXT_PUBLIC_CRX_TOKEN_ADDRESS?.trim() ||
+  '0x6A7BeF6Bff1CE03C14D25bC97b1AF7097894b05E';
+const CRX_DECIMALS = 18;
+const OFFICIAL_SITE = 'https://crickxfantasy.site';
+const OFFICIAL_EMAIL = 'contact@crickxfantasy.site';
+const TOKEN_LOGO = `${OFFICIAL_SITE}/crx.svg`;
+const CRX_LAUNCH_DATE = '17 October 2027';
 const PROJECT_DESCRIPTION =
   'CrickX is a fantasy-cricket platform that provides cricket match data, fantasy team management, scoring, and blockchain-based CRX utility features on the Polygon network.';
 
@@ -40,9 +47,13 @@ export default function TokenPage() {
                 ['Symbol', 'CRX'],
                 ['Network', 'Polygon'],
                 ['Standard', 'ERC-20'],
+                ['Decimals', String(CRX_DECIMALS)],
                 ['Maximum Supply', '500,000,000 CRX'],
                 ['Contract', CRX_ADDRESS],
-                ['Logo', 'https://crickxfantasy.site/crx.svg'],
+                ['Website', OFFICIAL_SITE],
+                ['Contact Email', OFFICIAL_EMAIL],
+                ['Launch Date', CRX_LAUNCH_DATE],
+                ['Logo (32×32 SVG)', TOKEN_LOGO],
               ].map(([label, value]) => (
                 <tr key={label}>
                   <th style={{ textAlign: 'left', padding: '11px 12px', borderTop: '1px solid rgba(255,255,255,.06)', width: '30%', color: 'var(--muted)', fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase' }}>{label}</th>
@@ -73,13 +84,13 @@ export default function TokenPage() {
       <div className="card" style={{ padding: 22 }}>
         <h2>Official links</h2>
         <div style={{ display: 'grid', gap: 9 }}>
-          <a href="https://crickxfantasy.site" target="_blank" rel="noreferrer">https://crickxfantasy.site</a>
-          <a href="https://crickxfantasy.site/whitepaper/" target="_blank" rel="noreferrer">https://crickxfantasy.site/whitepaper/</a>
-          <a href="https://crickxfantasy.site/crx.svg" target="_blank" rel="noreferrer">https://crickxfantasy.site/crx.svg</a>
+          <a href={OFFICIAL_SITE} target="_blank" rel="noreferrer">{OFFICIAL_SITE}</a>
+          <a href={`${OFFICIAL_SITE}/whitepaper/`} target="_blank" rel="noreferrer">{OFFICIAL_SITE}/whitepaper/</a>
+          <a href={TOKEN_LOGO} target="_blank" rel="noreferrer">{TOKEN_LOGO}</a>
           <a href="https://github.com/ejazmanzoor767/CrickX" target="_blank" rel="noreferrer">https://github.com/ejazmanzoor767/CrickX</a>
-          <a href="mailto:contact@crickxfantasy.site">contact@crickxfantasy.site</a>
-          <a href="mailto:info@crickxfantasy.site">info@crickxfantasy.site</a>
-          <a href="mailto:support@crickxfantasy.site">support@crickxfantasy.site</a>
+          <a href="mailto:contact@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">contact@crickxfantasy.site</a>
+          <a href="mailto:info@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">info@crickxfantasy.site</a>
+          <a href="mailto:support@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">support@crickxfantasy.site</a>
         </div>
       </div>
     </section>
