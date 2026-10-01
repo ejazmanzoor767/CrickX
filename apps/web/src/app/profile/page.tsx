@@ -276,7 +276,7 @@ export default function ProfilePage() {
       </div>
 
       <div
-        className="card"
+        className="card referral-card"
         style={{
           marginTop: 16,
           padding: 0,
@@ -297,7 +297,7 @@ export default function ProfilePage() {
                 Invite friends with your referral code. A referral becomes <strong style={{ color: '#eef2f7' }}>valid</strong> after the referred user successfully completes a subscription.
               </p>
             </div>
-            <div style={{ minWidth: 170, padding: 16, borderRadius: 18, background: 'rgba(0,0,0,.18)', border: '1px solid rgba(255,255,255,.07)' }}>
+            <div className="referral-stat-card" style={{ minWidth: 170, padding: 16, borderRadius: 18, background: 'rgba(0,0,0,.18)', border: '1px solid rgba(255,255,255,.07)' }}>
               <span style={{ display: 'block', color: '#9aa3b5', fontSize: 10, fontWeight: 900, letterSpacing: '.13em' }}>VALID REFERRALS</span>
               <strong style={{ display: 'block', marginTop: 5, fontSize: 30, lineHeight: 1 }}>{Number(referral?.validReferrals ?? 0)}</strong>
               <span style={{ display: 'block', marginTop: 7, color: '#9aa3b5', fontSize: 12 }}>of {Number(referral?.totalReferrals ?? 0)} total</span>
@@ -309,7 +309,7 @@ export default function ProfilePage() {
 
         <div style={{ padding: 24, display: 'grid', gap: 18 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-            <div style={{ padding: 15, borderRadius: 16, background: 'rgba(255,255,255,.028)', border: '1px solid rgba(255,255,255,.065)' }}>
+            <div className="referral-code-card" style={{ padding: 15, borderRadius: 16, background: 'rgba(255,255,255,.028)', border: '1px solid rgba(255,255,255,.065)' }}>
               <span style={{ display: 'block', color: '#8f98aa', fontSize: 10, fontWeight: 900, letterSpacing: '.12em' }}>YOUR CODE</span>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 }}>
                 <strong style={{ fontSize: 20, letterSpacing: '.05em', wordBreak: 'break-all' }}>{referral?.code ?? 'Loading…'}</strong>
@@ -344,7 +344,7 @@ export default function ProfilePage() {
 
               <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
                 {(referral.referrals ?? []).map((row: any) => (
-                  <div key={row.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)' }}>
+                  <div className="referral-row-card" key={row.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)' }}>
                     <div style={{ minWidth: 0 }}>
                       <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{row.email || row.userId}</strong>
                       <small style={{ display: 'block', marginTop: 3, color: '#8f98aa' }}>{row.status === 'VALID' ? 'Subscription confirmed' : 'Waiting for subscription'}</small>
@@ -363,7 +363,7 @@ export default function ProfilePage() {
 
           <div style={{ paddingTop: 4 }}>
             <span className="eyebrow">HAVE A REFERRAL CODE?</span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end', marginTop: 8 }}>
+            <div className="referral-apply-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end', marginTop: 8 }}>
               <input value={referralCodeInput} onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())} placeholder="Enter a friend's CrickX code" maxLength={15} />
               <button className="secondary-button" type="button" onClick={() => void applyReferralCode()} disabled={referralApplying} style={{ minHeight: 44 }}>
                 {referralApplying ? 'Applying…' : 'Apply Code'}
