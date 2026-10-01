@@ -41,21 +41,22 @@ function MatchCard({ fixture, live, completed, teamSaved }: { fixture: any; live
     {live && runs.length > 0 && <div className="live-score-strip">{(runs as any[]).slice(-2).map((r, i) => <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:18,padding:'11px 0'}}><span style={{fontWeight:800,color:'#cbd2df'}}>{r.team_id === fixture.localteam_id ? (fixture.localteam?.name ?? 'Home') : (fixture.visitorteam?.name ?? 'Away')}</span><strong style={{whiteSpace:'nowrap',fontSize:18}}>{scoreText(r)}</strong></div>)}</div>}
     
     {completed && hasSavedTeam && <div className="result-note">{fixture.note ?? 'Match completed'} · Your fantasy team saved</div>}
-    <div className="match-footer match-centre-footer">
+    {live ? <div className="match-footer match-centre-footer live-match-footer">
+      <Link className="primary-button live-scorecard-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/matches/detail?fixtureId=${fixture.id}`}>Scorecard →</Link>
+      <Link className="secondary-button live-predictions-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${fixture.id}`}>Predictions</Link>
+    </div> : <div className="match-footer match-centre-footer">
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         {completed && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/leaderboard?fixtureId=${fixture.id}`}>Leaderboard</Link>}
         {completed && hasSavedTeam && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={viewTeamHref}>View Team</Link>}
         {completed && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/matches/detail?fixtureId=${fixture.id}`}>Stats</Link>}
         {completed && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/predictions?fixtureId=${fixture.id}`}>View Predictions</Link>}
-        {!live && !completed && <span style={{color:'#98a0b3',fontSize:13}}>{hasSavedTeam ? 'Your team is saved' : 'Fantasy opens before match start'}</span>}
+        {!completed && <span style={{color:'#98a0b3',fontSize:13}}>{hasSavedTeam ? 'Your team is saved' : 'Fantasy opens before match start'}</span>}
       </div>
       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
-        {!completed && !live && <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${fixture.id}`}>Predictions</Link>}
-        {live && <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${fixture.id}`}>Predictions</Link>}
-        {live && <Link className="primary-button live-scorecard-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/matches/detail?fixtureId=${fixture.id}`}>Scorecard →</Link>}
-        {!completed && !live && <Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${fixture.id}`}>{hasSavedTeam ? 'View / Edit Team' : 'Create Team'}</Link>}
+        {!completed && <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${fixture.id}`}>Predictions</Link>}
+        {!completed && <Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${fixture.id}`}>{hasSavedTeam ? 'View / Edit Team' : 'Create Team'}</Link>}
       </div>
-    </div>
+    </div>}
   </article>;
 }
 
