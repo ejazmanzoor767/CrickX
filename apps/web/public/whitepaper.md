@@ -1,6 +1,6 @@
 # CrickX Whitepaper
 
-**Version 1.1 · September 30, 2026**
+**Version 1.2 · October 1, 2026**
 
 **Project:** CrickX  
 **Website:** https://crickxfantasy.site  
@@ -491,21 +491,32 @@ Users should participate only where the product and relevant laws permit.
 
 ---
 
-## 22. Official Links and Contacts
+## 22. Founder and Project Identity
 
-**Website:** https://crickxfantasy.site  
-**Whitepaper:** https://crickxfantasy.site/whitepaper/  
-**CRX token logo:** https://crickxfantasy.site/crx.svg  
-**GitHub:** https://github.com/ejazmanzoor767/CrickX
+**Founder:** Ejaz Manzoor  
+**Role:** Founder & Developer, CrickX  
+**GitHub:** https://github.com/ejazmanzoor767
 
-**Contact:** contact@crickxfantasy.com  
-**Info:** info@crickxfantasy.com  
-**Support:** support@crickxfantasy.com  
-**Owner:** ejazchouhan27@gmail.com
+The public founder identity is limited to information that can be tied directly to the CrickX project repository. A LinkedIn URL is not published in this document until the founder's verified professional profile URL is confirmed.
 
 ---
 
-## 23. Conclusion
+## 23. Official Links and Contacts
+
+**Website:** https://crickxfantasy.site  
+**Whitepaper:** https://crickxfantasy.site/whitepaper/  
+**CRX token page:** https://crickxfantasy.site/token  
+**CRX token logo:** https://crickxfantasy.site/crx.svg  
+**GitHub:** https://github.com/ejazmanzoor767/CrickX  
+**CRX contract:** `0x6A7BeF6Bff1CE03C14D25bC97b1AF7097894b05E`
+
+**Contact:** contact@crickxfantasy.site  
+**Info:** info@crickxfantasy.site  
+**Support:** support@crickxfantasy.site
+
+---
+
+## 24. Conclusion
 
 CrickX combines cricket data, fantasy competition, predictions, subscriptions and blockchain settlement into one match-centered platform.
 
