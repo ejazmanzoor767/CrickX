@@ -77,29 +77,55 @@ export default function FantasyHomePage() {
 
   const teamByFixture=useMemo(()=>{ const map=new Map<number,any>(); for(const t of teams){const id=Number(t.sportmonksFixtureId);if(!map.has(id))map.set(id,t);} return map; },[teams]);
 
-  return <section className="app-page fantasy-home-page">
-    <div className="page-intro"><div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Fantasy matches</h1><p className="section-subtitle">Upcoming and live matches are shown here so you can create a team, open Predictions, or manage a saved team before the match finishes.</p></div><div className="page-actions"><Link className="secondary-button" href="/matches">Match centre</Link></div></div>
-    {error&&<div className="card"><p className="error-text">{error}</p></div>}
-    {loading ? <div className="card skeleton-card">Loading fantasy matches…</div> : matches.length===0 ? <div className="card empty-state"><strong>No active fantasy matches found.</strong><span>Completed matches are not listed in Fantasy. Open Match Centre to view completed results.</span></div> : <div className="match-list">{matches.map((m:any)=>{
-      const live=isLive(m),team=teamByFixture.get(Number(m.id));
-      return <article className={`card match-list-card ${live?'match-live-card':''}`} key={m.id}>
-        <div className="match-topline"><span className="match-meta">{m.league?.name??m.type??'CRICKET'} · {live?'LIVE':'UPCOMING'}</span><span className={live?'badge-live':'match-date'}>{live?'● LIVE':fmtTime(m.starting_at)}</span></div>
-        <div className="match-teams"><div><small>{m.localteam?.code??'HOME'}</small><strong>{m.localteam?.name??'TBD'}</strong>{m.localteam?.image_path&&<img src={m.localteam.image_path} alt="" style={{width:28,height:28,objectFit:'contain',marginTop:6}}/>}</div><span className="vs-badge">VS</span><div className="team-away"><small>{m.visitorteam?.code??'AWAY'}</small><strong>{m.visitorteam?.name??'TBD'}</strong>{m.visitorteam?.image_path&&<img src={m.visitorteam.image_path} alt="" style={{width:28,height:28,objectFit:'contain',marginTop:6}}/>}</div></div>
-
-        {live ? <div className="match-footer live-fantasy-footer">
-          {team&&<Link className="secondary-button live-view-team-button" style={{padding:'9px 14px',fontSize:12}} href={`/fantasy/view?fixtureId=${m.id}`}>View Team</Link>}
-          <Link className="secondary-button live-predictions-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${m.id}`}>Predictions</Link>
-          <Link className="primary-button live-leaderboard-button" style={{padding:'10px 16px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/leaderboard?fixtureId=${m.id}`}>Leaderboard</Link>
-        </div> : <div className="match-footer">
-          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-            {team&&<Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/fantasy/view?fixtureId=${m.id}`}>View Team</Link>}
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
-            <Link className="primary-button" style={{padding:'10px 18px',fontSize:13,boxShadow:'0 10px 28px rgba(155,255,71,.16)'}} href={`/fantasy?fixtureId=${m.id}`}>{team?'Edit Team':'Create Team'}</Link>
-            <Link className="secondary-button" style={{padding:'10px 15px',fontSize:13}} href={`/predictions?fixtureId=${m.id}`}>Predictions</Link>
-          </div>
+  const matchCards = matches.map((m:any) => {
+    const live = isLive(m), team = teamByFixture.get(Number(m.id));
+    return <article className={`card match-list-card ${live ? 'match-live-card' : ''}`} key={m.id}>
+      <div className="match-topline">
+        <span className="match-meta">{m.league?.name ?? m.type ?? 'CRICKET'} · {live ? 'LIVE' : 'UPCOMING'}</span>
+        <span className={live ? 'badge-live' : 'match-date'}>{live ? '● LIVE' : fmtTime(m.starting_at)}</span>
+      </div>
+      <div className="match-teams">
+        <div>
+          <small>{m.localteam?.code ?? 'HOME'}</small>
+          <strong>{m.localteam?.name ?? 'TBD'}</strong>
+          {m.localteam?.image_path && <img src={m.localteam.image_path} alt="" style={{ width: 28, height: 28, objectFit: 'contain', marginTop: 6 }} />}
         </div>
-      </article>;
-    })}</div>}
-  </section>;
+        <span className="vs-badge">VS</span>
+        <div className="team-away">
+          <small>{m.visitorteam?.code ?? 'AWAY'}</small>
+          <strong>{m.visitorteam?.name ?? 'TBD'}</strong>
+          {m.visitorteam?.image_path && <img src={m.visitorteam.image_path} alt="" style={{ width: 28, height: 28, objectFit: 'contain', marginTop: 6 }} />}
+        </div>
+      </div>
+
+      {live ? <div className="match-footer live-fantasy-footer">
+        {team && <Link className="secondary-button live-view-team-button" style={{ padding: '9px 14px', fontSize: 12 }} href={`/fantasy/view?fixtureId=${m.id}`}>View Team</Link>}
+        <Link className="secondary-button live-predictions-button" style={{ padding: '10px 15px', fontSize: 13 }} href={`/predictions?fixtureId=${m.id}`}>Predictions</Link>
+        <Link className="primary-button live-leaderboard-button" style={{ padding: '10px 16px', fontSize: 13, boxShadow: '0 10px 28px rgba(155,255,71,.16)' }} href={`/leaderboard?fixtureId=${m.id}`}>Leaderboard</Link>
+      </div> : <div className="match-footer">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {team && <Link className="secondary-button" style={{ padding: '9px 14px', fontSize: 12 }} href={`/fantasy/view?fixtureId=${m.id}`}>View Team</Link>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Link className="primary-button" style={{ padding: '10px 18px', fontSize: 13, boxShadow: '0 10px 28px rgba(155,255,71,.16)' }} href={`/fantasy?fixtureId=${m.id}`}>{team ? 'Edit Team' : 'Create Team'}</Link>
+          <Link className="secondary-button" style={{ padding: '10px 15px', fontSize: 13 }} href={`/predictions?fixtureId=${m.id}`}>Predictions</Link>
+        </div>
+      </div>}
+    </article>;
+  });
+
+  return (
+    <section className="app-page fantasy-home-page">
+      <div className="page-intro">
+        <div>
+          <p className="eyebrow">CRICKX FANTASY</p>
+          <h1 className="section-title">Fantasy matches</h1>
+          <p className="section-subtitle">Upcoming and live matches are shown here so you can create a team, open Predictions, or manage a saved team before the match finishes.</p>
+        </div>
+        <div className="page-actions"><Link className="secondary-button" href="/matches">Match centre</Link></div>
+      </div>
+      {error && <div className="card"><p className="error-text">{error}</p></div>}
+      {loading ? <div className="card skeleton-card">Loading fantasy matches…</div> : matches.length === 0 ? <div className="card empty-state"><strong>No active fantasy matches found.</strong><span>Completed matches are not listed in Fantasy. Open Match Centre to view completed results.</span></div> : <div className="match-list">{matchCards}</div>}
+    </section>
+  );
 }
