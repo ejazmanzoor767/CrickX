@@ -6,6 +6,7 @@ import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { polygon, type AppKitNetwork } from '@reown/appkit/networks';
 import { http } from 'viem';
+import { createStorage } from 'wagmi';
 
 const projectId = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID?.trim() || '';
 const defaultRpcUrl = process.env.NEXT_PUBLIC_POLYGON_RPC_URL || 'https://polygon-bor-rpc.publicnode.com';
@@ -20,6 +21,7 @@ export const wagmiAdapter =
         projectId,
         networks: appKitNetworks,
         ssr: false,
+        storage: createStorage({ storage: window.localStorage }),
         transports: {
           [polygon.id]: http(defaultRpcUrl),
         },
