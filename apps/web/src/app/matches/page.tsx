@@ -49,7 +49,6 @@ function MatchCard({ fixture, live, completed, teamSaved }: { fixture: any; live
         {completed && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/leaderboard?fixtureId=${fixture.id}`}>Leaderboard</Link>}
         {completed && hasSavedTeam && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={viewTeamHref}>View Team</Link>}
         {completed && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/matches/detail?fixtureId=${fixture.id}`}>Stats</Link>}
-        {completed && <Link className="secondary-button" style={{padding:'9px 14px',fontSize:12}} href={`/predictions?fixtureId=${fixture.id}`}>View Predictions</Link>}
         {!completed && <span style={{color:'#98a0b3',fontSize:13}}>{hasSavedTeam ? 'Your team is saved' : 'Fantasy opens before match start'}</span>}
       </div>
       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
