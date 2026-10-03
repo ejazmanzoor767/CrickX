@@ -1,7 +1,7 @@
 'use client';
 
 import { createPublicClient, createWalletClient, custom, formatUnits, http, isAddress, parseUnits, type Address } from 'viem';
-import { getAccount, getWalletClient, switchChain } from '@wagmi/core';
+import { getAccount, getWalletClient, reconnect, switchChain } from '@wagmi/core';
 import { appKit, MULTI_WALLET_ENABLED, wagmiAdapter } from './appkit';
 import { polygon } from 'viem/chains';
 
@@ -191,7 +191,7 @@ export async function connectDetectedBrowserWallet(uuid: string): Promise<Addres
     if (!wallet) throw new Error('The selected wallet could not be identified.');
 
     activeInjectedWallet = wallet;
-    try { window.sessionStorage.setItem('crickx.wallet.rdns', wallet.rdns); } catch { /* storage may be unavailable */ }
+    try { window.localStorage.setItem('crickx.wallet.rdns', wallet.rdns); } catch { /* storage may be unavailable */ }
 
     if (appKit) {
       try { await appKit.disconnect(); } catch { /* keep direct wallet connection */ }
@@ -241,6 +241,75 @@ async function getEthereumProvider(connect = false): Promise<EthereumProvider> {
 function getWagmiConfig() {
   if (!MULTI_WALLET_ENABLED || !wagmiAdapter) return null;
   return wagmiAdapter.wagmiConfig;
+}
+
+let restoreConnectionPromise: Promise<Address | null> | null = null;
+
+async function restoreDirectInjectedWallet(): Promise<Address | null> {
+  if (typeof window === 'undefined') return null;
+
+  startBrowserWalletDiscovery();
+
+  let storedRdns = '';
+  try {
+    storedRdns = window.localStorage.getItem('crickx.wallet.rdns') || '';
+  } catch {
+    storedRdns = '';
+  }
+
+  if (!storedRdns) return null;
+
+  try {
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const restored = [...announcedWallets.values()].find(wallet => wallet.rdns === storedRdns);
+    if (!restored) return null;
+
+    const accounts = await restored.provider.request({ method: 'eth_accounts' });
+    const address = Array.isArray(accounts) ? accounts[0] : undefined;
+    if (typeof address !== 'string' || !isAddress(address)) return null;
+
+    activeInjectedWallet = restored;
+    return address as Address;
+  } catch {
+    return null;
+  }
+}
+
+export async function restorePersistedWalletConnection(): Promise<Address | null> {
+  if (typeof window === 'undefined') return null;
+  if (restoreConnectionPromise) return restoreConnectionPromise;
+
+  restoreConnectionPromise = (async () => {
+    const directAddress = await restoreDirectInjectedWallet();
+    if (directAddress) return directAddress;
+
+    const config = getWagmiConfig();
+    if (!config) return null;
+
+    try {
+      await reconnect(config);
+    } catch {
+      // A missing/unavailable wallet should not prevent the app from loading.
+    }
+
+    const deadline = Date.now() + 4000;
+    while (Date.now() < deadline) {
+      const account = getAccount(config);
+      if (account.isConnected && account.address && isAddress(account.address)) {
+        return account.address as Address;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return null;
+  })();
+
+  try {
+    return await restoreConnectionPromise;
+  } finally {
+    restoreConnectionPromise = null;
+  }
 }
 
 async function waitForWalletConnection() {
@@ -368,7 +437,7 @@ async function openWalletPicker() {
 
 export async function changeWallet(_currentAddress?: Address) {
   activeInjectedWallet = null;
-  try { window.sessionStorage.removeItem('crickx.wallet.rdns'); } catch { /* storage may be unavailable */ }
+  try { window.localStorage.removeItem('crickx.wallet.rdns'); } catch { /* storage may be unavailable */ }
   const config = getWagmiConfig();
 
   if (config && appKit) {
@@ -387,7 +456,7 @@ export async function changeWallet(_currentAddress?: Address) {
 
 export async function connectWallet() {
   activeInjectedWallet = null;
-  try { window.sessionStorage.removeItem('crickx.wallet.rdns'); } catch { /* storage may be unavailable */ }
+  try { window.localStorage.removeItem('crickx.wallet.rdns'); } catch { /* storage may be unavailable */ }
   startBrowserWalletDiscovery();
   const config = getWagmiConfig();
 
@@ -415,35 +484,19 @@ export async function signContestJoinMessage(message: string) {
 export async function getCurrentWallet() {
   if (typeof window === 'undefined') return null;
 
-  startBrowserWalletDiscovery();
-
   if (activeInjectedWallet) {
     try {
       const accounts = await activeInjectedWallet.provider.request({ method: 'eth_accounts' });
       const address = Array.isArray(accounts) ? accounts[0] : undefined;
-      return typeof address === 'string' && isAddress(address) ? address as Address : null;
+      if (typeof address === 'string' && isAddress(address)) return address as Address;
+      activeInjectedWallet = null;
     } catch {
-      return null;
+      activeInjectedWallet = null;
     }
   }
 
-  try {
-    const storedRdns = window.sessionStorage.getItem('crickx.wallet.rdns');
-    if (storedRdns) {
-      const wallets = [...announcedWallets.values()];
-      const restored = wallets.find(wallet => wallet.rdns === storedRdns);
-      if (restored) {
-        const accounts = await restored.provider.request({ method: 'eth_accounts' });
-        const address = Array.isArray(accounts) ? accounts[0] : undefined;
-        if (typeof address === 'string' && isAddress(address)) {
-          activeInjectedWallet = restored;
-          return address as Address;
-        }
-      }
-    }
-  } catch {
-    // Wallet storage or account access may be unavailable.
-  }
+  const restored = await restorePersistedWalletConnection();
+  if (restored) return restored;
 
   const config = getWagmiConfig();
   if (config) {
