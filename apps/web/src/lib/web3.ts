@@ -63,6 +63,27 @@ const announcedWallets = new Map<string, Eip6963Wallet>();
 let legacyDiscoveryStarted = false;
 let activeInjectedWallet: Eip6963Wallet | null = null;
 
+type TokenPocketWindow = Window & {
+  tokenpocket?: {
+    ethereum?: EthereumProvider;
+  };
+};
+
+function addNamedInjectedProvider(provider: EthereumProvider, name: string, rdns: string, icon = '') {
+  const existing = [...announcedWallets.values()].find(item => item.provider === provider);
+  if (existing) return existing.uuid;
+
+  const uuid = `legacy:${rdns}`;
+  announcedWallets.set(uuid, {
+    uuid,
+    name,
+    icon,
+    rdns,
+    provider,
+  });
+  return uuid;
+}
+
 function addLegacyProvider(provider: EthereumProvider, index = 0) {
   const existing = [...announcedWallets.values()].find(item => item.provider === provider);
   if (existing) return;
@@ -113,6 +134,14 @@ function startBrowserWalletDiscovery() {
   } else if (ethereum) {
     addLegacyProvider(ethereum);
   }
+
+  // TokenPocket explicitly exposes its EVM provider as window.tokenpocket.ethereum.
+  // Keep this as a standards-compatible legacy fallback for extension versions
+  // that inject the namespace even when their EIP-6963 announcement is delayed.
+  const tokenPocketProvider = (window as TokenPocketWindow).tokenpocket?.ethereum;
+  if (tokenPocketProvider) {
+    addNamedInjectedProvider(tokenPocketProvider, 'TokenPocket', 'io.tokenpocket', '');
+  }
 }
 
 export async function getDetectedBrowserWallets(): Promise<DetectedBrowserWallet[]> {
@@ -120,7 +149,10 @@ export async function getDetectedBrowserWallets(): Promise<DetectedBrowserWallet
   startBrowserWalletDiscovery();
 
   window.dispatchEvent(new Event('eip6963:requestProvider'));
-  await new Promise(resolve => setTimeout(resolve, 75));
+
+  // Wallet extensions can announce asynchronously. Collect announcements
+  // for a short, bounded window so late-loading extensions are not missed.
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   const wallets = [...announcedWallets.values()];
   const unique = new Map<string, Eip6963Wallet>();
