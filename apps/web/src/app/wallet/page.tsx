@@ -4,10 +4,14 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth-context';
 import { api } from '../../lib/api';
 import {
+  browserWalletPickerEventName,
+  cancelBrowserWalletPicker,
   changeWallet,
   connectDetectedBrowserWallet,
   connectWallet,
   getConnectedWalletName,
+  openWalletDirectory,
+  selectBrowserWalletFromPicker,
   getCurrentWallet,
   getDetectedBrowserWallets,
   readCrxWallet,
@@ -31,12 +35,24 @@ export default function WalletPage() {
   const [error, setError] = useState('');
   const [detectedBrowserWallets, setDetectedBrowserWallets] = useState<DetectedBrowserWallet[]>([]);
   const [walletLoading, setWalletLoading] = useState(true);
+  const [pickerWallets, setPickerWallets] = useState<DetectedBrowserWallet[]>([]);
 
   async function refresh(addr = address) {
     if (!addr) return;
     setWallet(await readCrxWallet(addr as any));
     setWalletName(await getConnectedWalletName());
   }
+
+  useEffect(() => {
+    const eventName = browserWalletPickerEventName();
+    const handlePickerRequest = (event: Event) => {
+      const wallets = (event as CustomEvent<{ wallets?: DetectedBrowserWallet[] }>).detail?.wallets;
+      setPickerWallets(Array.isArray(wallets) ? wallets : []);
+    };
+
+    window.addEventListener(eventName, handlePickerRequest);
+    return () => window.removeEventListener(eventName, handlePickerRequest);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -237,7 +253,130 @@ export default function WalletPage() {
 
   if (authLoading || walletLoading) return <section className="app-page"><div className="card skeleton-card">Restoring wallet connection…</div></section>;
 
-  return <section className="app-page wallet-page" style={{ maxWidth: 980 }}>
+  return (
+    <>
+      {pickerWallets.length > 0 && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="browser-wallet-picker-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 18,
+            background: 'rgba(3,7,12,.82)',
+            backdropFilter: 'blur(10px)',
+          }}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) cancelBrowserWalletPicker();
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: 'min(680px,100%)',
+              maxHeight: 'min(760px,calc(100vh - 36px))',
+              overflowY: 'auto',
+              padding: 22,
+              boxShadow: '0 28px 80px rgba(0,0,0,.45)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center' }}>
+              <div>
+                <p className="eyebrow">INSTALLED BROWSER WALLETS</p>
+                <h2 id="browser-wallet-picker-title" style={{ margin: '4px 0 5px' }}>Choose your wallet</h2>
+                <p className="section-subtitle" style={{ margin: 0 }}>
+                  These wallets were detected directly in this browser. This bypasses an incorrect “Browser Not Detected” label from a wallet directory.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => {
+                  cancelBrowserWalletPicker();
+                  setPickerWallets([]);
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10, marginTop: 18 }}>
+              {pickerWallets.map(browserWallet => (
+                <button
+                  key={browserWallet.uuid}
+                  type="button"
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setError('');
+                    setMessage('');
+                    try {
+                      await selectBrowserWalletFromPicker(browserWallet.uuid);
+                      setPickerWallets([]);
+                      const next = await getCurrentWallet();
+                      if (!next) throw new Error('The selected wallet did not stay connected.');
+                      setAddress(next);
+                      setWallet(await readCrxWallet(next));
+                      setWalletName(await getConnectedWalletName());
+                      setMessage((await getConnectedWalletName()) + ' connected on Polygon.');
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : 'Unable to connect the selected browser wallet.');
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  style={{ minHeight: 64, display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', padding: 12 }}
+                >
+                  {browserWallet.icon ? (
+                    <img
+                      src={browserWallet.icon}
+                      alt=""
+                      width={34}
+                      height={34}
+                      style={{ width: 34, height: 34, borderRadius: 9, objectFit: 'cover', flexShrink: 0 }}
+                    />
+                  ) : (
+                    <span style={{ width: 34, height: 34, borderRadius: 9, display: 'grid', placeItems: 'center', background: 'rgba(155,243,74,.12)', color: 'var(--accent)', fontWeight: 900 }}>W</span>
+                  )}
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{browserWallet.name}</span>
+                    <span style={{ display: 'block', color: 'var(--muted)', fontSize: 10, marginTop: 3 }}>Detected in this browser</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', marginTop: 18 }}>
+              <button
+                type="button"
+                className="primary-button"
+                disabled={busy}
+                onClick={async () => {
+                  setPickerWallets([]);
+                  cancelBrowserWalletPicker();
+                  try {
+                    await openWalletDirectory();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : 'Unable to open the wallet directory.');
+                  }
+                }}
+              >
+                Open all wallets
+              </button>
+              <span className="section-subtitle" style={{ alignSelf: 'center', fontSize: 12 }}>
+                Includes WalletConnect/mobile wallets and the rest of Reown’s wallet directory.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <section className="app-page wallet-page" style={{ maxWidth: 980 }}>
     <div className="page-intro">
       <div>
         <p className="eyebrow">CRICKX WEB3</p>
@@ -403,5 +542,7 @@ export default function WalletPage() {
 
     {message && <div className="notice" style={{ marginTop: 14, wordBreak: 'break-word' }}>{message}</div>}
     {error && <div className="card" style={{ marginTop: 14 }}><p className="error-text">{error}</p></div>}
-  </section>;
+      </section>
+    </>
+  );
 }
