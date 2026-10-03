@@ -5,6 +5,8 @@ import {
   browserWalletPickerEventName,
   cancelBrowserWalletPicker,
   openWalletDirectory,
+  rejectBrowserWalletPicker,
+  resolveBrowserWalletPicker,
   selectBrowserWalletFromPicker,
   type DetectedBrowserWallet,
 } from '../lib/web3';
@@ -55,7 +57,13 @@ export default function BrowserWalletPicker() {
     setBusyUuid('__directory__');
     try {
       const address = await openWalletDirectory();
-      if (address) setOpen(false);
+      if (address) {
+        resolveBrowserWalletPicker(address);
+        setOpen(false);
+      }
+    } catch (error) {
+      rejectBrowserWalletPicker(error);
+      setOpen(false);
     } finally {
       setBusyUuid(null);
     }
