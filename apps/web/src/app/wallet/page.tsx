@@ -264,6 +264,7 @@ export default function WalletPage() {
             <p className="section-subtitle">Network: Polygon Mainnet</p>
           </div>
         </div>
+      </div>
       <div className="card" style={{ padding: 24, marginBottom: 14, background: 'linear-gradient(145deg,rgba(155,255,71,.09),rgba(18,23,34,.98) 52%,rgba(10,13,19,.98))', border: '1px solid rgba(155,255,71,.15)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div>
