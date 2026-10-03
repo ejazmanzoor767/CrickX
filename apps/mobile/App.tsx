@@ -286,10 +286,16 @@ function AppContent() {
       if (protocol === 'about:' || protocol === 'blob:') return true;
       if (protocol === 'https:' && ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) return true;
 
-      // Never render third-party web pages inside the app shell. Open only
-      // explicitly allowed external destinations in the system/browser.
-      const allowedExternalProtocols = new Set(['https:', 'mailto:', 'tel:', 'metamask:', 'wc:', 'intent:']);
-      if (allowedExternalProtocols.has(protocol)) {
+      // WalletConnect/Reown can use different wallet-specific native schemes
+      // (e.g. metamask:, trust:, rainbow:, coinbasewallet:, phantom:, okx:,
+      // zerion:, imtoken:, etc.). Do not hard-code a small wallet list:
+      // forward safe non-web schemes to Android so any installed wallet that
+      // advertises a handler can be opened.
+      const blockedExternalProtocols = new Set(['javascript:', 'data:', 'file:', 'content:', 'chrome:', 'view-source:']);
+      const isExternalHttps = protocol === 'https:';
+      const isCustomScheme = !isExternalHttps && protocol !== 'http:' && !blockedExternalProtocols.has(protocol);
+
+      if (isExternalHttps || isCustomScheme) {
         void Linking.openURL(url).catch(() => {
           if (protocol === 'intent:') {
             const match = url.match(/^intent:\/\/compose\?([^#]+)/i);
