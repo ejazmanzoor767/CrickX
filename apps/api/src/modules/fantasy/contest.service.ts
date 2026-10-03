@@ -267,25 +267,11 @@ export class ContestService implements OnModuleInit {
     const existingPair = await this.prisma.contestEntry.findFirst({ where: { contestId: contest.id, fantasyTeamId: dto.fantasyTeamId } });
     if (existingPair) throw new ForbiddenException('This fantasy team has already joined the contest.');
 
+    // Free contest joining is intentionally off-chain: the user's wallet only signs
+    // ownership of the payout address. On-chain contest creation/funding is handled
+    // asynchronously by the backend provisioning + match-start workers, so a temporary
+    // RPC/gas problem must not block a valid 0-CRX entry.
     const chainContestId = Number((contest as any).chainContestId);
-    if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
-      throw new ServiceUnavailableException('This contest is still being prepared on-chain. Please try again shortly.');
-    }
-
-    try {
-      const chainSummary = await this.onchain.summary(chainContestId);
-      const expectedDeadline = Math.floor(new Date(liveFixture.starting_at).getTime() / 1000);
-      if (
-        !chainSummary.exists ||
-        Math.abs(Number(chainSummary.joinDeadline) - expectedDeadline) > 60
-      ) {
-        throw new ServiceUnavailableException('This contest is not ready on-chain yet. Please try again shortly.');
-      }
-    } catch (error) {
-      if (error instanceof ServiceUnavailableException) throw error;
-      throw new ServiceUnavailableException('Unable to verify the contest on-chain right now. Please try again shortly.');
-    }
-
     const timestamp = Math.floor(Date.now() / 1000);
     return {
       contestId: contest.id,
@@ -335,12 +321,9 @@ export class ContestService implements OnModuleInit {
     const existingWallet = await this.prisma.contestEntry.findFirst({ where: { contestId: contest.id, walletAddress: wallet } });
     if (existingWallet && existingWallet.userId !== userId) throw new ForbiddenException('This wallet has already joined the contest.');
 
-    const chainContestId = Number((contest as any).chainContestId);
-    if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
-      throw new ServiceUnavailableException('This contest is missing its on-chain contest ID. Please reopen the contest and try again.');
-    }
-
     // The user's signature only proves wallet ownership. The participant pays 0 CRX.
+    // The database entry is the source of truth for joining; the scheduled on-chain
+    // provisioning/funding workers reconcile the prize pool separately.
     // Firestore records +10 CRX immediately so the prize pool persists across refreshes.
     // No blockchain transaction is made during join; the complete pool is transferred
     // once when the match starts.
