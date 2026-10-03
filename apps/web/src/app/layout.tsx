@@ -5,7 +5,6 @@ import { AuthProvider } from '../lib/auth-context';
 import Nav from '../components/nav';
 import Footer from '../components/footer';
 import Web3Provider from './web3-provider';
-import BrowserWalletPicker from '../components/browser-wallet-picker';
 
 export const viewport = {
   width: 'device-width',
@@ -30,7 +29,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Nav />
           <main className="page-shell">{children}</main>
           <Footer />
-          <BrowserWalletPicker />
           </AuthProvider>
         </Web3Provider>
       </body>
