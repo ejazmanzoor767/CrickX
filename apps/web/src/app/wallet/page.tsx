@@ -5,15 +5,12 @@ import { useAuth } from '../../lib/auth-context';
 import { api } from '../../lib/api';
 import {
   changeWallet,
-  connectDetectedBrowserWallet,
   connectWallet,
   getConnectedWalletName,
   getCurrentWallet,
-  getDetectedBrowserWallets,
   readCrxWallet,
   sendCrx,
   shortAddress,
-  type DetectedBrowserWallet,
 } from '../../lib/web3';
 
 export default function WalletPage() {
@@ -29,7 +26,6 @@ export default function WalletPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [detectedBrowserWallets, setDetectedBrowserWallets] = useState<DetectedBrowserWallet[]>([]);
   const [walletLoading, setWalletLoading] = useState(true);
   async function refresh(addr = address) {
     if (!addr) return;
@@ -39,15 +35,6 @@ export default function WalletPage() {
 
   useEffect(() => {
     let active = true;
-    let timer: ReturnType<typeof setInterval> | null = null;
-
-    const refreshBrowserWallets = async () => {
-      const wallets = await getDetectedBrowserWallets();
-      if (active) setDetectedBrowserWallets(wallets);
-    };
-
-    void refreshBrowserWallets();
-    timer = setInterval(() => { void refreshBrowserWallets(); }, 1500);
 
     const initial = async () => {
       try {
@@ -73,7 +60,6 @@ export default function WalletPage() {
 
     return () => {
       active = false;
-      if (timer) clearInterval(timer);
     };
   }, []);
 
@@ -89,23 +75,6 @@ export default function WalletPage() {
       setMessage(`${await getConnectedWalletName()} connected on Polygon.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to connect wallet.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function connectDetected(wallet: DetectedBrowserWallet) {
-    setBusy(true);
-    setError('');
-    setMessage('');
-    try {
-      const next = await connectDetectedBrowserWallet(wallet.uuid);
-      setAddress(next);
-      setWallet(await readCrxWallet(next));
-      setWalletName(await getConnectedWalletName());
-      setMessage((await getConnectedWalletName()) + ' connected on Polygon.');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to connect the selected browser wallet.');
     } finally {
       setBusy(false);
     }
@@ -251,48 +220,13 @@ export default function WalletPage() {
     {!address ? (
       <div className="card" style={{ padding: 28 }}>
         <h2>Connect your wallet</h2>
-        <p className="section-subtitle">CrickX detects installed Chrome wallet extensions directly through EIP-6963 and also provides the full Reown wallet directory for WalletConnect/mobile wallets.</p>
+        <p className="section-subtitle">Connect through Reown AppKit to access supported browser extensions, WalletConnect/mobile wallets, and the full wallet directory in one secure flow.</p>
 
-        {detectedBrowserWallets.length > 0 && (
-          <div style={{ marginTop: 18, marginBottom: 16 }}>
-            <p className="eyebrow" style={{ marginBottom: 9 }}>DETECTED BROWSER WALLETS</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 9 }}>
-              {detectedBrowserWallets.map(wallet => (
-                <button
-                  key={wallet.uuid}
-                  type="button"
-                  className="secondary-button"
-                  disabled={busy}
-                  onClick={() => void connectDetected(wallet)}
-                  style={{ minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, textAlign: 'left' }}
-                  title={wallet.rdns}
-                >
-                  {wallet.icon ? (
-                    <img
-                      src={wallet.icon}
-                      alt=""
-                      width={28}
-                      height={28}
-                      style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
-                    />
-                  ) : (
-                    <span style={{ width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(155,243,74,.12)', color: 'var(--accent)', fontWeight: 900 }}>W</span>
-                  )}
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{wallet.name}</span>
-                    <span style={{ display: 'block', color: 'var(--muted)', fontSize: 10, marginTop: 2 }}>Installed extension</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <button className="primary-button" onClick={connect} disabled={busy}>
+                <button className="primary-button" onClick={connect} disabled={busy}>
           {busy ? 'Connecting…' : 'Connect wallet'}
         </button>
         <p className="section-subtitle" style={{ marginTop: 10, marginBottom: 0, fontSize: 12 }}>
-          The wallet directory can show WalletConnect-compatible mobile wallets and other supported wallets that do not inject a browser provider.
+          Reown AppKit provides the wallet list and connection flow. Your selected wallet connection is restored automatically on refresh when the wallet remains available.
         </p>
       </div>
     ) : <>
@@ -308,35 +242,7 @@ export default function WalletPage() {
                   <button className="secondary-button" onClick={chooseAnotherWallet} disabled={busy}>{busy ? 'Choose wallet…' : 'Change wallet'}</button>
           </div>
 
-          {detectedBrowserWallets.length > 0 && (
-            <div style={{ marginTop: 18 }}>
-              <p className="eyebrow" style={{ marginBottom: 9 }}>INSTALLED BROWSER WALLETS</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 8 }}>
-                {detectedBrowserWallets.map(browserWallet => (
-                  <button
-                    key={browserWallet.uuid}
-                    type="button"
-                    className="secondary-button"
-                    disabled={busy}
-                    onClick={() => void connectDetected(browserWallet)}
-                    style={{ minHeight: 48, display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left' }}
-                    title={browserWallet.rdns}
-                  >
-                    {browserWallet.icon ? (
-                      <img
-                        src={browserWallet.icon}
-                        alt=""
-                        width={24}
-                        height={24}
-                        style={{ width: 24, height: 24, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }}
-                      />
-                    ) : (
-                      <span style={{ width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'rgba(155,243,74,.12)', color: 'var(--accent)', fontWeight: 900 }}>W</span>
-                    )}
-                    <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{browserWallet.name}</span>
-                  </button>
-                ))}
-              </div>
+      </div>
             </div>
           )}
         </div>
