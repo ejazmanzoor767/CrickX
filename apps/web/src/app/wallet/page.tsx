@@ -30,6 +30,7 @@ export default function WalletPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [detectedBrowserWallets, setDetectedBrowserWallets] = useState<DetectedBrowserWallet[]>([]);
+  const [walletLoading, setWalletLoading] = useState(true);
 
   async function refresh(addr = address) {
     if (!addr) return;
@@ -50,14 +51,22 @@ export default function WalletPage() {
     timer = setInterval(() => { void refreshBrowserWallets(); }, 1500);
 
     const initial = async () => {
-      const current = await getCurrentWallet();
-      if (!active || !current) return;
-      setAddress(current);
-      setWalletName(await getConnectedWalletName());
       try {
-        setWallet(await readCrxWallet(current));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unable to read CRX balance.');
+        const current = await getCurrentWallet();
+        if (!active) return;
+        if (!current) {
+          setAddress(null);
+          return;
+        }
+        setAddress(current);
+        setWalletName(await getConnectedWalletName());
+        try {
+          setWallet(await readCrxWallet(current));
+        } catch (e) {
+          setError(e instanceof Error ? e.message : 'Unable to read CRX balance.');
+        }
+      } finally {
+        if (active) setWalletLoading(false);
       }
     };
 
@@ -209,7 +218,7 @@ export default function WalletPage() {
     };
   }, []);
 
-  if (authLoading) return <section className="app-page"><div className="card skeleton-card">Loading wallet…</div></section>;
+  if (authLoading || walletLoading) return <section className="app-page"><div className="card skeleton-card">Restoring wallet connection…</div></section>;
 
   return <section className="app-page wallet-page" style={{ maxWidth: 980 }}>
     <div className="page-intro">
