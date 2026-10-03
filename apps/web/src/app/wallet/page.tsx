@@ -271,7 +271,10 @@ export default function WalletPage() {
             backdropFilter: 'blur(10px)',
           }}
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) cancelBrowserWalletPicker();
+            if (event.target === event.currentTarget) {
+              cancelBrowserWalletPicker();
+              setPickerWallets([]);
+            }
           }}
         >
           <div
@@ -311,24 +314,9 @@ export default function WalletPage() {
                   type="button"
                   className="secondary-button"
                   disabled={busy}
-                  onClick={async () => {
-                    setBusy(true);
-                    setError('');
-                    setMessage('');
-                    try {
-                      await selectBrowserWalletFromPicker(browserWallet.uuid);
-                      setPickerWallets([]);
-                      const next = await getCurrentWallet();
-                      if (!next) throw new Error('The selected wallet did not stay connected.');
-                      setAddress(next);
-                      setWallet(await readCrxWallet(next));
-                      setWalletName(await getConnectedWalletName());
-                      setMessage((await getConnectedWalletName()) + ' connected on Polygon.');
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : 'Unable to connect the selected browser wallet.');
-                    } finally {
-                      setBusy(false);
-                    }
+                  onClick={() => {
+                    setPickerWallets([]);
+                    void selectBrowserWalletFromPicker(browserWallet.uuid);
                   }}
                   style={{ minHeight: 64, display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', padding: 12 }}
                 >
