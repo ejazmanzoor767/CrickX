@@ -325,6 +325,9 @@ export async function switchToPolygon() {
 }
 
 async function openWalletPicker() {
+  // Trigger EIP-6963 announcements before AppKit builds its connector list.
+  // This closes the race where an extension announces after the modal opens.
+  await getDetectedBrowserWallets();
   const config = getWagmiConfig();
   if (!config || !appKit) {
     throw new Error('The multi-wallet picker is not configured yet. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX build environment to enable wallet icons and wallet selection.');
