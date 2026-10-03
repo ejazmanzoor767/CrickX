@@ -514,34 +514,12 @@ export function shortAddress(address?: string | null) { return address ? `${addr
 
 export async function switchToPolygon() {
   const config = getWagmiConfig();
+  if (!config) throw new Error('Reown AppKit is not configured. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX web build environment.');
 
-  if (config) {
-    const account = getAccount(config);
-    if (!account.isConnected || !account.address) throw new Error('Connect a wallet first.');
-    if (account.chainId === POLYGON_CHAIN_ID) return;
-    await switchChain(config, { chainId: POLYGON_CHAIN_ID });
-    return;
-  }
-
-  const provider = await getEthereumProvider(true);
-  const chainId = await provider.request({ method: 'eth_chainId' });
-  if (chainId === '0x89') return;
-  try {
-    await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
-  } catch (error) {
-    const code = typeof error === 'object' && error && 'code' in error ? (error as { code?: number }).code : undefined;
-    if (code !== 4902) throw error;
-    await provider.request({
-      method: 'wallet_addEthereumChain',
-      params: [{
-        chainId: '0x89',
-        chainName: 'Polygon Mainnet',
-        nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
-        rpcUrls: [DEFAULT_RPC_URL],
-        blockExplorerUrls: ['https://polygonscan.com'],
-      }],
-    });
-  }
+  const account = getAccount(config);
+  if (!account.isConnected || !account.address) throw new Error('Connect a wallet first.');
+  if (account.chainId === POLYGON_CHAIN_ID) return;
+  await switchChain(config, { chainId: POLYGON_CHAIN_ID });
 }
 
 export async function openWalletDirectory() {
