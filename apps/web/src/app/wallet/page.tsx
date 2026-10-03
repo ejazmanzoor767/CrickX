@@ -95,6 +95,23 @@ export default function WalletPage() {
     }
   }
 
+  async function connectDetected(wallet: DetectedBrowserWallet) {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const next = await connectDetectedBrowserWallet(wallet.uuid);
+      setAddress(next);
+      setWallet(await readCrxWallet(next));
+      setWalletName(await getConnectedWalletName());
+      setMessage((await getConnectedWalletName()) + ' connected on Polygon.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to connect the selected browser wallet.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function chooseAnotherWallet() {
     if (!address) return connect();
     setBusy(true);
@@ -245,22 +262,7 @@ export default function WalletPage() {
                   type="button"
                   className="secondary-button"
                   disabled={busy}
-                  onClick={async () => {
-                    setBusy(true);
-                    setError('');
-                    setMessage('');
-                    try {
-                      const next = await connectDetectedBrowserWallet(wallet.uuid);
-                      setAddress(next);
-                      setWallet(await readCrxWallet(next));
-                      setWalletName(await getConnectedWalletName());
-                      setMessage((await getConnectedWalletName()) + ' connected on Polygon.');
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : 'Unable to connect the selected browser wallet.');
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
+                  onClick={() => void connectDetected(wallet)}
                   style={{ minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, textAlign: 'left' }}
                   title={wallet.rdns}
                 >
@@ -302,8 +304,40 @@ export default function WalletPage() {
           <div className="section-subtitle">{walletName} · {shortAddress(address)}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
             <button className="secondary-button" onClick={() => refresh()} disabled={busy}>Refresh balance</button>
-            <button className="secondary-button" onClick={chooseAnotherWallet} disabled={busy}>{busy ? 'Choose wallet…' : 'Change wallet'}</button>
+            <button className="secondary-button" onClick={chooseAnotherWallet} disabled={busy}>{busy ? 'Choose wallet…' : 'Open all wallets'}</button>
           </div>
+
+          {detectedBrowserWallets.length > 0 && (
+            <div style={{ marginTop: 18 }}>
+              <p className="eyebrow" style={{ marginBottom: 9 }}>INSTALLED BROWSER WALLETS</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 8 }}>
+                {detectedBrowserWallets.map(browserWallet => (
+                  <button
+                    key={browserWallet.uuid}
+                    type="button"
+                    className="secondary-button"
+                    disabled={busy}
+                    onClick={() => void connectDetected(browserWallet)}
+                    style={{ minHeight: 48, display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left' }}
+                    title={browserWallet.rdns}
+                  >
+                    {browserWallet.icon ? (
+                      <img
+                        src={browserWallet.icon}
+                        alt=""
+                        width={24}
+                        height={24}
+                        style={{ width: 24, height: 24, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }}
+                      />
+                    ) : (
+                      <span style={{ width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'rgba(155,243,74,.12)', color: 'var(--accent)', fontWeight: 900 }}>W</span>
+                    )}
+                    <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{browserWallet.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="card" style={{ padding: 28 }}>
           <p className="eyebrow">CONNECTED WALLET</p>
