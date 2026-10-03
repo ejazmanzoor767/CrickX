@@ -11,7 +11,15 @@ const queryClient = new QueryClient();
 export default function Web3Provider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!wagmiAdapter) return;
-    void restorePersistedWalletConnection();
+    void (async () => {
+      try {
+        const adapter = wagmiAdapter as unknown as { syncConnectors?: () => Promise<void> };
+        await adapter.syncConnectors?.();
+      } catch {
+        // Continue with the connectors already registered by Reown.
+      }
+      await restorePersistedWalletConnection();
+    })();
   }, []);
 
   if (!wagmiAdapter) return <>{children}</>;
