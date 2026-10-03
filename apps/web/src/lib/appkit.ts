@@ -39,6 +39,8 @@ export const appKit =
           url: 'https://crickxfantasy.site',
           icons: ['https://crickxfantasy.site/crickx-app-logo.svg'],
         },
+        enableEIP6963: true,
+        enableInjected: true,
         features: {
           analytics: false,
           email: false,
