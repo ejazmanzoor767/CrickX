@@ -263,6 +263,18 @@ export function cancelBrowserWalletPicker() {
   pending?.reject(new Error('Wallet selection cancelled.'));
 }
 
+export function resolveBrowserWalletPicker(address: Address) {
+  const pending = pendingBrowserWalletSelection;
+  pendingBrowserWalletSelection = null;
+  pending?.resolve(address);
+}
+
+export function rejectBrowserWalletPicker(error: unknown) {
+  const pending = pendingBrowserWalletSelection;
+  pendingBrowserWalletSelection = null;
+  pending?.reject(normalizeWalletError(error, 'Wallet connection could not be completed.'));
+}
+
 export async function connectDetectedBrowserWallet(uuid: string): Promise<Address> {
   const provider = await getDetectedWalletProvider(uuid);
   if (!provider) throw new Error('That browser wallet is no longer available. Refresh the page and try again.');
