@@ -20,7 +20,7 @@ export const wagmiAdapter =
     ? new WagmiAdapter({
         projectId,
         networks: appKitNetworks,
-        ssr: true,
+        ssr: false,
         storage: createStorage({ storage: window.localStorage }),
         transports: {
           [polygon.id]: http(defaultRpcUrl),
