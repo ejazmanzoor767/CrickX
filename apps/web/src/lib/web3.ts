@@ -591,41 +591,28 @@ export async function getCurrentWallet() {
   if (restored) return restored;
 
   const config = getWagmiConfig();
-  if (config) {
-    try {
-      const account = getAccount(config);
-      return account.isConnected && account.address && isAddress(account.address)
-        ? account.address as Address
-        : null;
-    } catch {
-      return null;
-    }
-  }
+  if (!config) return null;
 
   try {
-    const provider = getBrowserEthereumProvider();
-    const accounts = await provider.request({ method: 'eth_accounts' }) as unknown;
-    const address = Array.isArray(accounts) ? accounts[0] : undefined;
-    return typeof address === 'string' && isAddress(address) ? address as Address : null;
+    const account = getAccount(config);
+    return account.isConnected && account.address && isAddress(account.address)
+      ? account.address as Address
+      : null;
   } catch {
     return null;
   }
 }
 
 export async function getConnectedWalletName() {
-  if (activeInjectedWallet) return activeInjectedWallet.name || 'Browser Wallet';
-
   const config = getWagmiConfig();
-  if (config) {
-    try {
-      const account = getAccount(config);
-      return account.connector?.name || 'Wallet';
-    } catch {
-      return 'Wallet';
-    }
-  }
+  if (!config) return 'Wallet';
 
-  return 'Browser wallet';
+  try {
+    const account = getAccount(config);
+    return account.connector?.name || 'Wallet';
+  } catch {
+    return 'Wallet';
+  }
 }
 
 export async function readCrxWallet(address: Address) {
