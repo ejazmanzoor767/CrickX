@@ -35,7 +35,6 @@ export default function WalletPage() {
 
   useEffect(() => {
     let active = true;
-
     const initial = async () => {
       try {
         const current = await getCurrentWallet();
@@ -220,50 +219,37 @@ export default function WalletPage() {
     {!address ? (
       <div className="card" style={{ padding: 28 }}>
         <h2>Connect your wallet</h2>
-        <p className="section-subtitle">
-          Connect through Reown AppKit to access supported browser extensions, WalletConnect/mobile wallets, and the full wallet directory in one secure flow.
-        </p>
+        <p className="section-subtitle">Connect through Reown AppKit. Reown handles supported browser extensions, WalletConnect/mobile wallets, and its full wallet directory from one connection flow.</p>
 
         <button className="primary-button" onClick={connect} disabled={busy}>
           {busy ? 'Connecting…' : 'Connect wallet'}
         </button>
         <p className="section-subtitle" style={{ marginTop: 10, marginBottom: 0, fontSize: 12 }}>
-          Reown AppKit provides the wallet list and connection flow. Your selected wallet connection is restored automatically on refresh when the wallet remains available.
+          The Reown wallet selector is the single wallet connection UI, and the selected session is restored after refresh when the wallet remains available.
         </p>
       </div>
-    ) : (
-      <>
-        <div className="panel-grid" style={{ marginBottom: 14 }}>
-          <div
-            className="card"
-            style={{
-              padding: 28,
-              background: 'linear-gradient(135deg,rgba(155,255,71,.10),rgba(18,23,34,.96))',
-            }}
-          >
-            <p className="eyebrow">AVAILABLE CRX</p>
-            <div style={{ fontFamily: 'Barlow Condensed', fontSize: 58, fontWeight: 900 }}>
-              {wallet ? wallet.balance.toLocaleString(undefined, { maximumFractionDigits: 6 }) : '—'}{' '}
-              <span style={{ fontSize: 24 }}>CRX</span>
-            </div>
-            <div className="section-subtitle">{walletName} · {shortAddress(address)}</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
-              <button className="secondary-button" onClick={() => refresh()} disabled={busy}>
-                Refresh balance
-              </button>
-              <button className="secondary-button" onClick={chooseAnotherWallet} disabled={busy}>
-                {busy ? 'Choose wallet…' : 'Change wallet'}
-              </button>
-            </div>
+    ) : <>
+      <div className="panel-grid" style={{ marginBottom: 14 }}>
+        <div className="card" style={{ padding: 28, background: 'linear-gradient(135deg,rgba(155,255,71,.10),rgba(18,23,34,.96))' }}>
+          <p className="eyebrow">AVAILABLE CRX</p>
+          <div style={{ fontFamily: 'Barlow Condensed', fontSize: 58, fontWeight: 900 }}>
+            {wallet ? wallet.balance.toLocaleString(undefined, { maximumFractionDigits: 6 }) : '—'} <span style={{ fontSize: 24 }}>CRX</span>
+          </div>
+          <div className="section-subtitle">{walletName} · {shortAddress(address)}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
+            <button className="secondary-button" onClick={() => refresh()} disabled={busy}>Refresh balance</button>
+                  <button className="secondary-button" onClick={chooseAnotherWallet} disabled={busy}>{busy ? 'Choose wallet…' : 'Change wallet'}</button>
           </div>
 
-          <div className="card" style={{ padding: 28 }}>
-            <p className="eyebrow">CONNECTED WALLET</p>
-            <h2>{walletName}</h2>
-            <p className="section-subtitle" style={{ wordBreak: 'break-all' }}>{address}</p>
-            <p className="section-subtitle">Network: Polygon Mainnet</p>
-          </div>
         </div>
+        <div className="card" style={{ padding: 28 }}>
+          <p className="eyebrow">CONNECTED WALLET</p>
+          <h2>{walletName}</h2>
+          <p className="section-subtitle" style={{ wordBreak: 'break-all' }}>{address}</p>
+          <p className="section-subtitle">Network: Polygon Mainnet</p>
+        </div>
+      </div>
+
       <div className="card" style={{ padding: 24, marginBottom: 14, background: 'linear-gradient(145deg,rgba(155,255,71,.09),rgba(18,23,34,.98) 52%,rgba(10,13,19,.98))', border: '1px solid rgba(155,255,71,.15)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div>
