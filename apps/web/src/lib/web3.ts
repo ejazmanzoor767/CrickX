@@ -455,12 +455,17 @@ export async function restorePersistedWalletConnection(): Promise<Address | null
 
   restoreConnectionPromise = (async () => {
     const config = getWagmiConfig();
-    if (!config) return null;
+    if (!config || !wagmiAdapter) return null;
 
     try {
-      await reconnect(config);
+      const adapter = wagmiAdapter as unknown as { syncConnections?: () => Promise<void> };
+      await adapter.syncConnections?.();
     } catch {
-      // A missing/unavailable wallet should not prevent the app from loading.
+      try {
+        await reconnect(config);
+      } catch {
+        // A missing/unavailable wallet should not prevent the app from loading.
+      }
     }
 
     const deadline = Date.now() + 4000;
@@ -528,12 +533,21 @@ export async function openWalletDirectory() {
 
 async function openWalletPicker() {
   const config = getWagmiConfig();
-  if (!config || !appKit) {
+  if (!config || !appKit || !wagmiAdapter) {
     throw new Error('Reown AppKit is not configured. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX web build environment.');
   }
 
   try {
-    await appKit.open({ view: 'AllWallets' });
+    const adapter = wagmiAdapter as unknown as { syncConnectors?: () => Promise<void> };
+    await adapter.syncConnectors?.();
+  } catch {
+    // Reown will continue with the connectors already available.
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 150));
+
+  try {
+    await appKit.open({ view: 'Connect' });
   } catch (error) {
     throw normalizeWalletError(error, 'Unable to open the Reown wallet picker.');
   }
