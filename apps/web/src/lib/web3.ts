@@ -260,9 +260,14 @@ async function restoreDirectInjectedWallet(): Promise<Address | null> {
   if (!storedRdns) return null;
 
   try {
-    window.dispatchEvent(new Event('eip6963:requestProvider'));
-    await new Promise(resolve => setTimeout(resolve, 150));
-    const restored = [...announcedWallets.values()].find(wallet => wallet.rdns === storedRdns);
+    const deadline = Date.now() + 1500;
+    let restored: Eip6963Wallet | undefined;
+    while (Date.now() < deadline) {
+      window.dispatchEvent(new Event('eip6963:requestProvider'));
+      restored = [...announcedWallets.values()].find(wallet => wallet.rdns === storedRdns);
+      if (restored) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
     if (!restored) return null;
 
     const accounts = await restored.provider.request({ method: 'eth_accounts' });
