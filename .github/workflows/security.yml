@@ -30,10 +30,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --include=dev --no-audit --no-fund
-      - name: Audit API production dependencies
-        run: npm audit --workspace @fantasy-cricket/api --omit=dev --audit-level=moderate
-      - name: Audit web production dependencies
-        run: npm audit --workspace @fantasy-cricket/web --omit=dev --audit-level=moderate
+      - name: Audit API and web production dependency closures
+        run: node scripts/production-audit.mjs apps/api apps/web
       - name: Report mobile dependency advisories
         shell: bash
         run: |
