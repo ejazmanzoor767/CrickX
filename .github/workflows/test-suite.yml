@@ -66,10 +66,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --include=dev --no-audit --no-fund
-      - name: Audit API production dependencies
-        run: npm audit --workspace @fantasy-cricket/api --omit=dev --audit-level=moderate
-      - name: Audit web production dependencies
-        run: npm audit --workspace @fantasy-cricket/web --omit=dev --audit-level=moderate
+      - name: Audit API and web production dependency closures
+        run: node scripts/production-audit.mjs apps/api apps/web
 
   api-build:
     name: API production build
