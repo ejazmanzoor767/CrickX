@@ -77,6 +77,32 @@ type TokenPocketWindow = Window & {
   };
 };
 
+function isProviderLike(value: unknown): value is EthereumProvider {
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    typeof (value as { request?: unknown }).request === 'function',
+  );
+}
+
+function walletNameFromKey(key: string) {
+  const cleaned = key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim();
+  if (!cleaned) return 'Browser Wallet';
+  return cleaned
+    .split(/\s+/)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function addUnknownInjectedProvider(provider: EthereumProvider, source: string, index: number) {
+  const existing = [...announcedWallets.values()].find(item => item.provider === provider);
+  if (existing) return;
+
+  const name = walletNameFromKey(source);
+  const rdns = `legacy.injected.${source.toLowerCase().replace(/[^a-z0-9]+/g, '.')}`;
+  addNamedInjectedProvider(provider, name, `${rdns}.${index}`);
+}
+
 function addNamedInjectedProvider(provider: EthereumProvider, name: string, rdns: string, icon = '') {
   const existing = [...announcedWallets.values()].find(item => item.provider === provider);
   if (existing) return existing.uuid;
@@ -130,6 +156,46 @@ function refreshLegacyInjectedProviders() {
   const tokenPocketProvider = (window as TokenPocketWindow).tokenpocket?.ethereum;
   if (tokenPocketProvider) {
     addNamedInjectedProvider(tokenPocketProvider, 'TokenPocket', 'io.tokenpocket', '');
+  }
+
+  // Some wallets still expose an EIP-1193 provider on a wallet-specific
+  // window property even when their EIP-6963 announcement is unavailable.
+  // Discover those providers generically so the app does not depend on a
+  // hard-coded wallet allowlist.
+  const windowObject = window as Window & Record<string, unknown>;
+  const candidateKeys = Object.getOwnPropertyNames(windowObject);
+
+  for (const key of candidateKeys) {
+    if (!/(wallet|ethereum|provider|metamask|coinbase|rabby|trust|phantom|okx|bitget|bitkeep|imtoken|onekey|zerion|brave|exodus|backpack|frame|taho|tokenpocket)/i.test(key)) {
+      continue;
+    }
+
+    let value: unknown;
+    try {
+      value = windowObject[key];
+    } catch {
+      continue;
+    }
+
+    if (isProviderLike(value)) {
+      addUnknownInjectedProvider(value, key, 0);
+      continue;
+    }
+
+    if (!value || typeof value !== 'object') continue;
+
+    const nested = value as Record<string, unknown>;
+    for (const nestedKey of ['ethereum', 'provider', 'wallet']) {
+      let nestedValue: unknown;
+      try {
+        nestedValue = nested[nestedKey];
+      } catch {
+        continue;
+      }
+      if (isProviderLike(nestedValue)) {
+        addUnknownInjectedProvider(nestedValue, key + '.' + nestedKey, 0);
+      }
+    }
   }
 }
 
