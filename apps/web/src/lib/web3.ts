@@ -63,6 +63,14 @@ const announcedWallets = new Map<string, Eip6963Wallet>();
 let legacyDiscoveryStarted = false;
 let activeInjectedWallet: Eip6963Wallet | null = null;
 
+const BROWSER_WALLET_PICKER_EVENT = 'crickx:open-browser-wallet-picker';
+let pendingBrowserWalletSelection:
+  | {
+      resolve: (address: Address) => void;
+      reject: (error: Error) => void;
+    }
+  | null = null;
+
 type TokenPocketWindow = Window & {
   tokenpocket?: {
     ethereum?: EthereumProvider;
@@ -212,6 +220,47 @@ async function switchProviderToPolygon(provider: EthereumProvider) {
       }],
     });
   }
+}
+
+export function browserWalletPickerEventName() {
+  return BROWSER_WALLET_PICKER_EVENT;
+}
+
+export function requestBrowserWalletSelection(wallets: DetectedBrowserWallet[]): Promise<Address> {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('Wallet connection is only available in the browser.'));
+  }
+
+  if (pendingBrowserWalletSelection) {
+    pendingBrowserWalletSelection.reject(new Error('Previous wallet selection was replaced.'));
+  }
+
+  return new Promise<Address>((resolve, reject) => {
+    pendingBrowserWalletSelection = { resolve, reject };
+    window.dispatchEvent(new CustomEvent(BROWSER_WALLET_PICKER_EVENT, {
+      detail: { wallets },
+    }));
+  });
+}
+
+export async function selectBrowserWalletFromPicker(uuid: string) {
+  const pending = pendingBrowserWalletSelection;
+  if (!pending) return;
+
+  try {
+    const address = await connectDetectedBrowserWallet(uuid);
+    pendingBrowserWalletSelection = null;
+    pending.resolve(address);
+  } catch (error) {
+    pendingBrowserWalletSelection = null;
+    pending.reject(normalizeWalletError(error, 'Unable to connect the selected browser wallet.'));
+  }
+}
+
+export function cancelBrowserWalletPicker() {
+  const pending = pendingBrowserWalletSelection;
+  pendingBrowserWalletSelection = null;
+  pending?.reject(new Error('Wallet selection cancelled.'));
 }
 
 export async function connectDetectedBrowserWallet(uuid: string): Promise<Address> {
@@ -450,6 +499,10 @@ export async function switchToPolygon() {
   }
 }
 
+export async function openWalletDirectory() {
+  return openWalletPicker();
+}
+
 async function openWalletPicker() {
   // Trigger EIP-6963 announcements before AppKit builds its connector list.
   // This closes the race where an extension announces after the modal opens.
@@ -483,34 +536,37 @@ async function openWalletPicker() {
 export async function changeWallet(_currentAddress?: Address) {
   activeInjectedWallet = null;
   try { window.localStorage.removeItem('crickx.wallet.rdns'); } catch { /* storage may be unavailable */ }
-  const config = getWagmiConfig();
 
+  const config = getWagmiConfig();
   if (config && appKit) {
     try {
       await appKit.disconnect();
     } catch (error) {
       throw normalizeWalletError(error, 'Unable to disconnect the current wallet.');
     }
-
     await new Promise(resolve => setTimeout(resolve, 200));
-    return openWalletPicker();
   }
 
-  throw new Error('The multi-wallet picker is not configured yet. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX build environment to enable wallet icons and wallet selection.');
+  return connectWallet();
 }
 
 export async function connectWallet() {
   activeInjectedWallet = null;
   try { window.localStorage.removeItem('crickx.wallet.rdns'); } catch { /* storage may be unavailable */ }
   startBrowserWalletDiscovery();
-  const config = getWagmiConfig();
 
+  const detected = await getDetectedBrowserWallets();
+  if (detected.length > 0) {
+    return requestBrowserWalletSelection(detected);
+  }
+
+  const config = getWagmiConfig();
   if (config && appKit) {
     return openWalletPicker();
   }
 
   const provider = await getEthereumProvider(true);
-  if ((await provider.request({ method: 'eth_chainId' })) !== '0x89') await switchToPolygon();
+  await switchProviderToPolygon(provider);
   const accounts = await provider.request({ method: 'eth_accounts' }) as unknown;
   const address = Array.isArray(accounts) ? accounts[0] : undefined;
   if (typeof address !== 'string' || !isAddress(address)) throw new Error('No wallet account was selected.');
