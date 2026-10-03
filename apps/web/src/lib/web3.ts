@@ -162,11 +162,11 @@ function refreshLegacyInjectedProviders() {
   // window property even when their EIP-6963 announcement is unavailable.
   // Discover those providers generically so the app does not depend on a
   // hard-coded wallet allowlist.
-  const windowObject = window as Window & Record<string, unknown>;
+  const windowObject = window as unknown as Record<string, unknown>;
   const candidateKeys = Object.getOwnPropertyNames(windowObject);
 
   for (const key of candidateKeys) {
-    if (!/(wallet|ethereum|provider|metamask|coinbase|rabby|trust|phantom|okx|bitget|bitkeep|imtoken|onekey|zerion|brave|exodus|backpack|frame|taho|tokenpocket)/i.test(key)) {
+    if (key === 'window' || key === 'self' || key === 'globalThis' || key === 'frames' || key === 'parent' || key === 'top') {
       continue;
     }
 
@@ -182,10 +182,10 @@ function refreshLegacyInjectedProviders() {
       continue;
     }
 
-    if (!value || typeof value !== 'object') continue;
+    if (!value || (typeof value !== 'object' && typeof value !== 'function')) continue;
 
     const nested = value as Record<string, unknown>;
-    for (const nestedKey of ['ethereum', 'provider', 'wallet']) {
+    for (const nestedKey of ['ethereum', 'provider', 'evm', 'eth', 'wallet']) {
       let nestedValue: unknown;
       try {
         nestedValue = nested[nestedKey];
@@ -430,6 +430,7 @@ async function restoreDirectInjectedWallet(): Promise<Address | null> {
     const deadline = Date.now() + 1500;
     let restored: Eip6963Wallet | undefined;
     while (Date.now() < deadline) {
+      refreshLegacyInjectedProviders();
       window.dispatchEvent(new Event('eip6963:requestProvider'));
       restored = [...announcedWallets.values()].find(wallet => wallet.rdns === storedRdns);
       if (restored) break;
