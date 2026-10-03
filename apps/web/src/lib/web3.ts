@@ -41,11 +41,19 @@ type EthereumProvider = {
   isPhantom?: boolean;
 };
 
-type Eip6963Wallet = {
+type Eip6963ProviderInfo = {
   uuid: string;
   name: string;
   icon: string;
   rdns: string;
+};
+
+type Eip6963ProviderDetail = {
+  info: Eip6963ProviderInfo;
+  provider: EthereumProvider;
+};
+
+type Eip6963Wallet = Eip6963ProviderInfo & {
   provider: EthereumProvider;
 };
 
@@ -84,7 +92,7 @@ function startBrowserWalletDiscovery() {
   legacyDiscoveryStarted = true;
 
   const handleAnnouncement = (event: Event) => {
-    const detail = (event as CustomEvent<Eip6963Wallet>).detail;
+    const detail = (event as CustomEvent<Eip6963ProviderDetail>).detail;
     if (!detail?.info?.uuid || !detail?.provider) return;
     const info = detail.info;
     announcedWallets.set(info.uuid, {
