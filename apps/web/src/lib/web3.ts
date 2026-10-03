@@ -136,7 +136,10 @@ async function getDetectedWalletProvider(uuid: string) {
 
 async function switchProviderToPolygon(provider: EthereumProvider) {
   const chainId = await provider.request({ method: 'eth_chainId' });
-  if (chainId === '0x89' || Number.parseInt(String(chainId), 16) === POLYGON_CHAIN_ID) return;
+  const numericChainId = typeof chainId === 'number'
+    ? chainId
+    : Number.parseInt(String(chainId), 16);
+  if (numericChainId === POLYGON_CHAIN_ID) return;
 
   try {
     await provider.request({
@@ -180,6 +183,7 @@ export async function connectDetectedBrowserWallet(uuid: string): Promise<Addres
     if (!wallet) throw new Error('The selected wallet could not be identified.');
 
     activeInjectedWallet = wallet;
+    try { window.sessionStorage.setItem('crickx.wallet.rdns', wallet.rdns); } catch { /* storage may be unavailable */ }
 
     if (appKit) {
       try { await appKit.disconnect(); } catch { /* keep direct wallet connection */ }
@@ -356,6 +360,7 @@ async function openWalletPicker() {
 
 export async function changeWallet(_currentAddress?: Address) {
   activeInjectedWallet = null;
+  try { window.sessionStorage.removeItem('crickx.wallet.rdns'); } catch { /* storage may be unavailable */ }
   const config = getWagmiConfig();
 
   if (config && appKit) {
@@ -374,6 +379,7 @@ export async function changeWallet(_currentAddress?: Address) {
 
 export async function connectWallet() {
   activeInjectedWallet = null;
+  try { window.sessionStorage.removeItem('crickx.wallet.rdns'); } catch { /* storage may be unavailable */ }
   startBrowserWalletDiscovery();
   const config = getWagmiConfig();
 
@@ -411,6 +417,24 @@ export async function getCurrentWallet() {
     } catch {
       return null;
     }
+  }
+
+  try {
+    const storedRdns = window.sessionStorage.getItem('crickx.wallet.rdns');
+    if (storedRdns) {
+      const wallets = [...announcedWallets.values()];
+      const restored = wallets.find(wallet => wallet.rdns === storedRdns);
+      if (restored) {
+        const accounts = await restored.provider.request({ method: 'eth_accounts' });
+        const address = Array.isArray(accounts) ? accounts[0] : undefined;
+        if (typeof address === 'string' && isAddress(address)) {
+          activeInjectedWallet = restored;
+          return address as Address;
+        }
+      }
+    }
+  } catch {
+    // Wallet storage or account access may be unavailable.
   }
 
   const config = getWagmiConfig();
