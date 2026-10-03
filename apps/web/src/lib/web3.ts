@@ -454,9 +454,6 @@ export async function restorePersistedWalletConnection(): Promise<Address | null
   if (restoreConnectionPromise) return restoreConnectionPromise;
 
   restoreConnectionPromise = (async () => {
-    const directAddress = await restoreDirectInjectedWallet();
-    if (directAddress) return directAddress;
-
     const config = getWagmiConfig();
     if (!config) return null;
 
@@ -500,53 +497,22 @@ async function waitForWalletConnection() {
 }
 
 async function getConnectedWalletClient() {
-  if (activeInjectedWallet) {
-    const provider = activeInjectedWallet.provider;
-    const accounts = await provider.request({ method: 'eth_accounts' });
-    const address = Array.isArray(accounts) ? accounts[0] : undefined;
-    if (typeof address !== 'string' || !isAddress(address)) {
-      throw new Error('The connected browser wallet is unavailable. Please reconnect it.');
-    }
-    await switchProviderToPolygon(provider);
-    return createWalletClient({
-      account: address as Address,
-      chain: polygon,
-      transport: custom(provider as any),
-    });
-  }
-
   const config = getWagmiConfig();
+  if (!config) throw new Error('Reown AppKit is not configured. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX web build environment.');
 
-  if (config) {
-    const account = getAccount(config);
-    if (!account.isConnected || !account.address) throw new Error('Connect a wallet first.');
+  const account = getAccount(config);
+  if (!account.isConnected || !account.address) throw new Error('Connect a wallet first.');
 
-    if (account.chainId !== POLYGON_CHAIN_ID) await switchToPolygon();
+  if (account.chainId !== POLYGON_CHAIN_ID) await switchToPolygon();
 
-    const walletClient = await getWalletClient(config);
-    if (!walletClient?.account) throw new Error('The connected wallet is unavailable. Please reconnect your wallet.');
-    return walletClient;
-  }
-
-  const ethereum = await getEthereumProvider(true);
-  const baseWalletClient = createWalletClient({ chain: polygon, transport: custom(ethereum as any) });
-  const [account] = await baseWalletClient.requestAddresses();
-  if (!account) throw new Error('No wallet account was selected.');
-  return createWalletClient({
-    account,
-    chain: polygon,
-    transport: custom(ethereum as any),
-  });
+  const walletClient = await getWalletClient(config);
+  if (!walletClient?.account) throw new Error('The connected wallet is unavailable. Please reconnect your wallet.');
+  return walletClient;
 }
 
 export function shortAddress(address?: string | null) { return address ? `${address.slice(0, 6)}…${address.slice(-4)}` : ''; }
 
 export async function switchToPolygon() {
-  if (activeInjectedWallet) {
-    await switchProviderToPolygon(activeInjectedWallet.provider);
-    return;
-  }
-
   const config = getWagmiConfig();
 
   if (config) {
@@ -583,21 +549,18 @@ export async function openWalletDirectory() {
 }
 
 async function openWalletPicker() {
-  // Trigger EIP-6963 announcements before AppKit builds its connector list.
-  // This closes the race where an extension announces after the modal opens.
-  await getDetectedBrowserWallets();
   const config = getWagmiConfig();
   if (!config || !appKit) {
-    throw new Error('The multi-wallet picker is not configured yet. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX build environment to enable wallet icons and wallet selection.');
+    throw new Error('Reown AppKit is not configured. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX web build environment.');
   }
 
   try {
     await appKit.open({ view: 'AllWallets' });
   } catch (error) {
-    throw normalizeWalletError(error, 'Unable to open the wallet picker.');
+    throw normalizeWalletError(error, 'Unable to open the Reown wallet picker.');
   }
 
-  const deadline = Date.now() + 60_000;
+  const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     const account = getAccount(config);
     if (account.isConnected && account.address) {
@@ -609,7 +572,7 @@ async function openWalletPicker() {
     await new Promise(resolve => setTimeout(resolve, 250));
   }
 
-  throw new Error('No wallet was selected. Please choose a wallet from the list.');
+  throw new Error('Wallet connection was not completed. Please choose a wallet from the Reown wallet window.');
 }
 
 export async function changeWallet(_currentAddress?: Address) {
@@ -631,25 +594,7 @@ export async function changeWallet(_currentAddress?: Address) {
 
 export async function connectWallet() {
   activeInjectedWallet = null;
-  try { window.localStorage.removeItem('crickx.wallet.rdns'); } catch { /* storage may be unavailable */ }
-  startBrowserWalletDiscovery();
-
-  const detected = await getDetectedBrowserWallets();
-  if (detected.length > 0) {
-    return requestBrowserWalletSelection(detected);
-  }
-
-  const config = getWagmiConfig();
-  if (config && appKit) {
-    return openWalletPicker();
-  }
-
-  const provider = await getEthereumProvider(true);
-  await switchProviderToPolygon(provider);
-  const accounts = await provider.request({ method: 'eth_accounts' }) as unknown;
-  const address = Array.isArray(accounts) ? accounts[0] : undefined;
-  if (typeof address !== 'string' || !isAddress(address)) throw new Error('No wallet account was selected.');
-  return address as Address;
+  return openWalletPicker();
 }
 
 export async function signContestJoinMessage(message: string) {
@@ -663,17 +608,6 @@ export async function signContestJoinMessage(message: string) {
 
 export async function getCurrentWallet() {
   if (typeof window === 'undefined') return null;
-
-  if (activeInjectedWallet) {
-    try {
-      const accounts = await activeInjectedWallet.provider.request({ method: 'eth_accounts' });
-      const address = Array.isArray(accounts) ? accounts[0] : undefined;
-      if (typeof address === 'string' && isAddress(address)) return address as Address;
-      activeInjectedWallet = null;
-    } catch {
-      activeInjectedWallet = null;
-    }
-  }
 
   const restored = await restorePersistedWalletConnection();
   if (restored) return restored;
