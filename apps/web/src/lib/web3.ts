@@ -108,8 +108,28 @@ function addLegacyProvider(provider: EthereumProvider, index = 0) {
   });
 }
 
+function refreshLegacyInjectedProviders() {
+  if (typeof window === 'undefined') return;
+
+  const ethereum = (window as typeof window & { ethereum?: EthereumProvider }).ethereum;
+  if (ethereum?.providers?.length) {
+    ethereum.providers.forEach((provider, index) => addLegacyProvider(provider, index));
+  } else if (ethereum) {
+    addLegacyProvider(ethereum);
+  }
+
+  // TokenPocket explicitly exposes its EVM provider as window.tokenpocket.ethereum.
+  const tokenPocketProvider = (window as TokenPocketWindow).tokenpocket?.ethereum;
+  if (tokenPocketProvider) {
+    addNamedInjectedProvider(tokenPocketProvider, 'TokenPocket', 'io.tokenpocket', '');
+  }
+}
+
 function startBrowserWalletDiscovery() {
-  if (typeof window === 'undefined' || legacyDiscoveryStarted) return;
+  if (typeof window === 'undefined' || legacyDiscoveryStarted) {
+    refreshLegacyInjectedProviders();
+    return;
+  }
   legacyDiscoveryStarted = true;
 
   const handleAnnouncement = (event: Event) => {
@@ -126,27 +146,14 @@ function startBrowserWalletDiscovery() {
   };
 
   window.addEventListener('eip6963:announceProvider', handleAnnouncement);
+  refreshLegacyInjectedProviders();
   window.dispatchEvent(new Event('eip6963:requestProvider'));
-
-  const ethereum = (window as typeof window & { ethereum?: EthereumProvider }).ethereum;
-  if (ethereum?.providers?.length) {
-    ethereum.providers.forEach((provider, index) => addLegacyProvider(provider, index));
-  } else if (ethereum) {
-    addLegacyProvider(ethereum);
-  }
-
-  // TokenPocket explicitly exposes its EVM provider as window.tokenpocket.ethereum.
-  // Keep this as a standards-compatible legacy fallback for extension versions
-  // that inject the namespace even when their EIP-6963 announcement is delayed.
-  const tokenPocketProvider = (window as TokenPocketWindow).tokenpocket?.ethereum;
-  if (tokenPocketProvider) {
-    addNamedInjectedProvider(tokenPocketProvider, 'TokenPocket', 'io.tokenpocket', '');
-  }
 }
 
 export async function getDetectedBrowserWallets(): Promise<DetectedBrowserWallet[]> {
   if (typeof window === 'undefined') return [];
   startBrowserWalletDiscovery();
+  refreshLegacyInjectedProviders();
 
   window.dispatchEvent(new Event('eip6963:requestProvider'));
 
@@ -169,6 +176,7 @@ export async function getDetectedBrowserWallets(): Promise<DetectedBrowserWallet
 
 async function getDetectedWalletProvider(uuid: string) {
   startBrowserWalletDiscovery();
+  refreshLegacyInjectedProviders();
   window.dispatchEvent(new Event('eip6963:requestProvider'));
   await new Promise(resolve => setTimeout(resolve, 75));
   return announcedWallets.get(uuid)?.provider ?? null;
