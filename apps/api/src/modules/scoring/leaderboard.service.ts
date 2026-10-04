@@ -43,117 +43,127 @@ export class LeaderboardService {
   async recordFixtureScores(scores: MatchScore[]) {
     if (!scores.length) return [];
 
-    const batch = this.firestore.db.batch();
+    // Keep only the latest score for each user/fixture pair in this write.
+    const normalized = [...new Map(
+      scores.map((score) => [
+        this.matchScoreId(String(score.userId), Number(score.fixtureId)),
+        {
+          userId: String(score.userId),
+          fixtureId: Number(score.fixtureId),
+          format: String(score.format ?? ''),
+          points: Number(score.points) || 0,
+        },
+      ]),
+    ).values()];
+
+    const missingProfileIds = new Set<string>();
     const now = new Date();
-    for (const score of scores) {
-      const ref = this.firestore.db.collection(this.matchScores).doc(this.matchScoreId(score.userId, score.fixtureId));
-      batch.set(ref, {
-        userId: score.userId,
-        fixtureId: score.fixtureId,
-        format: score.format,
-        points: Number(score.points) || 0,
-        updatedAt: now,
-      }, { merge: true });
-    }
-    await batch.commit();
-    return this.rebuildGlobal();
-  }
-
-  async rebuildGlobal() {
-    const [matchSnap, previousSnap] = await Promise.all([
-      this.firestore.db.collection(this.matchScores).get(),
-      this.firestore.db.collection(this.users).get(),
-    ]);
-
-    const aggregate = new Map<string, {
-      totalPoints: number;
-      matchesPlayed: number;
-      lastPoints: number;
-      lastFixtureId: number | null;
-      lastFormat: string | null;
-      lastUpdatedAt: number;
-    }>();
-
-    for (const doc of matchSnap.docs) {
-      const row = doc.data() as Record<string, any>;
-      const userId = String(row.userId);
-      const timestamp = row.updatedAt?.toDate?.();
-      const updatedAt = timestamp instanceof Date
-        ? timestamp.getTime()
-        : (new Date(row.updatedAt ?? 0).getTime() || 0);
-      const current = aggregate.get(userId) ?? {
-        totalPoints: 0,
-        matchesPlayed: 0,
-        lastPoints: 0,
-        lastFixtureId: null,
-        lastFormat: null,
-        lastUpdatedAt: 0,
-      };
-
-      current.totalPoints += Number(row.points) || 0;
-      current.matchesPlayed += 1;
-      if (updatedAt >= current.lastUpdatedAt) {
-        current.lastUpdatedAt = updatedAt;
-        current.lastPoints = Number(row.points) || 0;
-        current.lastFixtureId = Number(row.fixtureId) || null;
-        current.lastFormat = row.format ? String(row.format) : null;
-      }
-      aggregate.set(userId, current);
-    }
-
-    const rows = [...aggregate.entries()]
-      .map(([userId, value]) => ({ userId, ...value }))
-      .sort((a, b) => b.totalPoints - a.totalPoints || b.lastPoints - a.lastPoints || a.userId.localeCompare(b.userId));
-
-    const profiles = await this.profilesForUserIds(rows.map((row) => String(row.userId)));
-    const previousRanks = new Map(
-      previousSnap.docs.map((doc) => [doc.id, Number(doc.data().rank) || 0]),
+    const matchRefs = normalized.map((score) =>
+      this.firestore.db.collection(this.matchScores).doc(this.matchScoreId(score.userId, score.fixtureId)),
     );
-    const batch = this.firestore.db.batch();
-    const now = new Date();
+    const userRefs = normalized.map((score) =>
+      this.firestore.db.collection(this.users).doc(score.userId),
+    );
 
-    for (const [index, row] of rows.entries()) {
-      const rank = index + 1;
-      const previousRank = previousRanks.get(row.userId) || null;
-      const profile = profiles.get(row.userId) as Record<string, any> | undefined;
-      const ref = this.firestore.db.collection(this.users).doc(row.userId);
+    await this.firestore.db.runTransaction(async (tx) => {
+      // Read all state first; only then issue transaction writes.
+      const matchSnapshots = await Promise.all(matchRefs.map((ref) => tx.get(ref)));
+      const userSnapshots = await Promise.all(userRefs.map((ref) => tx.get(ref)));
 
-      batch.set(ref, {
-        userId: row.userId,
-        displayName: profile?.displayName ?? 'CrickX Player',
-        avatarUrl: profile?.avatarUrl ?? null,
-        totalPoints: Math.round(row.totalPoints * 10) / 10,
-        matchesPlayed: row.matchesPlayed,
-        lastMatchPoints: Math.round(row.lastPoints * 10) / 10,
-        lastFixtureId: row.lastFixtureId,
-        lastFormat: row.lastFormat,
-        previousRank,
-        rank,
-        rankChange: previousRank ? previousRank - rank : 0,
-        updatedAt: now,
-      }, { merge: true });
+      normalized.forEach((score, index) => {
+        const oldMatch = matchSnapshots[index].exists
+          ? (matchSnapshots[index].data() as Record<string, any>)
+          : null;
+        const oldUser = userSnapshots[index].exists
+          ? (userSnapshots[index].data() as Record<string, any>)
+          : null;
+
+        if (!oldUser) missingProfileIds.add(score.userId);
+
+        const previousPoints = Number(oldMatch?.points) || 0;
+        const previousTotal = Number(oldUser?.totalPoints) || 0;
+        const delta = oldMatch ? score.points - previousPoints : score.points;
+        const totalPoints = Math.round((previousTotal + delta) * 10) / 10;
+        const matchesPlayed = Number(oldUser?.matchesPlayed) || 0;
+        const nextMatchesPlayed = oldMatch ? matchesPlayed : matchesPlayed + 1;
+        const displayName = oldUser?.displayName || 'CrickX Player';
+        const avatarUrl = oldUser?.avatarUrl ?? null;
+
+        tx.set(matchRefs[index], {
+          userId: score.userId,
+          fixtureId: score.fixtureId,
+          format: score.format,
+          points: score.points,
+          displayName,
+          avatarUrl,
+          updatedAt: now,
+        }, { merge: true });
+
+        tx.set(userRefs[index], {
+          userId: score.userId,
+          displayName,
+          avatarUrl,
+          totalPoints,
+          matchesPlayed: nextMatchesPlayed,
+          lastMatchPoints: score.points,
+          lastFixtureId: score.fixtureId,
+          lastFormat: score.format || null,
+          updatedAt: now,
+          // Rank is computed dynamically by global(); it is not rebuilt on every
+          // live scoring tick. Keeping the old value here preserves compatibility
+          // for older records without making it a source of truth.
+          rank: oldUser?.rank ?? null,
+          previousRank: oldUser?.previousRank ?? null,
+          rankChange: 0,
+        }, { merge: true });
+      });
+    });
+
+    // Profile reads happen only for first-time leaderboard users, not on every
+    // 30-second scoring update. Cache the resolved name/avatar in both collections.
+    if (missingProfileIds.size) {
+      const profiles = await this.profilesForUserIds([...missingProfileIds]);
+      if (profiles.size) {
+        const profileBatch = this.firestore.db.batch();
+        for (const userId of missingProfileIds) {
+          const profile = profiles.get(userId);
+          if (!profile) continue;
+          const patch = {
+            displayName: profile.displayName ?? 'CrickX Player',
+            avatarUrl: profile.avatarUrl ?? null,
+          };
+          profileBatch.set(this.firestore.db.collection(this.users).doc(userId), patch, { merge: true });
+          const userScore = normalized.find((score) => score.userId === userId);
+          if (userScore) {
+            profileBatch.set(
+              this.firestore.db.collection(this.matchScores).doc(this.matchScoreId(userId, userScore.fixtureId)),
+              patch,
+              { merge: true },
+            );
+          }
+        }
+        await profileBatch.commit();
+      }
     }
 
-    if (rows.length) await batch.commit();
-    return rows;
+    return normalized;
   }
 
   async global(limit = 100) {
     const safeLimit = this.safeLimit(limit);
     const snap = await this.firestore.db.collection(this.users)
-      .orderBy('rank', 'asc')
+      .orderBy('totalPoints', 'desc')
       .limit(safeLimit)
       .get();
     const rows = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const profiles = await this.profilesForUserIds(rows.map((row: any) => String(row.userId)));
-    return rows.map((row: any) => {
-      const profile = profiles.get(String(row.userId));
-      return {
-        ...row,
-        displayName: profile?.displayName ?? row.displayName ?? 'CrickX Player',
-        avatarUrl: profile?.avatarUrl ?? row.avatarUrl ?? null,
-      };
-    });
+
+    // Rank is derived from the current ordered result. This avoids maintaining
+    // every user's rank on every live score update.
+    return rows.map((row: any, index) => ({
+      ...row,
+      rank: index + 1,
+      rankChange: row.previousRank ? Number(row.previousRank) - (index + 1) : 0,
+    }));
   }
 
   async me(userId: string) {
@@ -163,65 +173,33 @@ export class LeaderboardService {
 
   async fixture(fixtureId: number, limit = 100) {
     const safeLimit = this.safeLimit(limit);
-    // Avoid requiring a Firestore composite index for the public leaderboard.
-    // We filter by fixture first, then rank the bounded result in application code.
-    // This keeps the leaderboard available even when Firebase index deployment lags.
-    const [scoreSnap, teamSnap] = await Promise.all([
-      this.firestore.db.collection(this.matchScores)
-        .where('fixtureId', '==', fixtureId)
-        .get(),
-      this.firestore.db.collection('fantasyTeams')
-        .where('sportmonksFixtureId', '==', fixtureId)
-        .get(),
-    ]);
+    // Scoring writes one match-score document for every saved fantasy team.
+    // Read only those score documents; do not re-scan fantasyTeams or profiles
+    // every time a user opens/refreshes the leaderboard.
+    const snap = await this.firestore.db.collection(this.matchScores)
+      .where('fixtureId', '==', fixtureId)
+      .get();
 
-    const scoresByUser = new Map<string, Record<string, any>>();
-    for (const doc of scoreSnap.docs) {
+    const rows = snap.docs.map((doc) => {
       const row = doc.data() as Record<string, any>;
-      scoresByUser.set(String(row.userId), row);
-    }
-
-    const users = new Map<string, any>();
-    for (const doc of teamSnap.docs) {
-      const team = doc.data() as Record<string, any>;
-      const userId = String(team.userId);
-      const score = scoresByUser.get(userId);
-      users.set(userId, {
-        id: this.matchScoreId(userId, fixtureId),
-        userId,
+      return {
+        id: doc.id,
+        userId: String(row.userId),
         fixtureId,
-        format: score?.format ?? null,
-        points: Number(score?.points) || 0,
-        hasScore: Boolean(score),
-      });
-    }
-
-    for (const [userId, score] of scoresByUser.entries()) {
-      if (users.has(userId)) continue;
-      users.set(userId, {
-        id: this.matchScoreId(userId, fixtureId),
-        userId,
-        fixtureId,
-        format: score.format ?? null,
-        points: Number(score.points) || 0,
+        format: row.format ?? null,
+        points: Number(row.points) || 0,
         hasScore: true,
-      });
-    }
-
-    const rows = [...users.values()]
-      .sort((a, b) => Number(b.points) - Number(a.points) || String(a.userId).localeCompare(String(b.userId)))
+        displayName: row.displayName ?? 'CrickX Player',
+        avatarUrl: row.avatarUrl ?? null,
+      };
+    })
+      .sort((a, b) => Number(b.points) - Number(a.points) || a.userId.localeCompare(b.userId))
       .slice(0, safeLimit);
 
-    const profiles = await this.profilesForUserIds(rows.map((row) => String(row.userId)));
-    return rows.map((row, index) => {
-      const profile = profiles.get(String(row.userId));
-      return {
-        ...row,
-        displayName: profile?.displayName ?? 'CrickX Player',
-        avatarUrl: profile?.avatarUrl ?? null,
-        rank: index + 1,
-      };
-    });
+    return rows.map((row, index) => ({
+      ...row,
+      rank: index + 1,
+    }));
   }
 
   async contest(contestId: string, limit = 100) {
