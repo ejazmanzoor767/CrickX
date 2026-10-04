@@ -16,8 +16,7 @@ Prepared for the CrickX CRX token information update on Polygon.
 - Official project email: contact@crickxfantasy.site
 - Official token page: https://crickxfantasy.site/token
 - Logo: https://crickxfantasy.site/crx.svg
-- Logo format currently used by the site: SVG, 32×32
-- PolygonScan submission logo requirement: **PNG, 256×256** according to the current PolygonScan support guideline. citeturn988852search1
+- Logo format: SVG, 32×32
 - Whitepaper: https://crickxfantasy.site/whitepaper/
 - Founder & project team: https://crickxfantasy.site/founder
 - Founder public developer profile: https://github.com/ejazmanzoor767
@@ -55,10 +54,6 @@ CrickX is a fantasy-cricket platform that provides cricket match data, fantasy t
 PolygonScan's published guidance says token-update submissions should use the official form, the token contract ownership should be verified, and the contract source code should be published/verified. It also requires accessible project links and an official project-domain email. citeturn988852search0turn988852search1
 
 Before submitting, do not send duplicate requests for the same contract.
-
-## Submission caution
-
-The previous submission used the 32×32 SVG logo URL. The resubmission now uses the public 256×256 PNG version at https://crickxfantasy.site/crx-256.png, matching PolygonScan's current logo requirement.
 
 ## Social/profile submission
 
