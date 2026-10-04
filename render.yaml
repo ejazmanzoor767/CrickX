@@ -42,6 +42,8 @@ services:
         sync: false
       - key: CRX_CONTEST_POOL_ADDRESS
         sync: false
+      - key: CRX_PREDICTION_POOL_ADDRESS
+        sync: false
       - key: CRX_CONTEST_OWNER_PRIVATE_KEY
         sync: false
       - key: CRX_PRIZE_DISTRIBUTION_BATCH_SIZE
