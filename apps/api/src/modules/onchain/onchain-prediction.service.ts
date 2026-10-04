@@ -136,6 +136,16 @@ export class OnchainPredictionService {
         throw new BadRequestException('The on-chain prediction is no longer open for funding.');
       }
 
+      if (current.lockAt > Math.floor(Date.now() / 1000)) {
+        return {
+          skipped: true,
+          alreadyFunded: false,
+          fundingTxHash: null,
+          registrationTxHash: null,
+          totalPool: current.totalPool,
+        };
+      }
+
       const per = BigInt(await this.publicClient.readContract({
         address: this.poolAddress!,
         abi: POOL_ABI,
