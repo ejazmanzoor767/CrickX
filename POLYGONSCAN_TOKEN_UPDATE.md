@@ -18,6 +18,8 @@ Prepared for the CrickX CRX token information update on Polygon.
 - Logo: https://crickxfantasy.site/crx.svg
 - Logo format: SVG, 32×32
 - Whitepaper: https://crickxfantasy.site/whitepaper/
+- Founder & project team: https://crickxfantasy.site/founder
+- Founder public developer profile: https://github.com/ejazmanzoor767
 - GitHub: https://github.com/ejazmanzoor767/CrickX
 
 ## Project description
@@ -28,7 +30,9 @@ CrickX is a fantasy-cricket platform that provides cricket match data, fantasy t
 
 - Name: Ejaz Manzoor
 - Role: Founder & Developer, CrickX
-- Public profile: https://github.com/ejazmanzoor767
+- Public developer profile: https://github.com/ejazmanzoor767
+- Official CrickX repository: https://github.com/ejazmanzoor767/CrickX
+- Founder/project identity page: https://crickxfantasy.site/founder
 
 ## Official contact channels
 
@@ -41,6 +45,10 @@ CrickX is a fantasy-cricket platform that provides cricket match data, fantasy t
 PolygonScan's published guidance says token-update submissions should use the official form, the token contract ownership should be verified, the contract source code should be published/verified, public links should work, and the project email should use the project's official domain (or the primary email shown on the official website). The token logo should be supplied as an accessible 32×32 SVG or 64×64 PNG. 
 
 Before submitting, verify the CRX contract ownership from the PolygonScan account that will file the request. Do not submit multiple requests for the same contract.
+
+## Social/profile submission
+
+Use only public channels that are actually controlled by CrickX. Do not invent or substitute unofficial social URLs. The current public project identity includes the founder's GitHub developer profile and the official CrickX repository.
 
 ## Missing information to add only when required by the form
 
