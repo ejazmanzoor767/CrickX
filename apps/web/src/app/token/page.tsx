@@ -74,10 +74,13 @@ export default function TokenPage() {
         <h2>Founder</h2>
         <p><strong>Ejaz Manzoor</strong><br />Founder &amp; Developer, CrickX</p>
         <p className="section-subtitle">
-          GitHub: <a href="https://github.com/ejazmanzoor767" target="_blank" rel="noreferrer">github.com/ejazmanzoor767</a>
+          Public developer profile: <a href="https://github.com/ejazmanzoor767" target="_blank" rel="noreferrer">github.com/ejazmanzoor767</a>
+        </p>
+        <p className="section-subtitle">
+          Official CrickX repository: <a href="https://github.com/ejazmanzoor767/CrickX" target="_blank" rel="noreferrer">github.com/ejazmanzo767/CrickX</a>
         </p>
         <p className="section-subtitle" style={{ marginBottom: 0 }}>
-          A LinkedIn URL is not published here until the founder's verified professional profile URL is confirmed.
+          Full founder and project identity: <Link href="/founder">CrickX Founder &amp; Project Team</Link>
         </p>
       </div>
 
@@ -88,6 +91,7 @@ export default function TokenPage() {
           <a href={`${OFFICIAL_SITE}/whitepaper/`} target="_blank" rel="noreferrer">{OFFICIAL_SITE}/whitepaper/</a>
           <a href={TOKEN_LOGO} target="_blank" rel="noreferrer">{TOKEN_LOGO}</a>
           <a href="https://github.com/ejazmanzoor767/CrickX" target="_blank" rel="noreferrer">https://github.com/ejazmanzoor767/CrickX</a>
+          <Link href="/founder">Founder &amp; Project Team</Link>
           <a href="mailto:contact@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">contact@crickxfantasy.site</a>
           <a href="mailto:info@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">info@crickxfantasy.site</a>
           <a href="mailto:support@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">support@crickxfantasy.site</a>
