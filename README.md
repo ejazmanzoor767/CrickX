@@ -1,6 +1,6 @@
-# Fantasy Cricket
+# CrickX — Fantasy Cricket
 
-Real-money-style fantasy cricket platform. Cricket data (fixtures, teams, players,
+Fantasy-cricket platform with blockchain-based CRX utility features. Cricket data (fixtures, teams, players,
 scores, stats, ball-by-ball) is always live from **Sportmonks Cricket API v2.0** —
 see `apps/api/src/modules/sportmonks`. Application data (users, wallet, fantasy
 teams, contests) lives in Postgres — see `apps/api/prisma/schema.prisma`.
@@ -129,4 +129,11 @@ The production backend can run on Google Cloud Run and use Firestore. See `FIRES
 
 ## Web3 CRX contest
 
-The fantasy contest flow is Web3-based. Fantasy team creation is free; every Sportmonks fixture has exactly one contest with a 4 CRX entry fee and unlimited users. A single deployed `CRXContestPool` contract manages many fixture-specific contests keyed by Sportmonks fixture id. The backend creates the on-chain contest with the match start time as the join deadline, verifies each MetaMask transaction before creating `ContestEntry`, and settles the top 30% after final ranking. See `WEB3_CONTEST_WORKFLOW.md` and `contracts/` for deployment details.
+The fantasy contest flow is Web3-based. Fantasy team creation and contest entry are free to participants; the participant signs a wallet-ownership message and does not transfer CRX to join. CrickX allocates 10 CRX per joined participant to the prize pool and settles the funded pool through the deployed `CRXContestPool` contract. The backend creates or recovers the on-chain contest for the Sportmonks fixture, verifies the wallet signature, records participant accounting, funds the pool from the treasury/funding wallet, and distributes the final ranked pool after scoring. See `WEB3_CONTEST_WORKFLOW.md` and `contracts/` for deployment details.
+
+## Founder & project identity
+
+**Founder:** Ejaz Manzoor — Founder & Developer, CrickX  
+**Public developer profile:** https://github.com/ejazmanzoor767  
+**Founder page:** https://crickxfantasy.site/founder  
+**Official project email:** contact@crickxfantasy.site
