@@ -178,8 +178,18 @@ export default function WhitepaperPage() {
 
         <Section n={14} title="Founder and Project Identity">
           <p><strong>Ejaz Manzoor</strong> is the Founder &amp; Developer of CrickX.</p>
-          <p>GitHub: <a href="https://github.com/ejazmanzoor767" target="_blank" rel="noreferrer">https://github.com/ejazmanzoor767</a></p>
-          <p className="section-subtitle" style={{ marginBottom: 0 }}>A LinkedIn URL is not published in the project documentation until the founder's verified professional profile URL is confirmed.</p>
+          <p>
+            Public developer profile: <a href="https://github.com/ejazmanzoor767" target="_blank" rel="noreferrer">https://github.com/ejazmanzoor767</a>
+          </p>
+          <p>
+            Official CrickX repository: <a href="https://github.com/ejazmanzoor767/CrickX" target="_blank" rel="noreferrer">https://github.com/ejazmanzoor767/CrickX</a>
+          </p>
+          <p>
+            Detailed founder information: <Link href="/founder">CrickX Founder &amp; Project Team</Link>
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            Official project email: <a href="mailto:contact@crickxfantasy.site">contact@crickxfantasy.site</a>
+          </p>
         </Section>
       </article>
     </section>
