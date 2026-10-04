@@ -800,16 +800,14 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     // Do not scan the entire fantasyTeams collection every 30 seconds just to
     // discover fixture IDs; score only contests that are actually UPCOMING/LIVE.
     const now = Date.now();
-    const [liveSnapshot, startedSnapshot] = await Promise.all([
-      this.prisma.db
-        .collection('contests')
-        .where('status', 'in', ['LIVE', 'UPCOMING'])
-        .select('sportmonksFixtureId', 'lineupLockAt')
-        .limit(25)
-        .get(),
-    ]);
+    const contestSnapshot = await this.prisma.db
+      .collection('contests')
+      .where('status', 'in', ['LIVE', 'UPCOMING'])
+      .select('sportmonksFixtureId', 'lineupLockAt')
+      .limit(25)
+      .get();
 
-    const contestDocs = [...liveSnapshot.docs];
+    const contestDocs = [...contestSnapshot.docs];
     const fixtureIds = new Set<number>();
     for (const doc of contestDocs) {
       const data = doc.data() as any;
