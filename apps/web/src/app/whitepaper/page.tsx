@@ -172,6 +172,7 @@ export default function WhitepaperPage() {
             ['Contact', 'contact@crickxfantasy.site'],
             ['Info', 'info@crickxfantasy.site'],
             ['Support', 'support@crickxfantasy.site'],
+            ['X / Twitter', 'https://x.com/crickxowner'],
           ]} />
           <p style={{ marginBottom: 0 }}>The full technical whitepaper is maintained in the project repository as <strong>WHITEPAPER.md</strong> and is publicly readable through the Whitepaper page.</p>
         </Section>
