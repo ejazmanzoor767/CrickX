@@ -21,6 +21,7 @@ Prepared for the CrickX CRX token information update on Polygon.
 - Whitepaper: https://crickxfantasy.site/whitepaper/
 - Founder & project team: https://crickxfantasy.site/founder
 - Founder public developer profile: https://github.com/ejazmanzoor767
+- Founder LinkedIn: https://www.linkedin.com/in/ejaz-manzoor-3a4a0b440/
 - GitHub: https://github.com/ejazmanzoor767/CrickX
 
 ## Project description
@@ -34,6 +35,7 @@ CrickX is a fantasy-cricket platform that provides cricket match data, fantasy t
 - Public developer profile: https://github.com/ejazmanzoor767
 - Official CrickX repository: https://github.com/ejazmanzoor767/CrickX
 - Founder/project identity page: https://crickxfantasy.site/founder
+- LinkedIn: https://www.linkedin.com/in/ejaz-manzoor-3a4a0b440/
 
 ## Official contact channels
 
