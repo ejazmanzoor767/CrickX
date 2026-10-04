@@ -276,12 +276,9 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     // A live fixture must be able to fund its contest even if the cached
     // contest status/counter drifted. Terminal contest states are the only
     // states that must never receive new prize-pool funding.
-    const contests = await this.prisma.contest.findMany({
-      where: {
-        sportmonksFixtureId: fixtureId,
-        status: { notIn: ['COMPLETED', 'CANCELLED'] },
-      },
-    });
+    const contests = (await this.prisma.contest.findMany({
+      where: { sportmonksFixtureId: fixtureId },
+    })).filter((contest: any) => !['COMPLETED', 'CANCELLED'].includes(String(contest.status ?? '')));
 
     for (const contest of contests) {
       let participantCount = Number(contest.filledSpots || 0);
@@ -479,10 +476,10 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       if (scored.total > previous) userFixtureScores.set(team.userId, scored.total);
     }
 
-    const contests = await this.prisma.contest.findMany({
-      where: { sportmonksFixtureId: fixtureId, status: { in: ['UPCOMING', 'LIVE'] } },
+    const contests = (await this.prisma.contest.findMany({
+      where: { sportmonksFixtureId: fixtureId },
       include: { scoringRuleSet: true, entries: { include: { fantasyTeam: { include: { players: true } } } } },
-    });
+    })).filter((contest: any) => ['UPCOMING', 'LIVE'].includes(String(contest.status ?? '')));
 
     for (const contest of contests) {
       const configuredRules = contest.scoringRuleSet?.rules as Partial<ScoringRules> | undefined;
@@ -831,13 +828,10 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     const final = isFinished(fixture.status, fixture.live);
     if (!final) return;
 
-    const contests = await this.prisma.contest.findMany({
-      where: {
-        sportmonksFixtureId: fixtureId,
-        status: { in: ['UPCOMING', 'LIVE'] },
-      },
-      select: { id: true },
-    });
+    const contests = (await this.prisma.contest.findMany({
+      where: { sportmonksFixtureId: fixtureId },
+      select: { id: true, status: true },
+    })).filter((contest: any) => ['UPCOMING', 'LIVE'].includes(String(contest.status ?? '')));
 
     for (const row of contests) {
       try {
@@ -891,8 +885,8 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
           await this.scoreFixture(fixtureId);
         } catch (err) {
           this.logger.error(
-            `Scoring failed for fixture ${fixtureId}`,
-            err instanceof Error ? err.stack : String(err),
+            `Scoring failed for fixture ${fixtureId}: ${err instanceof Error ? err.message : String(err)}`,
+            err instanceof Error ? err.stack : undefined,
           );
         }
       }
