@@ -38,11 +38,21 @@ const TABS = [
 const NATIVE_SHELL_CSS = [
   ".site-header,.mobile-bottom-nav,footer{display:none !important;}",
   "html,body{background:#080b10 !important;margin:0 !important;padding:0 !important;overflow-x:hidden !important;overflow-y:auto !important;height:auto !important;min-height:100% !important;max-width:100% !important;touch-action:pan-y !important;-webkit-overflow-scrolling:touch !important;overscroll-behavior-y:auto !important;}",
-  "html.crickx-native-app .page-shell,html.crickx-native-app .app-page,html.crickx-native-app .profile-page{padding:0 12px 16px !important;min-height:100% !important;max-width:100% !important;box-sizing:border-box !important;}",
+  "html.crickx-native-app .page-shell,html.crickx-native-app .app-page,html.crickx-native-app .profile-page{padding:2px 12px 20px !important;min-height:100% !important;max-width:100% !important;box-sizing:border-box !important;}",
   "html.crickx-native-app button,html.crickx-native-app .primary-button,html.crickx-native-app .secondary-button{min-width:0 !important;max-width:100% !important;box-sizing:border-box !important;touch-action:manipulation !important;}",
   "html.crickx-native-app input,html.crickx-native-app select,html.crickx-native-app textarea{max-width:100% !important;box-sizing:border-box !important;}",
   "html.crickx-native-app a{-webkit-tap-highlight-color:transparent !important;}",
   "html.crickx-native-app .card{box-shadow:none !important;transform:none !important;}",
+  "html.crickx-native-app button,html.crickx-native-app a{-webkit-tap-highlight-color:transparent !important;}",
+  "html.crickx-native-app button{min-height:42px !important;}",
+  "html.crickx-native-app .primary-button,html.crickx-native-app .secondary-button{min-height:42px !important;border-radius:12px !important;}",
+  "html.crickx-native-app .page-intro{margin-bottom:8px !important;}",
+  "html.crickx-native-app .section-title{font-size:clamp(22px,6vw,28px) !important;line-height:1.05 !important;}",
+  "html.crickx-native-app .section-subtitle{font-size:12px !important;line-height:1.5 !important;}",
+  "html.crickx-native-app .empty-state{padding:24px 16px !important;border-radius:18px !important;text-align:center !important;}",
+  "html.crickx-native-app .error-text{font-size:12px !important;line-height:1.5 !important;word-break:break-word !important;}",
+  "html.crickx-native-app .notice{border-radius:14px !important;}",
+  "html.crickx-native-app .card{border-radius:18px !important;}",
   "#crickx-native-profile-resources{margin:16px 0 12px !important;padding:0 !important;overflow:hidden !important;border:1px solid rgba(155,243,74,.14) !important;background:linear-gradient(145deg,rgba(155,243,74,.07),rgba(18,23,34,.98)) !important;border-radius:20px !important;}",
   "#crickx-native-profile-resources .crx-res-head{padding:20px 18px 15px;border-bottom:1px solid rgba(255,255,255,.07);}",
   "#crickx-native-profile-resources .crx-res-eyebrow{margin:0 0 6px;color:#9bf34a;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;}",
@@ -154,12 +164,12 @@ const script = `
               <span class="crx-res-copy"><span class="crx-res-name">Contact</span><span class="crx-res-value">contact@crickxfantasy.site</span></span>
               <span class="crx-res-arrow">›</span>
             </a>
-            <a class="crx-res-row" class="crx-gmail-link crx-res-row" data-email="info@crickxfantasy.site" href="mailto:info@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">
+            <a class="crx-gmail-link crx-res-row" data-email="info@crickxfantasy.site" href="mailto:info@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">
               <span class="crx-res-icon">✉</span>
               <span class="crx-res-copy"><span class="crx-res-name">Info</span><span class="crx-res-value">info@crickxfantasy.site</span></span>
               <span class="crx-res-arrow">›</span>
             </a>
-            <a class="crx-res-row" class="crx-gmail-link crx-res-row" data-email="support@crickxfantasy.site" href="mailto:support@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">
+            <a class="crx-gmail-link crx-res-row" data-email="support@crickxfantasy.site" href="mailto:support@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">
               <span class="crx-res-icon">✉</span>
               <span class="crx-res-copy"><span class="crx-res-name">Support</span><span class="crx-res-value">support@crickxfantasy.site</span></span>
               <span class="crx-res-arrow">›</span>
@@ -267,7 +277,7 @@ function AppContent() {
   }, [canGoBack, exitHintVisible]);
 
   function navigate(path: string) {
-    if (activeTab === path && currentUrl.includes(path)) return;
+    if (tabForUrl(currentUrl) === path) return;
     const target = WEB_URL.replace(/\/$/, '') + path;
     setActiveTab(path);
     setExitHintVisible(false);
@@ -447,7 +457,15 @@ function AppContent() {
               const status = event.nativeEvent.statusCode;
               const url = event.nativeEvent.url || '';
               if (status >= 500 && isAllowedCrickXUrl(url)) {
-                setFailed(`CrickX page returned HTTP ${status}.`);
+                try {
+                  const parsed = new URL(url);
+                  const isApiRequest = parsed.pathname.startsWith('/api/');
+                  if (!isApiRequest && parsed.pathname === new URL(currentUrl).pathname) {
+                    setFailed(`CrickX page returned HTTP ${status}.`);
+                  }
+                } catch {
+                  // Ignore malformed resource URLs.
+                }
               }
             }}
             onContentProcessDidTerminate={() => {
@@ -462,12 +480,17 @@ function AppContent() {
             overScrollMode="never"
           />
 
-          {loading && (
+          {loading && !initialLoadComplete.current && (
             <View style={styles.loading}>
               <Image source={require('./assets/crickx-original-icon.png')} style={styles.loadingLogo} />
               <Text style={styles.loadingBrand}>CRICKX</Text>
               <ActivityIndicator size="small" color="#9bf34a" style={{ marginTop: 14 }} />
               <Text style={styles.loadingText}>Loading {screenTitle}…</Text>
+            </View>
+          )}
+          {loading && initialLoadComplete.current && (
+            <View pointerEvents="none" style={styles.navigationProgress}>
+              <View style={styles.navigationProgressBar} />
             </View>
           )}
         </View>
@@ -479,7 +502,7 @@ function AppContent() {
         )}
 
         {isCrickXPage && (
-          <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+          <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>{/* Safe-area-aware Android navigation bar */}
             {TABS.map((tab) => {
               const active = activeTab === tab.path;
               return (
@@ -566,10 +589,10 @@ const styles = StyleSheet.create({
   webContainer: { flex: 1, backgroundColor: '#080b10' },
   web: { flex: 1, backgroundColor: '#080b10' },
   bottomBar: {
-    minHeight: 70,
-    paddingHorizontal: 5,
-    paddingTop: 5,
-    paddingBottom: 10,
+    minHeight: 76,
+    paddingHorizontal: 6,
+    paddingTop: 6,
+    paddingBottom: 12,
     flexDirection: 'row',
     backgroundColor: '#0a0e15',
     borderTopWidth: 1,
@@ -583,8 +606,8 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     minWidth: 0,
-    minHeight: 58,
-    borderRadius: 13,
+    minHeight: 60,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 2,
@@ -595,7 +618,7 @@ const styles = StyleSheet.create({
   tabIcon: { color: '#7f8999', fontSize: 18, lineHeight: 21, fontWeight: '900', includeFontPadding: false },
   tabIconCompact: { fontSize: 17, lineHeight: 20 },
   tabIconActive: { color: '#9bf34a' },
-  tabLabel: { color: '#7f8999', fontSize: 10, fontWeight: '800', marginTop: 3, letterSpacing: 0.05, includeFontPadding: false },
+  tabLabel: { color: '#7f8999', fontSize: 10.5, fontWeight: '800', marginTop: 4, letterSpacing: 0.05, includeFontPadding: false },
   tabLabelCompact: { fontSize: 9, marginTop: 3 },
   tabLabelActive: { color: '#9bf34a' },
   exitHint: {
@@ -628,9 +651,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 20,
   },
+  navigationProgress: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,.06)',
+    zIndex: 25,
+  },
+  navigationProgressBar: {
+    width: '42%',
+    height: 3,
+    borderRadius: 3,
+    backgroundColor: '#9bf34a',
+  },
   loadingLogo: { width: 78, height: 78, borderRadius: 22 },
   loadingBrand: { color: '#9bf34a', fontWeight: '900', letterSpacing: 4, fontSize: 14, marginTop: 12 },
-  loadingText: { color: '#96a0b3', fontSize: 13, marginTop: 8 },
+  loadingText: { color: '#96a0b3', fontSize: 13, marginTop: 8, fontWeight: '600' },
   errorShell: {
     flex: 1,
     justifyContent: 'center',
