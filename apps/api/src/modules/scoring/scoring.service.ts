@@ -281,9 +281,38 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       const participantCount = Number(contest.filledSpots || 0);
       if (!Number.isInteger(participantCount) || participantCount <= 0) continue;
 
-      const chainContestId = Number((contest as any).chainContestId);
+      let chainContestId = Number((contest as any).chainContestId);
       if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
-        this.logger.warn(`Cannot bulk-fund contest ${contest.id}: missing on-chain contest ID.`);
+        try {
+          // Recovery path for contests that were joined while the normal
+          // pre-match provisioning worker was unavailable. The pool contract
+          // requires a future deadline at creation time, so create a short
+          // accounting-only window and fund it on the next scoring poll after
+          // that deadline. No participant CRX is taken at join time.
+          const recoveryDeadline = Math.floor(Date.now() / 1000) + 15;
+          const created = await this.onchain.createContest(recoveryDeadline);
+          chainContestId = created.chainContestId;
+          await this.prisma.contest.update({
+            where: { id: contest.id },
+            data: {
+              chainContestId,
+              prizePoolFundingStatus: 'PENDING_MATCH_START',
+              prizePoolFundingError: null,
+            },
+          });
+          this.logger.warn(
+            `Recovered missing on-chain contest ID contest=${contest.id} chainContestId=${chainContestId} createTx=${created.createTxHash}; funding will retry after the recovery deadline.`,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Cannot recover on-chain contest ID contest=${contest.id}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          continue;
+        }
+
+        // The newly created recovery contest cannot be funded until its
+        // on-chain join deadline is reached. The next 30-second scoring poll
+        // will perform the single bulk CRX transfer + fundContest accounting.
         continue;
       }
 
