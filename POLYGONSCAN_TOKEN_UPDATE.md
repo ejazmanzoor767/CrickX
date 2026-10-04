@@ -57,7 +57,6 @@ The current public project identity also includes the founder's GitHub developer
 ## Missing information to add only when required by the form
 
 - Official Telegram URL
-- Official Telegram URL
 - Official Discord URL
 - Any official LinkedIn/company URL
 - Any other public social/community URLs used by CrickX
