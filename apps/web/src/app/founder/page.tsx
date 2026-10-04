@@ -69,6 +69,9 @@ export default function FounderPage() {
           <a href="https://x.com/crickxowner" target="_blank" rel="noreferrer">
             Official X/Twitter: https://x.com/crickxowner
           </a>
+          <a href="https://www.linkedin.com/in/ejaz-manzoor-3a4a0b440/" target="_blank" rel="noreferrer">
+            Founder LinkedIn: https://www.linkedin.com/in/ejaz-manzoor-3a4a0b440/
+          </a>
           <a href={'mailto:' + CONTACT_EMAIL}>
             Official project email: {CONTACT_EMAIL}
           </a>
