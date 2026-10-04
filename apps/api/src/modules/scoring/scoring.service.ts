@@ -389,12 +389,11 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       'Fixture ' + fixtureId + ' scoring check: status=' + String(fixture.status ?? '') + ', providerLive=' + fixture.live + ', live=' + actuallyLive + ', final=' + final,
     );
 
-    if (actuallyLive || final) await this.fundStartedContestPrizePools(fixtureId);
-
     const fantasyTeams = await this.prisma.fantasyTeam.findMany({
       where: { sportmonksFixtureId: fixtureId },
       include: { players: true },
     });
+    this.logger.log(`Fixture ${fixtureId} loaded fantasy teams: ${fantasyTeams.length}`);
 
     // Once play starts, lock every saved team so the frontend switches to View Team
     // and the backend cannot accept late edits.
@@ -510,6 +509,18 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
     if (userFixtureScores.size) {
       await this.leaderboard.recordFixtureScores([...userFixtureScores.entries()].map(([userId, points]) => ({ userId, fixtureId, format: fixture.type, points })));
+      this.logger.log(`Fixture ${fixtureId} leaderboard written: users=${userFixtureScores.size}`);
+    } else {
+      this.logger.log(`Fixture ${fixtureId} leaderboard write skipped: no fantasy-team users found`);
+    }
+
+    // Prize-pool funding must never block live scoring/leaderboard updates.
+    if (actuallyLive || final) {
+      void this.fundStartedContestPrizePools(fixtureId).catch((error) => {
+        this.logger.error(
+          `Background contest funding failed for fixture ${fixtureId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
     }
 
     return { scored: true, fixtureId, format: fixture.type, final, users: userFixtureScores.size };
