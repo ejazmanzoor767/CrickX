@@ -14,6 +14,7 @@ const SIGNATURE_WINDOW_SECONDS = 300;
 export class ContestService implements OnModuleInit {
   private readonly logger = new Logger(ContestService.name);
   private chainProvisionQueue: Promise<void> = Promise.resolve();
+  private liveFundingQueue: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly prisma: FirestoreService,
@@ -61,6 +62,50 @@ export class ContestService implements OnModuleInit {
 
     const promise = this.chainProvisionQueue.then(run, run);
     this.chainProvisionQueue = promise.then(() => undefined, () => undefined);
+    return promise;
+  }
+
+  private queueLiveContestFunding(contestId: string, chainContestId: number, participantCount: number) {
+    const run = async () => {
+      if (!Number.isFinite(chainContestId) || chainContestId <= 0 || !Number.isInteger(participantCount) || participantCount <= 0) {
+        return;
+      }
+      try {
+        const current = await this.prisma.contest.findUnique({ where: { id: contestId } });
+        if (!current) return;
+        if (String((current as any).prizePoolFundingStatus) === 'FUNDED' && Number((current as any).prizePoolFundedAmount) >= participantCount * CRX_PRIZE_PER_PARTICIPANT) {
+          return;
+        }
+
+        const funding = await this.onchain.fundContestPrizePool(chainContestId, participantCount);
+        await this.prisma.contest.update({
+          where: { id: contestId },
+          data: {
+            prizePoolFundingStatus: funding.skipped ? 'PENDING_MATCH_START' : 'FUNDED',
+            prizePoolFundedAmount: Number(funding.totalPool || participantCount * CRX_PRIZE_PER_PARTICIPANT),
+            prizePoolFundingTxHash: funding.fundingTxHash ?? (current as any).prizePoolFundingTxHash ?? null,
+            prizePoolFundingAt: funding.skipped ? ((current as any).prizePoolFundingAt ?? null) : new Date(),
+            prizePoolFundingError: null,
+          },
+        });
+        this.logger.log(
+          `Live contest CRX funding complete contest=${contestId} chainContestId=${chainContestId} participants=${participantCount} pool=${funding.totalPool ?? participantCount * CRX_PRIZE_PER_PARTICIPANT} tokenTx=${funding.fundingTxHash ?? 'none'} accountingTx=${funding.registrationTxHash ?? 'none'}`,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await this.prisma.contest.update({
+          where: { id: contestId },
+          data: {
+            prizePoolFundingStatus: 'FAILED',
+            prizePoolFundingError: message.slice(0, 1000),
+          },
+        }).catch(() => undefined);
+        this.logger.error(`Live contest CRX funding failed contest=${contestId}: ${message}`);
+      }
+    };
+
+    const promise = this.liveFundingQueue.then(run, run);
+    this.liveFundingQueue = promise.then(() => undefined, () => undefined);
     return promise;
   }
 
@@ -209,28 +254,35 @@ export class ContestService implements OnModuleInit {
       contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE', entryFee: 0 } });
     }
 
-    // User requests must never be able to trigger owner-wallet blockchain writes.
-    // Chain contests are provisioned by the scheduled backend worker instead.
+    // Backend-owned chain operations remain bounded by the contest state.
+    // Before kickoff, queue normal chain provisioning. At/after kickoff, the
+    // same endpoint can safely trigger recovery funding for this contest so a
+    // scheduler outage cannot strand the accumulated prize pool.
     let chain: any = null;
-    const storedChainContestId = Number((contest as any).chainContestId);
+    let storedChainContestId = Number((contest as any).chainContestId);
     const expectedJoinDeadline = Math.floor(
       new Date(fixtureForClock?.starting_at ?? contest.lineupLockAt).getTime() / 1000,
     );
 
-    if ((!Number.isFinite(storedChainContestId) || storedChainContestId <= 0) &&
+    if ((!Number.isFinite(storedChainContestId) || storedChainContestId <= 0) && !started &&
         Number.isFinite(expectedJoinDeadline) &&
         expectedJoinDeadline > Math.floor(Date.now() / 1000)) {
       void this.queueChainProvisioning(contest.id, expectedJoinDeadline);
+    } else if ((!Number.isFinite(storedChainContestId) || storedChainContestId <= 0) && started && !providerFinished) {
+      // Emergency recovery for contests created in the database while the
+      // previous backend was unable to provision their on-chain contest.
+      // The contract requires a future deadline, so create a short-lived
+      // recovery contest and fund it on the next live poll.
+      const recoveryDeadline = Math.floor(Date.now() / 1000) + 10;
+      void this.queueChainProvisioning(contest.id, recoveryDeadline);
     }
 
     if (Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
       try {
         const candidate = await this.onchain.contestSummaryOrNull(storedChainContestId);
-        if (
-          candidate &&
-          Number.isFinite(expectedJoinDeadline) &&
-          Math.abs(Number(candidate.joinDeadline) - expectedJoinDeadline) <= 60
-        ) {
+        if (candidate && (started ||
+            !Number.isFinite(expectedJoinDeadline) ||
+            Math.abs(Number(candidate.joinDeadline) - expectedJoinDeadline) <= 60)) {
           chain = candidate;
         }
       } catch {
@@ -239,6 +291,10 @@ export class ContestService implements OnModuleInit {
     }
 
     const participantCount = Number(contest.filledSpots || 0);
+
+    if (started && !providerFinished && participantCount > 0 && Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
+      void this.queueLiveContestFunding(contest.id, storedChainContestId, participantCount);
+    }
     const actualPool = Number(contest.prizePoolTotal || 0);
 
     return {
