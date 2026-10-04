@@ -669,6 +669,35 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
+      // Recovery path: if the live-start funding trigger was missed, fund the
+      // complete pool once at settlement time before finalizing the ranking.
+      if (summary.stage === 0 && (!summary.fundingComplete || summary.participantCount === 0 || summary.totalPool <= 0)) {
+        try {
+          const funding = await this.onchain.fundContestPrizePool(chainContestId, rankedEntries.length);
+          summary = await this.onchain.summary(chainContestId);
+          await this.prisma.contest.update({
+            where: { id: contestId },
+            data: {
+              prizePoolFundingStatus: 'FUNDED',
+              prizePoolFundedAmount: summary.totalPool,
+              prizePoolFundingTxHash: funding.fundingTxHash ?? (contest as any).prizePoolFundingTxHash ?? null,
+              prizePoolFundingAt: new Date(),
+              prizePoolFundingError: null,
+            },
+          });
+          this.logger.log(
+            `Contest ${contestId} funding recovery complete: participants=${summary.participantCount} pool=${summary.totalPool} tokenTx=${funding.fundingTxHash ?? 'none'} accountingTx=${funding.registrationTxHash ?? 'none'}`,
+          );
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          await this.prisma.contest.update({
+            where: { id: contestId },
+            data: { prizePoolFundingStatus: 'FAILED', prizePoolFundingError: detail.slice(0, 1000) },
+          }).catch(() => undefined);
+          throw new BadRequestException(`Contest ${contestId} cannot settle because its on-chain prize pool is not funded: ${detail}`);
+        }
+      }
+
       if (summary.stage === 1 && summary.participantCount !== rankedEntries.length) {
         throw new BadRequestException(
           `On-chain participant count (${summary.participantCount}) does not match scored entries (${rankedEntries.length}).`,
@@ -774,19 +803,13 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     const [liveSnapshot, startedSnapshot] = await Promise.all([
       this.prisma.db
         .collection('contests')
-        .where('status', '==', 'LIVE')
+        .where('status', 'in', ['LIVE', 'UPCOMING'])
         .select('sportmonksFixtureId', 'lineupLockAt')
-        .limit(100)
-        .get(),
-      this.prisma.db
-        .collection('contests')
-        .where('status', '==', 'UPCOMING')
-        .select('sportmonksFixtureId', 'lineupLockAt')
-        .limit(100)
+        .limit(25)
         .get(),
     ]);
 
-    const contestDocs = [...liveSnapshot.docs, ...startedSnapshot.docs];
+    const contestDocs = [...liveSnapshot.docs];
     const fixtureIds = new Set<number>();
     for (const doc of contestDocs) {
       const data = doc.data() as any;
