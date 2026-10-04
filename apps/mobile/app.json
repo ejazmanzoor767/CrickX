@@ -12,7 +12,14 @@
     "icon": "./assets/crickx-android-icon.jpg",
     "android": {
       "package": "com.crickx.app",
-      "versionCode": 29
+      "versionCode": 29,
+      "softwareKeyboardLayoutMode": "resize",
+      "predictiveBackGestureEnabled": true
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#080B10",
+      "barStyle": "light-content",
+      "translucent": false
     },
     "splash": {
       "backgroundColor": "#0B0D12",
