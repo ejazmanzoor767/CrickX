@@ -28,7 +28,7 @@ export default function TokenPage() {
 
       <div className="card" style={{ padding: 28, marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <img src="/crx.svg" alt="CRX token logo" width={64} height={64} style={{ width: 64, height: 64, borderRadius: 16 }} />
+          <img src="/crickx-app-logo.svg" alt="CRX token logo" width={64} height={64} style={{ width: 64, height: 64, borderRadius: 16 }} />
           <div>
             <p className="eyebrow">CRX</p>
             <h2 style={{ margin: '4px 0' }}>CrickX</h2>
@@ -53,7 +53,7 @@ export default function TokenPage() {
                 ['Website', OFFICIAL_SITE],
                 ['Contact Email', OFFICIAL_EMAIL],
                 ['Launch Date', CRX_LAUNCH_DATE],
-                ['Logo (32×32 SVG)', TOKEN_LOGO],
+                ['PolygonScan Logo (256×256 PNG)', TOKEN_LOGO],
               ].map(([label, value]) => (
                 <tr key={label}>
                   <th style={{ textAlign: 'left', padding: '11px 12px', borderTop: '1px solid rgba(255,255,255,.06)', width: '30%', color: 'var(--muted)', fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase' }}>{label}</th>
