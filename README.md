@@ -137,4 +137,5 @@ The fantasy contest flow is Web3-based. Fantasy team creation and contest entry 
 **Founder:** Ejaz Manzoor — Founder & Developer, CrickX  
 **Public developer profile:** https://github.com/ejazmanzoor767  
 **Founder page:** https://crickxfantasy.site/founder  
+**Founder LinkedIn:** https://www.linkedin.com/in/ejaz-manzoor-3a4a0b440/  
 **Official project email:** contact@crickxfantasy.site
