@@ -93,6 +93,7 @@ export default function TokenPage() {
           <a href="https://github.com/ejazmanzoor767/CrickX" target="_blank" rel="noreferrer">https://github.com/ejazmanzoor767/CrickX</a>
           <Link href="/founder">Founder &amp; Project Team</Link>
           <a href="https://x.com/crickxowner" target="_blank" rel="noreferrer">X/Twitter: https://x.com/crickxowner</a>
+          <a href="https://www.linkedin.com/in/ejaz-manzoor-3a4a0b440/" target="_blank" rel="noreferrer">Founder LinkedIn: https://www.linkedin.com/in/ejaz-manzoor-3a4a0b440/</a>
           <a href="mailto:contact@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">contact@crickxfantasy.site</a>
           <a href="mailto:info@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">info@crickxfantasy.site</a>
           <a href="mailto:support@crickxfantasy.site?subject=CrickX%20Support&body=Hello%20CrickX%20team%2C%0A%0A">support@crickxfantasy.site</a>
