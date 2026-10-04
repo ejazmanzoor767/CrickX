@@ -30,6 +30,7 @@ export default function Footer() {
             <Link href="/profile/metamask">CRX in MetaMask</Link>
             <Link href="/token">CRX Token</Link>
             <Link href="/business-information">Business Information</Link>
+            <Link href="/founder">Founder &amp; Project Team</Link>
           </div>
 
           <div className="footer-link-group">
