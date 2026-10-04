@@ -109,13 +109,22 @@ export class OnchainContestService {
       functionName: 'nextContestId',
     }));
 
+    const estimatedGas = await this.publicClient.estimateContractGas({
+      account: this.ownerAccount!,
+      address: this.poolAddress!,
+      abi: POOL_ABI,
+      functionName: 'createContest',
+      args: [BigInt(Math.floor(joinDeadlineUnix))],
+    });
+    const gasLimit = estimatedGas + estimatedGas / 5n + 5_000n;
+
     const hash = await this.walletClient!.writeContract({
       account: this.ownerAccount!,
       address: this.poolAddress!,
       abi: POOL_ABI,
       functionName: 'createContest',
       args: [BigInt(Math.floor(joinDeadlineUnix))],
-      gas: 150_000n,
+      gas: gasLimit,
     });
     await this.publicClient.waitForTransactionReceipt({ hash });
 
