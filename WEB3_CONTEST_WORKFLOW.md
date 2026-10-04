@@ -5,18 +5,18 @@ CrickX uses one deployed CRXContestPool contract that manages one contest per Sp
 ## Subscription and entry flow
 
 1. User logs in.
-2. User opens the Weekly Subscription page.
-3. User pays 50 PKR through the RapidGateway hosted checkout.
-4. RapidGateway sends a signed transaction.completed webhook to the CrickX API.
-5. CrickX verifies the webhook signature and activates the subscription for 7 days.
+2. User opens the Subscription page.
+3. User selects the currently published weekly ($0.18 / 7 days) or monthly ($0.60 / 30 days) plan.
+4. The configured payment provider hosts checkout and sends a signed completion webhook to the CrickX API.
+5. CrickX verifies the webhook signature and activates the subscription only after successful payment confirmation.
 6. User creates or saves a fantasy XI for a fixture.
 7. User selects the single contest for that fixture.
 8. The backend requires an active subscription and verifies the match has not started.
 9. The user connects MetaMask on Polygon and signs a short, contest-specific message proving control of the intended payout wallet.
 10. No CRX is deducted from the participant. MetaMask is used only to sign a wallet-ownership message.
-11. The backend owner wallet calls the pool contract to fund exactly 10 CRX for the participant.
-12. The backend then creates the contest entry and increases the participant count.
-13. The on-chain pool and the displayed pool become participantCount × 10 CRX.
+11. The backend records the participant accounting and wallet.
+12. When the fixture reaches the funding stage, the backend funds the complete required pool from the treasury/funding wallet at 10 CRX per participant.
+13. The on-chain pool target is participantCount × 10 CRX; no participant CRX transfer is required to join.
 
 ## Prize settlement
 
@@ -24,7 +24,7 @@ CrickX uses one deployed CRXContestPool contract that manages one contest per Sp
 2. Every joined participant is included in the ranking; there is no top-30% winner cutoff.
 3. The backend sends the complete ordered wallet list to CRXContestPool.
 4. The contract verifies that every ranked wallet was already funded during the join period.
-5. No additional CRX is pulled at settlement because the pool was funded per participant at join time.
+5. No participant CRX is pulled at settlement; the pool is funded from the CrickX treasury/funding wallet.
 6. The contract stores the final ranking.
 6. The contract distributes the entire pool to every ranked participant. The current default weighting is rank 1 through rank N with weights N through 1; the final rank receives the rounding remainder.
 7. The backend records each participant's rank and prize and marks the contest completed only after the contract reaches Distributed.
