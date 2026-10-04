@@ -48,11 +48,15 @@ Before submitting, verify the CRX contract ownership from the PolygonScan accoun
 
 ## Social/profile submission
 
-Use only public channels that are actually controlled by CrickX. Do not invent or substitute unofficial social URLs. The current public project identity includes the founder's GitHub developer profile and the official CrickX repository.
+Use only public channels that are actually controlled by CrickX. The official CrickX X/Twitter profile is:
+
+- X/Twitter: https://x.com/crickxowner
+
+The current public project identity also includes the founder's GitHub developer profile and the official CrickX repository.
 
 ## Missing information to add only when required by the form
 
-- Official X/Twitter URL
+- Official Telegram URL
 - Official Telegram URL
 - Official Discord URL
 - Any official LinkedIn/company URL
