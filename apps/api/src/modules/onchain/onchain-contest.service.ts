@@ -110,10 +110,12 @@ export class OnchainContestService {
     }));
 
     const hash = await this.walletClient!.writeContract({
+      account: this.ownerAccount!,
       address: this.poolAddress!,
       abi: POOL_ABI,
       functionName: 'createContest',
       args: [BigInt(Math.floor(joinDeadlineUnix))],
+      gas: 150_000n,
     });
     await this.publicClient.waitForTransactionReceipt({ hash });
 
