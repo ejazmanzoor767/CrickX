@@ -16,7 +16,8 @@ Prepared for the CrickX CRX token information update on Polygon.
 - Official project email: contact@crickxfantasy.site
 - Official token page: https://crickxfantasy.site/token
 - Logo: https://crickxfantasy.site/crx.svg
-- Logo format: SVG, 32×32
+- Logo format currently used by the site: SVG, 32×32
+- PolygonScan submission logo requirement: **PNG, 256×256** according to the current PolygonScan support guideline. citeturn988852search1
 - Whitepaper: https://crickxfantasy.site/whitepaper/
 - Founder & project team: https://crickxfantasy.site/founder
 - Founder public developer profile: https://github.com/ejazmanzoor767
@@ -40,11 +41,22 @@ CrickX is a fantasy-cricket platform that provides cricket match data, fantasy t
 - Information: info@crickxfantasy.site
 - Support: support@crickxfantasy.site
 
-## Important PolygonScan prerequisites
+## Verification status
 
-PolygonScan's published guidance says token-update submissions should use the official form, the token contract ownership should be verified, the contract source code should be published/verified, public links should work, and the project email should use the project's official domain (or the primary email shown on the official website). The token logo should be supplied as an accessible 32×32 SVG or 64×64 PNG. 
+- Contract ownership: **Verified on PolygonScan** on 2026-09-17 for 0x6A7BeF6Bff1CE03C14D25bC97b1AF7097894b05E.
+- Contract source: **Source Code Verified — Exact Match** on PolygonScan.
+- Contract name shown by PolygonScan: **CrickX**
+- Compiler shown by PolygonScan: **v0.8.34+commit.80d5c536**
+- Optimization shown by PolygonScan: **No, 200 runs**
+- PolygonScan account currently shows this contract in the verified-address list.
 
-Before submitting, verify the CRX contract ownership from the PolygonScan account that will file the request. Do not submit multiple requests for the same contract.
+PolygonScan's published guidance says token-update submissions should use the official form, the token contract ownership should be verified, and the contract source code should be published/verified. It also requires accessible project links and an official project-domain email. citeturn988852search0turn988852search1
+
+Before submitting, do not send duplicate requests for the same contract.
+
+## Submission caution
+
+The previous submission used the 32×32 SVG logo URL. PolygonScan's current support guideline specifies a 256×256 PNG for the logo field, so the resubmission should use a public 256×256 PNG version of the same CrickX logo rather than the old SVG link. citeturn988852search1
 
 ## Social/profile submission
 
