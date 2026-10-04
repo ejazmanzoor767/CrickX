@@ -31,6 +31,39 @@ export class ContestService implements OnModuleInit {
     await this.provisionUpcomingChainContests();
   }
 
+  private queueChainProvisioning(contestId: string, expectedDeadlineUnix: number) {
+    const key = String(contestId);
+    const run = async () => {
+      try {
+        const contest = await this.prisma.contest.findUnique({ where: { id: key } });
+        if (!contest) return;
+        const existing = Number((contest as any).chainContestId);
+        if (Number.isFinite(existing) && existing > 0) return;
+        if (!Number.isFinite(expectedDeadlineUnix) || expectedDeadlineUnix <= Math.floor(Date.now() / 1000)) {
+          return;
+        }
+
+        const created = await this.onchain.createContest(expectedDeadlineUnix);
+        const latest = await this.prisma.contest.findUnique({ where: { id: key } });
+        if (latest && !Number((latest as any).chainContestId)) {
+          await this.prisma.contest.update({
+            where: { id: key },
+            data: { chainContestId: created.chainContestId },
+          });
+        }
+        this.logger.log(`Chain contest provisioned contest=${key}, chainContestId=${created.chainContestId}, tx=${created.createTxHash}`);
+      } catch (error) {
+        this.logger.warn(
+          `Deferred chain contest provisioning failed contest=${key}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    };
+
+    const promise = this.chainProvisionQueue.then(run, run);
+    this.chainProvisionQueue = promise.then(() => undefined, () => undefined);
+    return promise;
+  }
+
   private provisionUpcomingChainContests() {
     const run = async () => {
       try {
@@ -183,6 +216,12 @@ export class ContestService implements OnModuleInit {
     const expectedJoinDeadline = Math.floor(
       new Date(fixtureForClock?.starting_at ?? contest.lineupLockAt).getTime() / 1000,
     );
+
+    if ((!Number.isFinite(storedChainContestId) || storedChainContestId <= 0) &&
+        Number.isFinite(expectedJoinDeadline) &&
+        expectedJoinDeadline > Math.floor(Date.now() / 1000)) {
+      void this.queueChainProvisioning(contest.id, expectedJoinDeadline);
+    }
 
     if (Number.isFinite(storedChainContestId) && storedChainContestId > 0) {
       try {
@@ -393,6 +432,13 @@ export class ContestService implements OnModuleInit {
     }) as { entry: any; participantCount: number };
 
     const latestContest = await this.prisma.contest.findUnique({ where: { id: contest.id } });
+
+    const joinDeadlineUnix = Math.floor(
+      new Date((latestContest as any)?.lineupLockAt ?? contest.lineupLockAt).getTime() / 1000,
+    );
+    if (Number.isFinite(joinDeadlineUnix) && joinDeadlineUnix > Math.floor(Date.now() / 1000)) {
+      void this.queueChainProvisioning(contest.id, joinDeadlineUnix);
+    }
 
     return {
       ...result.entry,
