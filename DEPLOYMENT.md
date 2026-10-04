@@ -24,7 +24,7 @@ The pool fundingWallet is the treasury wallet from which the contract pulls 10 C
 | RAPIDGATEWAY_MERCHANT_NAME | Render API (CrickX) |
 | RAPIDGATEWAY_CLIENT_SECRET | Render API secret |
 | RAPIDGATEWAY_WEBHOOK_SECRET | Render API secret |
-| CRICKX_WEB_URL | Render API (https://crickx-3d806.web.app) |
+| CRICKX_WEB_URL | Render API (https://crickxfantasy.site) |
 
 Register the RapidGateway LIVE webhook as:
 
@@ -34,13 +34,13 @@ The frontend never receives the RapidGateway client secret, webhook secret or OA
 
 ## Subscription
 
-The subscription is 50 PKR for 7 days. Contest joining is free while the subscription is active. The current integration uses a new RapidGateway checkout for each weekly renewal; the supplied RapidGateway documentation does not define an automatic recurring mandate flow, so CrickX does not assume that RECURRING_TXN creates an automatic weekly charge.
+The current subscription plans are $0.18 for 7 days or $0.60 for 30 days. Contest joining is free while the subscription is active. The current integration uses a new RapidGateway checkout for each weekly renewal; the supplied RapidGateway documentation does not define an automatic recurring mandate flow, so CrickX does not assume that RECURRING_TXN creates an automatic weekly charge.
 
 ## Contest prize funding
 
 Joining a contest does not charge the participant's wallet. MetaMask only signs a wallet-ownership message.
 
-After the signature is verified, the backend owner calls CRXContestPool.fundParticipant() and the fundingWallet transfers exactly 10 CRX into the pool contract. The application then records the participant and the on-chain pool increases immediately.
+After the signature is verified, the application records the participant accounting. The backend later funds the required pool from the configured treasury/funding wallet at exactly 10 CRX per participant; the participant does not transfer CRX to join.
 
 When final rankings are ready, the backend submits every ranked participant wallet to CRXContestPool. The contract only finalizes the existing funded pool, records the ranking and distributes 100% of the pool to all ranked wallets.
 
