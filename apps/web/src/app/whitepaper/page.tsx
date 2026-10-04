@@ -169,6 +169,7 @@ export default function WhitepaperPage() {
             ['GitHub', 'https://github.com/ejazmanzoor767/CrickX'],
             ['CRX token page', 'https://crickxfantasy.site/token'],
             ['CRX logo', 'https://crickxfantasy.site/crx.svg'],
+            ['PolygonScan logo (256×256 PNG)', 'https://crickxfantasy.site/crx-256.png'],
             ['Contact', 'contact@crickxfantasy.site'],
             ['Info', 'info@crickxfantasy.site'],
             ['Support', 'support@crickxfantasy.site'],
