@@ -15,7 +15,7 @@ Prepared for the CrickX CRX token information update on Polygon.
 - Official website: https://crickxfantasy.site
 - Official project email: contact@crickxfantasy.site
 - Official token page: https://crickxfantasy.site/token
-- PolygonScan logo: https://crickxfantasy.site/crx-256.png
+- Logo: https://crickxfantasy.site/crx.svg
 - Logo format currently used by the site: SVG, 32×32
 - PolygonScan submission logo requirement: **PNG, 256×256** according to the current PolygonScan support guideline. citeturn988852search1
 - Whitepaper: https://crickxfantasy.site/whitepaper/
