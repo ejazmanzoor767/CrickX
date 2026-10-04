@@ -799,46 +799,49 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     // Contest documents are the source of truth for fantasy scoring.
     // Do not scan the entire fantasyTeams collection every 30 seconds just to
     // discover fixture IDs; score only contests that are actually UPCOMING/LIVE.
-    const now = Date.now();
-    const contestSnapshot = await this.prisma.db
-      .collection('contests')
-      .where('status', 'in', ['LIVE', 'UPCOMING'])
-      .select('sportmonksFixtureId', 'lineupLockAt')
-      .limit(25)
-      .get();
+    try {
+      const now = Date.now();
+      const contestSnapshot = await this.prisma.db
+        .collection('contests')
+        .where('status', 'in', ['LIVE', 'UPCOMING'])
+        .select('sportmonksFixtureId', 'lineupLockAt')
+        .limit(25)
+        .get();
 
-    const contestDocs = [...contestSnapshot.docs];
-    const fixtureIds = new Set<number>();
-    for (const doc of contestDocs) {
-      const data = doc.data() as any;
-      const lockValue = data.lineupLockAt;
-      const lockMs =
-        lockValue && typeof lockValue.toDate === 'function'
-          ? lockValue.toDate().getTime()
-          : lockValue instanceof Date
-            ? lockValue.getTime()
-            : Number.NaN;
-      if (Number.isFinite(lockMs) && lockMs > now) continue;
-      fixtureIds.add(Number(data.sportmonksFixtureId));
-    }
-
-    for (const fixtureId of fixtureIds) {
-      if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
-      try {
-        const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
-        if (isFinished(fixture.status, fixture.live)) {
-          // Terminal contests are handled by runFinishedContestSweep(), which
-          // directly scores their entries and settles them. Do not load the
-          // heavyweight global scoring graph again here.
-          continue;
-        }
-        await this.scoreFixture(fixtureId);
-      } catch (err) {
-        this.logger.error(
-          `Scoring failed for fixture ${fixtureId}`,
-          err instanceof Error ? err.stack : String(err),
-        );
+      const contestDocs = [...contestSnapshot.docs];
+      const fixtureIds = new Set<number>();
+      for (const doc of contestDocs) {
+        const data = doc.data() as any;
+        const lockValue = data.lineupLockAt;
+        const lockMs =
+          lockValue && typeof lockValue.toDate === 'function'
+            ? lockValue.toDate().getTime()
+            : lockValue instanceof Date
+              ? lockValue.getTime()
+              : Number.NaN;
+        if (Number.isFinite(lockMs) && lockMs > now) continue;
+        fixtureIds.add(Number(data.sportmonksFixtureId));
       }
+
+      for (const fixtureId of fixtureIds) {
+        if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
+        try {
+          const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+          if (isFinished(fixture.status, fixture.live)) {
+            continue;
+          }
+          await this.scoreFixture(fixtureId);
+        } catch (err) {
+          this.logger.error(
+            `Scoring failed for fixture ${fixtureId}`,
+            err instanceof Error ? err.stack : String(err),
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Live contest scoring poll skipped: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }
