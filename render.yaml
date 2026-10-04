@@ -11,7 +11,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: CORS_ORIGIN
-        value: https://crickx-3d806.web.app
+        value: https://crickxfantasy.site
+      - key: CRICKX_ALLOWED_ORIGINS
+        value: https://crickxfantasy.site,https://www.crickxfantasy.site,https://crickx-3d806.web.app,https://crickx-3d806.firebaseapp.com
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: FIREBASE_CLIENT_EMAIL
@@ -61,4 +63,4 @@ services:
       - key: RAPIDGATEWAY_WEBHOOK_SECRET
         sync: false
       - key: CRICKX_WEB_URL
-        value: https://crickx-3d806.web.app
+        value: https://crickxfantasy.site
