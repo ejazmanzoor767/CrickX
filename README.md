@@ -25,7 +25,8 @@ Full architecture and design rationale: [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 **Project description:** CrickX is a fantasy-cricket platform that provides cricket match data, fantasy team management, scoring, and blockchain-based CRX utility features on the Polygon network.
 
 **Founder:** Ejaz Manzoor — Founder & Developer, CrickX  
-**Founder GitHub:** https://github.com/ejazmanzoor767
+**Founder GitHub:** https://github.com/ejazmanzoor767  
+**Official X/Twitter:** https://x.com/crickxowner
 
 **Official contacts:**  
 contact@crickxfantasy.site  
