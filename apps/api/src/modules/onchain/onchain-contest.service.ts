@@ -175,6 +175,16 @@ export class OnchainContestService {
       const current = await this.summary(contestId);
       if (!current.exists) throw new BadRequestException('The on-chain contest does not exist.');
       if (current.stage !== 0) throw new BadRequestException('The on-chain contest is no longer open for initial funding.');
+      if (current.joinDeadline > Math.floor(Date.now() / 1000)) {
+        return {
+          alreadyFunded: false,
+          skipped: true,
+          fundingTxHash: null,
+          registrationTxHash: null,
+          participantCount: current.participantCount,
+          totalPool: current.totalPool,
+        };
+      }
 
       const perParticipant = BigInt(await this.publicClient.readContract({
         address: this.poolAddress!,
