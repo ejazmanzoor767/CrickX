@@ -273,13 +273,42 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async fundStartedContestPrizePools(fixtureId: number) {
+    // A live fixture must be able to fund its contest even if the cached
+    // contest status/counter drifted. Terminal contest states are the only
+    // states that must never receive new prize-pool funding.
     const contests = await this.prisma.contest.findMany({
-      where: { sportmonksFixtureId: fixtureId, status: { in: ['UPCOMING', 'LIVE'] } },
+      where: {
+        sportmonksFixtureId: fixtureId,
+        status: { notIn: ['COMPLETED', 'CANCELLED'] },
+      },
     });
 
     for (const contest of contests) {
-      const participantCount = Number(contest.filledSpots || 0);
-      if (!Number.isInteger(participantCount) || participantCount <= 0) continue;
+      let participantCount = Number(contest.filledSpots || 0);
+
+      // The contest entry rows are the source of truth if the denormalized
+      // filledSpots counter is stale or missing.
+      if (!Number.isInteger(participantCount) || participantCount < 0) participantCount = 0;
+      if (participantCount === 0) {
+        try {
+          participantCount = await this.prisma.contestEntry.count({
+            where: { contestId: contest.id },
+          });
+        } catch {
+          participantCount = 0;
+        }
+      }
+
+      this.logger.log(
+        `Contest funding check fixture=${fixtureId} contest=${contest.id} status=${String((contest as any).status ?? '')} participants=${participantCount} chainContestId=${String((contest as any).chainContestId ?? '')}`,
+      );
+
+      if (!Number.isInteger(participantCount) || participantCount <= 0) {
+        this.logger.warn(
+          `Skipping contest funding fixture=${fixtureId} contest=${contest.id}: no participants found.`,
+        );
+        continue;
+      }
 
       let chainContestId = Number((contest as any).chainContestId);
       if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
