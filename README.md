@@ -13,7 +13,6 @@ Full architecture and design rationale: [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 **Whitepaper:** https://crickxfantasy.site/whitepaper/  
 **CRX token page:** https://crickxfantasy.site/token  
 **CRX logo:** https://crickxfantasy.site/crx.svg  
-**PolygonScan logo (256×256 PNG):** https://crickxfantasy.site/crx-256.png  
 **GitHub:** https://github.com/ejazmanzoor767/CrickX
 
 **Token name:** CrickX  
