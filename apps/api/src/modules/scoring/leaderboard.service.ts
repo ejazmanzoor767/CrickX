@@ -163,15 +163,15 @@ export class LeaderboardService {
 
   async fixture(fixtureId: number, limit = 100) {
     const safeLimit = this.safeLimit(limit);
+    // Avoid requiring a Firestore composite index for the public leaderboard.
+    // We filter by fixture first, then rank the bounded result in application code.
+    // This keeps the leaderboard available even when Firebase index deployment lags.
     const [scoreSnap, teamSnap] = await Promise.all([
       this.firestore.db.collection(this.matchScores)
         .where('fixtureId', '==', fixtureId)
-        .orderBy('points', 'desc')
-        .limit(safeLimit)
         .get(),
       this.firestore.db.collection('fantasyTeams')
         .where('sportmonksFixtureId', '==', fixtureId)
-        .limit(safeLimit)
         .get(),
     ]);
 
@@ -226,10 +226,10 @@ export class LeaderboardService {
 
   async contest(contestId: string, limit = 100) {
     const safeLimit = this.safeLimit(limit);
+    // Rank contest entries in application code so the endpoint does not depend
+    // on a Firestore composite index being present in the target project.
     const snap = await this.firestore.db.collection('contestEntries')
       .where('contestId', '==', contestId)
-      .orderBy('totalPoints', 'desc')
-      .limit(safeLimit)
       .get();
     const rows = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
     const profiles = await this.profilesForUserIds(rows.map((row: any) => String(row.userId)));
