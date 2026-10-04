@@ -66,6 +66,9 @@ export default function FounderPage() {
           <a href={PROJECT_SITE} target="_blank" rel="noreferrer">
             Official website: {PROJECT_SITE}
           </a>
+          <a href="https://x.com/crickxowner" target="_blank" rel="noreferrer">
+            Official X/Twitter: https://x.com/crickxowner
+          </a>
           <a href={'mailto:' + CONTACT_EMAIL}>
             Official project email: {CONTACT_EMAIL}
           </a>
