@@ -19,6 +19,11 @@ function isFinished(status: string | null | undefined, live: 0 | 1) {
   );
 }
 
+function isFirestoreQuotaError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /RESOURCE_EXHAUSTED|Quota exceeded/i.test(message);
+}
+
 function isActuallyLive(fixture: any) {
   const value = String(fixture?.status ?? '').trim().toLowerCase();
   const live: 0 | 1 = Number(fixture?.live) === 1 ? 1 : 0;
@@ -53,6 +58,7 @@ function isActuallyLive(fixture: any) {
 export class ScoringService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ScoringService.name);
   private readonly settlingContests = new Set<string>();
+  private firestoreQuotaBackoffUntil = 0;
   private settlementSweepTimer: ReturnType<typeof setInterval> | null = null;
   private settlementSweepRunning = false;
 
@@ -273,6 +279,8 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async fundStartedContestPrizePools(fixtureId: number) {
+    if (Date.now() < this.firestoreQuotaBackoffUntil) return;
+
     // A live fixture must be able to fund its contest even if the cached
     // contest status/counter drifted. Terminal contest states are the only
     // states that must never receive new prize-pool funding.
@@ -287,13 +295,12 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       // filledSpots counter is stale or missing.
       if (!Number.isInteger(participantCount) || participantCount < 0) participantCount = 0;
       if (participantCount === 0) {
-        try {
-          participantCount = await this.prisma.contestEntry.count({
-            where: { contestId: contest.id },
-          });
-        } catch {
-          participantCount = 0;
-        }
+        // filledSpots can be stale; contestEntry is the source of truth.
+        // Never convert a Firestore read failure into participantCount=0,
+        // because that silently prevents the on-chain funding transaction.
+        participantCount = await this.prisma.contestEntry.count({
+          where: { contestId: contest.id },
+        });
       }
 
       this.logger.log(
@@ -902,6 +909,13 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         }
       }
     } catch (err) {
+      if (isFirestoreQuotaError(err)) {
+        this.firestoreQuotaBackoffUntil = Date.now() + 2 * 60_000;
+        this.logger.warn(
+          `Live contest scoring poll backed off for Firestore quota exhaustion: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return;
+      }
       this.logger.warn(
         `Live contest scoring poll skipped: ${err instanceof Error ? err.message : String(err)}`,
       );
