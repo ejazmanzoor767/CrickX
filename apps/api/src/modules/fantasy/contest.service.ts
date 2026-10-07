@@ -7,7 +7,7 @@ import { OnchainContestService } from '../onchain/onchain-contest.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { CreateContestDto, JoinContestDto, PrepareJoinContestDto, CRX_PRIZE_PER_PARTICIPANT } from './dto';
 import { T20_RULES, T10_RULES, ODI_RULES } from '../scoring/scoring.rules';
-import { CloudSqlContestError, CloudSqlService } from '../../common/cloud-sql.service';
+import { PostgresContestError, PostgresService } from '../../common/cloud-sql.service';
 
 const SIGNATURE_WINDOW_SECONDS = 300;
 
@@ -22,25 +22,25 @@ export class ContestService implements OnModuleInit {
     private readonly sportmonks: SportmonksDataService,
     private readonly onchain: OnchainContestService,
     private readonly subscriptions: SubscriptionService,
-    private readonly cloudSql: CloudSqlService,
+    private readonly postgres: PostgresService,
   ) {}
 
   onModuleInit() {
-    // Cloud SQL is now the primary store. Firestore is used only as a realtime projection.
+    // PostgreSQL is now the primary store. Firestore is used only as a realtime projection.
     // The old automatic contest bootstrap queried Firestore on every startup and could exhaust
-    // the Firestore no-cost quota before Cloud SQL was even needed.
+    // the Firestore no-cost quota before PostgreSQL was even needed.
     void this.provisionUpcomingChainContests();
   }
 
   private async readContest(contestId: string) {
-    if (this.cloudSql.isEnabled()) {
-      const contest = await this.cloudSql.getContest(contestId);
+    if (this.postgres.isEnabled()) {
+      const contest = await this.postgres.getContest(contestId);
       if (contest) return contest;
     }
     const contest = await this.prisma.contest.findUnique({ where: { id: contestId } });
-    if (contest && this.cloudSql.isEnabled()) {
-      await this.cloudSql.upsertContestFromRecord(contest);
-      return (await this.cloudSql.getContest(contestId)) ?? contest;
+    if (contest && this.postgres.isEnabled()) {
+      await this.postgres.upsertContestFromRecord(contest);
+      return (await this.postgres.getContest(contestId)) ?? contest;
     }
     return contest;
   }
@@ -86,8 +86,8 @@ export class ContestService implements OnModuleInit {
             data: { chainContestId: created.chainContestId },
           });
         }
-        if (this.cloudSql.isEnabled()) {
-          await this.cloudSql.updateContest(key, { chainContestId: created.chainContestId });
+        if (this.postgres.isEnabled()) {
+          await this.postgres.updateContest(key, { chainContestId: created.chainContestId });
         }
         this.logger.log(`Chain contest provisioned contest=${key}, chainContestId=${created.chainContestId}, tx=${created.createTxHash}`);
       } catch (error) {
@@ -178,8 +178,8 @@ export class ContestService implements OnModuleInit {
                 data: { chainContestId: created.chainContestId },
               });
             }
-            if (this.cloudSql.isEnabled()) {
-              await this.cloudSql.updateContest(contest.id, { chainContestId: created.chainContestId });
+            if (this.postgres.isEnabled()) {
+              await this.postgres.updateContest(contest.id, { chainContestId: created.chainContestId });
             }
           } catch (error) {
             this.logger.warn(
@@ -232,7 +232,7 @@ export class ContestService implements OnModuleInit {
         maxTeamsPerUser: 1,
       },
     });
-    if (this.cloudSql.isEnabled()) await this.cloudSql.upsertContestFromRecord(createdContest);
+    if (this.postgres.isEnabled()) await this.postgres.upsertContestFromRecord(createdContest);
     return createdContest;
   }
 
@@ -283,7 +283,7 @@ export class ContestService implements OnModuleInit {
           maxTeamsPerUser: 1,
         },
       });
-      if (this.cloudSql.isEnabled()) await this.cloudSql.upsertContestFromRecord(contest);
+      if (this.postgres.isEnabled()) await this.postgres.upsertContestFromRecord(contest);
     }
 
     const startingAtMs = new Date((contest as any).lineupLockAt ?? fixtureForClock?.starting_at).getTime();
@@ -292,17 +292,17 @@ export class ContestService implements OnModuleInit {
     const started = Number.isFinite(startingAtMs) && Date.now() >= startingAtMs;
     const isOpen = !providerFinished && !started && contest.status !== 'COMPLETED' && contest.status !== 'CANCELLED';
     if (isOpen && contest.status !== 'UPCOMING') {
-      if (this.cloudSql.isEnabled()) {
-        await this.cloudSql.updateContest(contest.id, { status: 'UPCOMING', entryFee: 0 });
-        contest = (await this.cloudSql.getContest(contest.id)) ?? contest;
+      if (this.postgres.isEnabled()) {
+        await this.postgres.updateContest(contest.id, { status: 'UPCOMING', entryFee: 0 });
+        contest = (await this.postgres.getContest(contest.id)) ?? contest;
         void this.projectContestState(contest.id, { status: 'UPCOMING', entryFee: 0 });
       } else {
         contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING', entryFee: 0 } });
       }
     } else if (started && !providerFinished && contest.status === 'UPCOMING') {
-      if (this.cloudSql.isEnabled()) {
-        await this.cloudSql.updateContest(contest.id, { status: 'LIVE', entryFee: 0 });
-        contest = (await this.cloudSql.getContest(contest.id)) ?? contest;
+      if (this.postgres.isEnabled()) {
+        await this.postgres.updateContest(contest.id, { status: 'LIVE', entryFee: 0 });
+        contest = (await this.postgres.getContest(contest.id)) ?? contest;
         void this.projectContestState(contest.id, { status: 'LIVE', entryFee: 0 });
       } else {
         contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE', entryFee: 0 } });
@@ -478,9 +478,9 @@ export class ContestService implements OnModuleInit {
     // No blockchain transaction is made during join; the complete pool is transferred
     // once when the match starts.
 
-    if (this.cloudSql.isEnabled()) {
+    if (this.postgres.isEnabled()) {
       try {
-        const sqlResult = await this.cloudSql.joinContest({
+        const sqlResult = await this.postgres.joinContest({
           entryId: `entry_${contest.id}_${userId}`,
           contestId: contest.id,
           userId,
@@ -506,7 +506,7 @@ export class ContestService implements OnModuleInit {
           poolFundingStatus: 'PENDING_MATCH_START',
         };
       } catch (error) {
-        if (error instanceof CloudSqlContestError) {
+        if (error instanceof PostgresContestError) {
           if (['ALREADY_JOINED', 'WALLET_USED', 'TEAM_USED'].includes(error.code)) {
             throw new ForbiddenException(error.message);
           }
@@ -607,8 +607,8 @@ export class ContestService implements OnModuleInit {
   }
 
   async myEntries(userId: string) {
-    if (this.cloudSql.isEnabled()) {
-      const entries = await this.cloudSql.listUserContestEntries(userId);
+    if (this.postgres.isEnabled()) {
+      const entries = await this.postgres.listUserContestEntries(userId);
       return Promise.all(entries.map(async (entry: any) => ({
         ...entry,
         contest: await this.readContest(entry.contestId),
@@ -626,8 +626,8 @@ export class ContestService implements OnModuleInit {
   }
 
   async leaderboard(contestId: string) {
-    if (this.cloudSql.isEnabled()) {
-      return this.cloudSql.listContestEntries(contestId, 200);
+    if (this.postgres.isEnabled()) {
+      return this.postgres.listContestEntries(contestId, 200);
     }
 
     const snap = await this.prisma.db.collection('contestEntries')
