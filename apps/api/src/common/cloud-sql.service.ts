@@ -123,6 +123,31 @@ export class CloudSqlService implements OnModuleInit, OnModuleDestroy {
       );
       CREATE INDEX IF NOT EXISTS crickx_contest_wallet_locks_user_idx
         ON crickx_contest_wallet_locks (contest_id, user_id);
+
+      CREATE TABLE IF NOT EXISTS crickx_records (
+        collection_name TEXT NOT NULL,
+        id TEXT NOT NULL,
+        data JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (collection_name, id)
+      );
+      CREATE INDEX IF NOT EXISTS crickx_records_collection_updated_idx
+        ON crickx_records (collection_name, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS crickx_records_data_gin_idx
+        ON crickx_records USING GIN (data);
+      CREATE UNIQUE INDEX IF NOT EXISTS crickx_records_user_email_idx
+        ON crickx_records ((data->>'email'))
+        WHERE collection_name = 'users' AND data ? 'email';
+      CREATE UNIQUE INDEX IF NOT EXISTS crickx_records_refresh_token_hash_idx
+        ON crickx_records ((data->>'tokenHash'))
+        WHERE collection_name = 'refreshTokens' AND data ? 'tokenHash';
+      CREATE UNIQUE INDEX IF NOT EXISTS crickx_records_transaction_idempotency_idx
+        ON crickx_records ((data->>'idempotencyKey'))
+        WHERE collection_name = 'transactions' AND data ? 'idempotencyKey';
+      CREATE UNIQUE INDEX IF NOT EXISTS crickx_records_wallet_user_idx
+        ON crickx_records ((data->>'userId'))
+        WHERE collection_name = 'wallets' AND data ? 'userId';
     `);
   }
 
