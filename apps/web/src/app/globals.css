@@ -763,3 +763,210 @@ html.crickx-native-app .notice{border-radius:14px !important;font-size:12px !imp
     font-size:10px;
   }
 }
+
+
+/* =========================================================
+   WALLET — MOBILE WEB FINISH
+   Keeps wallet controls readable on narrow browser screens.
+   ========================================================= */
+.wallet-page{
+  width:100%;
+}
+.wallet-page .wallet-connect-card h2,
+.wallet-page .wallet-send-card h2{
+  line-height:1.05;
+}
+.wallet-overview-grid{
+  gap:14px;
+}
+.wallet-balance-card,
+.wallet-connected-card,
+.wallet-early-buy-card,
+.wallet-send-card,
+.wallet-buy-card{
+  min-width:0;
+}
+.wallet-balance-card > div[style*="font-size: 58px"]{
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+.wallet-connected-card p[style*="word-break: break-all"]{
+  overflow-wrap:anywhere;
+  word-break:break-word !important;
+  line-height:1.45;
+}
+.wallet-early-buy-card{
+  overflow:hidden;
+}
+.wallet-early-buy-card > div:first-child{
+  min-width:0;
+}
+.wallet-early-buy-card .badge-live{
+  flex:0 0 auto;
+}
+.wallet-buy-grid{
+  min-width:0;
+}
+.wallet-buy-card{
+  overflow:hidden;
+}
+.wallet-buy-card .text-input{
+  min-width:0;
+}
+.wallet-send-card{
+  overflow:hidden;
+}
+
+@media (max-width:920px){
+  .wallet-overview-grid{
+    grid-template-columns:1fr !important;
+  }
+}
+
+@media (max-width:640px){
+  .wallet-page{
+    padding-bottom:100px !important;
+  }
+  .wallet-page .page-intro{
+    gap:10px;
+  }
+  .wallet-page .page-intro > .badge-live{
+    align-self:flex-start;
+  }
+  .wallet-page .section-title{
+    font-size:36px !important;
+  }
+  .wallet-page .section-subtitle{
+    font-size:13px;
+    line-height:1.55;
+  }
+
+  .wallet-page .wallet-connect-card{
+    padding:18px !important;
+  }
+  .wallet-page .wallet-connect-card h2{
+    font-size:24px;
+    margin:0 0 8px;
+  }
+  .wallet-page .wallet-connect-card .primary-button{
+    width:100%;
+    min-height:48px;
+  }
+
+  .wallet-page .wallet-overview-grid{
+    gap:10px !important;
+    margin-bottom:10px !important;
+  }
+  .wallet-page .wallet-balance-card,
+  .wallet-page .wallet-connected-card{
+    padding:18px !important;
+    margin-bottom:0 !important;
+  }
+  .wallet-page .wallet-balance-card > div[style*="font-size: 58px"]{
+    font-size:46px !important;
+    line-height:.9 !important;
+    letter-spacing:-.04em;
+  }
+  .wallet-page .wallet-balance-card > div[style*="font-size: 58px"] span{
+    font-size:20px !important;
+  }
+  .wallet-page .wallet-balance-card > div[style*="display: flex"]{
+    display:grid !important;
+    grid-template-columns:1fr 1fr;
+    gap:8px !important;
+  }
+  .wallet-page .wallet-balance-card > div[style*="display: flex"] .secondary-button{
+    width:100%;
+    min-width:0;
+    padding:10px 8px;
+    font-size:12px;
+  }
+  .wallet-page .wallet-connected-card h2{
+    font-size:23px !important;
+    margin-bottom:8px;
+  }
+  .wallet-page .wallet-connected-card .section-subtitle{
+    overflow-wrap:anywhere;
+  }
+
+  .wallet-page .wallet-early-buy-card{
+    padding:18px !important;
+    margin-bottom:10px !important;
+  }
+  .wallet-page .wallet-early-buy-card > div:first-child{
+    align-items:flex-start !important;
+  }
+  .wallet-page .wallet-early-buy-card > div:first-child > .badge-live{
+    align-self:flex-start;
+    font-size:10px;
+  }
+  .wallet-page .wallet-early-buy-card h2{
+    font-size:23px !important;
+  }
+  .wallet-page .wallet-buy-grid{
+    grid-template-columns:1fr !important;
+    gap:9px !important;
+    margin-top:13px !important;
+  }
+  .wallet-page .wallet-buy-card{
+    padding:14px !important;
+    margin-bottom:0 !important;
+  }
+  .wallet-page .wallet-buy-card input.text-input{
+    font-size:23px !important;
+    min-height:49px;
+  }
+  .wallet-page .wallet-buy-card .secondary-button{
+    flex:1 1 calc(50% - 4px);
+    min-width:0;
+    padding:9px 7px !important;
+    font-size:12px;
+  }
+  .wallet-page .wallet-early-buy-card > .primary-button{
+    width:100%;
+    min-height:50px !important;
+    margin-top:10px !important;
+    font-size:13px;
+    overflow:hidden;
+    white-space:normal;
+    line-height:1.25;
+  }
+
+  .wallet-page .wallet-send-card{
+    padding:18px !important;
+  }
+  .wallet-page .wallet-send-card h2{
+    font-size:23px;
+  }
+  .wallet-page .wallet-send-card .text-input{
+    min-height:49px;
+    font-size:14px;
+  }
+  .wallet-page .wallet-send-card .primary-button{
+    width:100%;
+    min-height:49px;
+  }
+
+  .wallet-page > .notice,
+  .wallet-page > .card:last-child{
+    max-width:100%;
+  }
+}
+
+@media (max-width:390px){
+  .wallet-page .section-title{
+    font-size:33px !important;
+  }
+  .wallet-page .wallet-balance-card > div[style*="font-size: 58px"]{
+    font-size:40px !important;
+  }
+  .wallet-page .wallet-balance-card > div[style*="font-size: 58px"] span{
+    font-size:17px !important;
+  }
+  .wallet-page .wallet-balance-card > div[style*="display: flex"]{
+    grid-template-columns:1fr;
+  }
+  .wallet-page .wallet-buy-card .secondary-button{
+    flex-basis:100%;
+  }
+}
