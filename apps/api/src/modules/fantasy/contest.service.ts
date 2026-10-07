@@ -7,6 +7,7 @@ import { OnchainContestService } from '../onchain/onchain-contest.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { CreateContestDto, JoinContestDto, PrepareJoinContestDto, CRX_PRIZE_PER_PARTICIPANT } from './dto';
 import { T20_RULES, T10_RULES, ODI_RULES } from '../scoring/scoring.rules';
+import { CloudSqlContestError, CloudSqlService } from '../../common/cloud-sql.service';
 
 const SIGNATURE_WINDOW_SECONDS = 300;
 
@@ -21,10 +22,54 @@ export class ContestService implements OnModuleInit {
     private readonly sportmonks: SportmonksDataService,
     private readonly onchain: OnchainContestService,
     private readonly subscriptions: SubscriptionService,
+    private readonly cloudSql: CloudSqlService,
   ) {}
 
   onModuleInit() {
+    void this.bootstrapCloudSql();
     void this.provisionUpcomingChainContests();
+  }
+
+  private async bootstrapCloudSql() {
+    if (!this.cloudSql.isEnabled()) return;
+    try {
+      await this.cloudSql.bootstrapFromFirestore(this.prisma.db);
+    } catch (error) {
+      this.logger.warn(`Cloud SQL contest bootstrap skipped: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async readContest(contestId: string) {
+    if (this.cloudSql.isEnabled()) {
+      const contest = await this.cloudSql.getContest(contestId);
+      if (contest) return contest;
+    }
+    const contest = await this.prisma.contest.findUnique({ where: { id: contestId } });
+    if (contest && this.cloudSql.isEnabled()) {
+      await this.cloudSql.upsertContestFromRecord(contest);
+      return (await this.cloudSql.getContest(contestId)) ?? contest;
+    }
+    return contest;
+  }
+
+  private async projectContestEntry(entry: any) {
+    try {
+      await this.prisma.contestEntry.upsert({
+        where: { id: entry.id },
+        update: entry,
+        create: entry,
+      });
+    } catch (error) {
+      this.logger.warn(`Firestore contest-entry projection failed entry=${String(entry.id)}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async projectContestState(contestId: string, data: Record<string, any>) {
+    try {
+      await this.prisma.contest.update({ where: { id: contestId }, data });
+    } catch (error) {
+      this.logger.warn(`Firestore contest projection failed contest=${contestId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   @Cron('0 */2 * * * *')
