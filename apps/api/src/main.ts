@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import express from 'express';
 
 function allowedOrigins() {
   const configured = String(process.env.CRICKX_ALLOWED_ORIGINS || '').split(',').map((v) => v.trim()).filter(Boolean);
@@ -10,7 +11,13 @@ function allowedOrigins() {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create(AppModule, { rawBody: true, bodyParser: false });
+  const server = app.getHttpAdapter().getInstance();
+  server.use(express.json({
+    limit: '1.5mb',
+    verify: (req: any, _res, buf) => { req.rawBody = buf; },
+  }));
+  server.use(express.urlencoded({ extended: true, limit: '1.5mb' }));
 
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
@@ -20,8 +27,6 @@ async function bootstrap() {
   }));
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  const httpAdapter = app.getHttpAdapter();
-  const server = httpAdapter.getInstance();
   server.set('trust proxy', 1);
 
   const origins = new Set(allowedOrigins());
