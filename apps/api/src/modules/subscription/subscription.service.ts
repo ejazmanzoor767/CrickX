@@ -132,18 +132,30 @@ export class SubscriptionService {
     if (!referrerId) throw new ConflictException('Referral code is not available.');
     if (referrerId === userId) throw new ConflictException('You cannot use your own referral code.');
 
-    // A referral code only becomes usable after its owner has successfully
-    // subscribed at least once. There is no limit on how many users can use
-    // one qualified referrer's code.
-    if (!await this.hasSuccessfulSubscription(referrerId)) {
-      throw new ConflictException('The referrer must complete a subscription first before this referral code can be used.');
-    }
-
     const existing = await this.firestore.db.collection('referrals').doc(userId).get();
     if (existing.exists) {
       const row = existing.data() as any;
       if (String(row.referrerId) === referrerId) return { applied: true, status: row.status, referrerId };
       throw new ConflictException('A referral is already attached to this account.');
+    }
+
+    // A referral code becomes usable only after its owner has successfully
+    // subscribed at least once, and each code can be used by only one user.
+    if (!await this.hasSuccessfulSubscription(referrerId)) {
+      throw new ConflictException('The referrer must complete a subscription first before this referral code can be used.');
+    }
+
+    const codeUsage = await this.firestore.db
+      .collection('referrals')
+      .where('referralCode', '==', code)
+      .limit(1)
+      .get();
+    if (!codeUsage.empty) {
+      const usedBy = String(codeUsage.docs[0].data()?.referredUserId ?? codeUsage.docs[0].id ?? '');
+      if (usedBy && usedBy !== userId) {
+        throw new ConflictException('This code has already been added by another user.');
+      }
+      return { applied: true, status: codeUsage.docs[0].data()?.status ?? 'PENDING', referrerId };
     }
 
     const priorSubscriptions = await this.subscriptionsForUser(userId);
