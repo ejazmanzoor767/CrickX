@@ -26,9 +26,7 @@ export class ContestService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    // PostgreSQL is now the primary store. Firestore is used only as a realtime projection.
-    // The old automatic contest bootstrap queried Firestore on every startup and could exhaust
-    // the Firestore no-cost quota before PostgreSQL was even needed.
+    // PostgreSQL/Neon is the single authoritative contest store. Contest state is not mirrored to Firestore.
     void this.provisionUpcomingChainContests();
   }
 
@@ -38,22 +36,6 @@ export class ContestService implements OnModuleInit {
     }
     // Local/dev fallback only when PostgreSQL is not configured.
     return this.prisma.contest.findUnique({ where: { id: contestId } });
-  }
-
-  private async projectContestEntry(entry: any) {
-    try {
-      await this.prisma.realtimeDb.collection('contestEntries').doc(String(entry.id)).set({ id: entry.id, ...entry }, { merge: true });
-    } catch (error) {
-      this.logger.warn(`Firestore contest-entry projection failed entry=${String(entry.id)}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  private async projectContestState(contestId: string, data: Record<string, any>) {
-    try {
-      await this.prisma.realtimeDb.collection('contests').doc(String(contestId)).set({ id: contestId, ...data }, { merge: true });
-    } catch (error) {
-      this.logger.warn(`Firestore contest projection failed contest=${contestId}: ${error instanceof Error ? error.message : String(error)}`);
-    }
   }
 
   @Cron('0 */2 * * * *')
@@ -290,7 +272,6 @@ export class ContestService implements OnModuleInit {
       if (this.postgres.isEnabled()) {
         await this.postgres.updateContest(contest.id, { status: 'UPCOMING', entryFee: 0 });
         contest = (await this.postgres.getContest(contest.id)) ?? contest;
-        void this.projectContestState(contest.id, { status: 'UPCOMING', entryFee: 0 });
       } else {
         contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING', entryFee: 0 } });
       }
@@ -298,7 +279,6 @@ export class ContestService implements OnModuleInit {
       if (this.postgres.isEnabled()) {
         await this.postgres.updateContest(contest.id, { status: 'LIVE', entryFee: 0 });
         contest = (await this.postgres.getContest(contest.id)) ?? contest;
-        void this.projectContestState(contest.id, { status: 'LIVE', entryFee: 0 });
       } else {
         contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE', entryFee: 0 } });
       }
@@ -469,7 +449,7 @@ export class ContestService implements OnModuleInit {
     // The user's signature only proves wallet ownership. The participant pays 0 CRX.
     // The database entry is the source of truth for joining; the scheduled on-chain
     // provisioning/funding workers reconcile the prize pool separately.
-    // Firestore records +10 CRX immediately so the prize pool persists across refreshes.
+    // Neon accounting persists the participant and prize-pool state across refreshes.
     // No blockchain transaction is made during join; the complete pool is transferred
     // once when the match starts.
 
@@ -483,12 +463,6 @@ export class ContestService implements OnModuleInit {
           walletAddress: wallet,
         });
 
-        void this.projectContestEntry(sqlResult.entry);
-        void this.projectContestState(contest.id, {
-          filledSpots: sqlResult.participantCount,
-          prizePoolTotal: sqlResult.participantCount * CRX_PRIZE_PER_PARTICIPANT,
-          entryFee: 0,
-        });
 
         return {
           ...sqlResult.entry,
@@ -546,8 +520,7 @@ export class ContestService implements OnModuleInit {
       if (currentContest.status === 'COMPLETED' || currentContest.status === 'CANCELLED') throw new ForbiddenException('Contest is already closed.');
 
       const currentCount = Number(currentContest.filledSpots || 0);
-      // Firestore transactions require every read to happen before the first write.
-      // Update the contest first, then create the entry; both operations below are writes.
+      // Read the current Neon records before applying the transaction writes.
       await tx.contest.update({
         where: { id: contest.id },
         data: {
