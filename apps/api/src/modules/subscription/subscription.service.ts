@@ -131,28 +131,34 @@ export class SubscriptionService {
     }
 
     const priorSubscriptions = await this.subscriptionsForUser(userId);
-    const alreadySubscribed = priorSubscriptions.some((row: any) =>
-      row.status === 'ACTIVE' || row.status === 'EXPIRED' || (row.status === 'PAYMENT_FAILED' && row.startedAt),
-    );
-    if (alreadySubscribed) {
-      throw new ConflictException('Referral can only be added before your first successful subscription.');
-    }
+    const successfulSubscriptions = priorSubscriptions
+      .filter((row: any) =>
+        row.status === 'ACTIVE' ||
+        row.status === 'EXPIRED' ||
+        (row.status === 'PAYMENT_FAILED' && row.startedAt),
+      )
+      .sort((a: any, b: any) =>
+        (this.asDate(b.startedAt)?.getTime() ?? this.asDate(b.createdAt)?.getTime() ?? 0) -
+        (this.asDate(a.startedAt)?.getTime() ?? this.asDate(a.createdAt)?.getTime() ?? 0),
+      );
+    const successfulSubscription = successfulSubscriptions[0] ?? null;
 
     const now = new Date();
+    const status = successfulSubscription ? 'VALID' : 'PENDING';
     await this.firestore.db.collection('referrals').doc(userId).set({
       id: userId,
       referrerId,
       referredUserId: userId,
       referredEmail: email ?? null,
       referralCode: code,
-      status: 'PENDING',
-      subscriptionId: null,
+      status,
+      subscriptionId: successfulSubscription?.id ?? null,
       createdAt: now,
       updatedAt: now,
-      qualifiedAt: null,
+      qualifiedAt: successfulSubscription ? now : null,
     }, { merge: false });
 
-    return { applied: true, status: 'PENDING', referrerId };
+    return { applied: true, status, referrerId };
   }
 
   private async markReferralValid(userId: string, subscriptionId: string) {
