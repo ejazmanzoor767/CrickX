@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { getApps, initializeApp, cert, App } from 'firebase-admin/app';
 import { Firestore, getFirestore } from 'firebase-admin/firestore';
 import { createHash, randomUUID } from 'crypto';
@@ -490,7 +491,7 @@ export class FirestoreService {
   readonly cachedFixture: Delegate;
   readonly cachedPlayer: Delegate;
 
-  constructor(postgres: PostgresService | null = null) {
+  constructor(@Optional() @Inject(PostgresService) postgres: PostgresService | null = null) {
     this.postgres = postgres;
 
     if (getApps().length) this.app = getApps()[0]!;
