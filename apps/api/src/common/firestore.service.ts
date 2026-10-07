@@ -657,11 +657,11 @@ export class FirestoreService {
     if (model === 'user') {
       const profile = args.data?.profile?.create;
       const wallet = args.data?.wallet?.create;
-      if (profile) await this.create({ data: { ...(profile as any), userId: id }, _model: 'profile' }, 'profile');
-      if (wallet) await this.create({ data: { ...(wallet as any), userId: id, id }, _model: 'wallet' }, 'wallet');
+      if (profile) await this.create('profile', { data: { ...(profile as any), userId: id } });
+      if (wallet) await this.create('wallet', { data: { ...(wallet as any), userId: id, id } });
     } else if (model === 'fantasyTeam') {
       const players = Array.isArray(args.data?.players?.create) ? args.data.players.create : [];
-      for (const player of players) await this.create({ data: { ...(player as any), fantasyTeamId: id }, _model: 'fantasyTeamPlayer' }, 'fantasyTeamPlayer');
+      for (const player of players) await this.create('fantasyTeamPlayer', { data: { ...(player as any), fantasyTeamId: id } });
     }
 
     const row = await this.ref(model, id).get();
@@ -684,7 +684,7 @@ export class FirestoreService {
     await this.ref(model, String(current.id)).update(updated);
 
     if (model === 'fantasyTeam' && Array.isArray(nestedPlayers)) {
-      for (const p of nestedPlayers) await this.create({ data: { ...(p as any), fantasyTeamId: current.id } }, 'fantasyTeamPlayer', 'fantasyTeamPlayer');
+      for (const p of nestedPlayers) await this.create('fantasyTeamPlayer', { data: { ...(p as any), fantasyTeamId: current.id } });
     }
     const row = await this.ref(model, String(current.id)).get();
     return this.hydrate(model, row.data(), args?.include, args?.select);
