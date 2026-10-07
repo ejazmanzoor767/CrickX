@@ -6,11 +6,10 @@ import { FantasyTeamService } from './fantasy-team.service';
 import { FantasyDraftService } from './fantasy-draft.service';
 import { ContestService } from './contest.service';
 import { FantasyTeamController, ContestController } from './fantasy.controller';
-import { FirestoreService } from '../../common/firestore.service';
 
 @Module({
   imports: [SportmonksModule, OnchainModule, SubscriptionModule],
-  providers: [FantasyTeamService, FantasyDraftService, ContestService, FirestoreService],
+  providers: [FantasyTeamService, FantasyDraftService, ContestService],
   controllers: [FantasyTeamController, ContestController],
   exports: [FantasyTeamService, FantasyDraftService, ContestService],
 })
