@@ -5,7 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
-import { FirestoreService } from '../../common/firestore.service';
 
 @Module({
   imports: [
@@ -24,7 +23,7 @@ import { FirestoreService } from '../../common/firestore.service';
       },
     }),
   ],
-  providers: [AuthService, JwtStrategy, FirestoreService],
+  providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
   exports: [AuthService],
 })
