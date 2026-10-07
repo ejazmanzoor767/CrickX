@@ -125,13 +125,27 @@ describe('SubscriptionService payment recovery', () => {
     );
   });
 
-  it('allows unlimited users to apply a qualified referrer code and keeps new referrals pending', async () => {
+  it('allows a qualified referral code to be used once and rejects a second user', async () => {
     const referralSets: Array<Record<string, any>> = [];
     const referralCodeGet = jest.fn().mockResolvedValue({
       exists: true,
       data: () => ({ userId: 'referrer-1', code: 'CRXABC12345' }),
     });
     const existingDocs = new Map<string, any>();
+    const usageGet = jest
+      .fn()
+      .mockResolvedValueOnce({ empty: true, docs: [] })
+      .mockResolvedValueOnce({
+        empty: false,
+        docs: [{
+          id: 'user-a',
+          data: () => ({
+            referredUserId: 'user-a',
+            status: 'PENDING',
+          }),
+        }],
+      });
+
     const referralCollection = {
       doc: jest.fn((userId: string) => {
         if (!existingDocs.has(userId)) {
@@ -144,6 +158,11 @@ describe('SubscriptionService payment recovery', () => {
         }
         return existingDocs.get(userId);
       }),
+      where: jest.fn(() => ({
+        limit: jest.fn(() => ({
+          get: usageGet,
+        })),
+      })),
     };
 
     const { service, firestore } = buildService();
@@ -164,12 +183,10 @@ describe('SubscriptionService payment recovery', () => {
     });
 
     const first = await service.applyReferral('user-a', 'CRXABC12345', 'a@example.com');
-    const second = await service.applyReferral('user-b', 'CRXABC12345', 'b@example.com');
-
     expect(first).toEqual({ applied: true, status: 'PENDING', referrerId: 'referrer-1' });
-    expect(second).toEqual({ applied: true, status: 'PENDING', referrerId: 'referrer-1' });
-    expect(referralSets).toHaveLength(2);
-    expect(referralSets.every((row) => row.status === 'PENDING')).toBe(true);
+
+    const second = await service.applyReferral('user-b', 'CRXABC12345', 'b@example.com');
+    await expect(Promise.resolve(second)).rejects.toThrow('This code has already been added by another user.');
   });
 
   it('rejects a referral code until the referrer has completed a subscription', async () => {
