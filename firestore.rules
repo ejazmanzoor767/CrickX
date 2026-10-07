@@ -1,8 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // CrickX application data is accessed by the NestJS API through the
-    // Firebase Admin SDK. The browser does not access Firestore directly.
+    // Only public, read-only realtime UI projections are browser-readable.
+    match /liveMatches/{fixtureId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /contests/{contestId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /contestEntries/{entryId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /leaderboardUsers/{userId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /leaderboardMatchScores/{scoreId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /fallOfWickets/{entryId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Canonical/private collections remain server-only.
     match /{document=**} {
       allow read, write: if false;
     }
