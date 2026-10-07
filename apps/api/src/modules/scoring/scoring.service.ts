@@ -5,7 +5,7 @@ import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { OnchainContestService } from '../onchain/onchain-contest.service';
 import { LeaderboardService } from './leaderboard.service';
 import { ScoringRules, computePlayerScoreBreakdown, rulesForFormat } from './scoring.rules';
-import { CloudSqlService } from '../../common/cloud-sql.service';
+import { PostgresService } from '../../common/cloud-sql.service';
 
 function isFinished(status: string | null | undefined, live: 0 | 1) {
   // Sportmonks can briefly keep the live flag set while publishing a terminal
@@ -68,11 +68,11 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     private readonly sportmonks: SportmonksDataService,
     private readonly onchain: OnchainContestService,
     private readonly leaderboard: LeaderboardService,
-    private readonly cloudSql: CloudSqlService,
+    private readonly postgres: PostgresService,
   ) {}
 
   onModuleInit() {
-    // Cloud SQL is authoritative when enabled. Firestore remains a realtime
+    // PostgreSQL is authoritative when enabled. Firestore remains a realtime
     // projection, so scoring startup must not scan Firestore for bootstrap data.
     // Recovery is intentionally infrequent. The main 30-second scoring loop
     // handles live contests; this sweep is only a terminal-state safety net.
@@ -293,12 +293,12 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async fundStartedContestPrizePools(fixtureId: number) {
-    if (this.cloudSql.isEnabled()) {
-      const contests = await this.cloudSql.listContestsByFixture(fixtureId, true);
+    if (this.postgres.isEnabled()) {
+      const contests = await this.postgres.listContestsByFixture(fixtureId, true);
 
       for (const contest of contests) {
         if (!contest) continue;
-        const participantCount = await this.cloudSql.countContestEntries(contest.id);
+        const participantCount = await this.postgres.countContestEntries(contest.id);
         this.logger.log(
           `SQL contest funding check fixture=${fixtureId} contest=${contest.id} participants=${participantCount} chainContestId=${String(contest.chainContestId ?? '')}`,
         );
@@ -323,7 +323,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
             prizePoolFundingAt: status === 'FUNDED' ? new Date() : contest.prizePoolFundingAt ?? null,
             prizePoolFundingError: null,
           };
-          await this.cloudSql.updateContest(contest.id, state);
+          await this.postgres.updateContest(contest.id, state);
           void this.projectContestState(contest.id, state);
           this.logger.log(
             `SQL contest ${contest.id} bulk CRX funding complete: participants=${participantCount}, pool=${totalPool} CRX, tokenTx=${funding.fundingTxHash ?? 'none'}, accountingTx=${funding.registrationTxHash ?? 'none'}`,
@@ -334,7 +334,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
             prizePoolFundingStatus: 'FAILED',
             prizePoolFundingError: message.slice(0, 1000),
           };
-          await this.cloudSql.updateContest(contest.id, failureState);
+          await this.postgres.updateContest(contest.id, failureState);
           void this.projectContestState(contest.id, failureState);
           this.logger.error(`SQL bulk CRX funding failed for contest ${contest.id}: ${message}`);
         }
@@ -559,16 +559,16 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       for (const entry of contest.entries) {
         const scored = this.calculateTeamScore(entry.fantasyTeam, battingByPlayer, bowlingByPlayer, fieldingByPlayer, dotBallsByPlayer, rules, fixture.winner_team_id, fixture.man_of_match_id);
         await this.prisma.contestEntry.update({ where: { id: entry.id }, data: { totalPoints: scored.total } });
-        if (this.cloudSql.isEnabled()) await this.cloudSql.updateContestEntry(entry.id, { totalPoints: scored.total });
+        if (this.postgres.isEnabled()) await this.postgres.updateContestEntry(entry.id, { totalPoints: scored.total });
         const previous = userFixtureScores.get(entry.userId) ?? -Infinity;
         if (scored.total > previous) userFixtureScores.set(entry.userId, scored.total);
       }
 
       const ranked = await this.prisma.contestEntry.findMany({ where: { contestId: contest.id }, orderBy: { totalPoints: 'desc' } });
       await this.prisma.$transaction(ranked.map((entry, index) => this.prisma.contestEntry.update({ where: { id: entry.id }, data: { rank: index + 1 } })));
-      if (this.cloudSql.isEnabled()) {
+      if (this.postgres.isEnabled()) {
         for (const [index, entry] of ranked.entries()) {
-          await this.cloudSql.updateContestEntry(entry.id, { rank: index + 1 });
+          await this.postgres.updateContestEntry(entry.id, { rank: index + 1 });
         }
       }
 
@@ -945,10 +945,10 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async pollLiveContests() {
-    if (this.cloudSql.isEnabled()) {
+    if (this.postgres.isEnabled()) {
       try {
-        let activeContests = await this.cloudSql.listStartedActiveContests();
-        // Do not bootstrap from Firestore here. Cloud SQL is authoritative.
+        let activeContests = await this.postgres.listStartedActiveContests();
+        // Do not bootstrap from Firestore here. PostgreSQL is authoritative.
         const fixtureIds = new Set<number>(
           activeContests.map((contest: any) => Number(contest.sportmonksFixtureId)),
         );
