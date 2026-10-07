@@ -145,7 +145,7 @@ export default function ProfilePage() {
     setReferralError('');
     setReferralSuccess('');
     try {
-      const result = await api.applyReferral(code) as { status?: string };
+      await api.applyReferral(code);
       setReferralCodeInput('');
       setReferral(await api.referralInfo());
       setReferralSuccess('Referral code applied successfully.');
