@@ -87,6 +87,15 @@ export class SubscriptionService {
     return code;
   }
 
+  private async hasSuccessfulSubscription(userId: string) {
+    const subscriptions = await this.subscriptionsForUser(userId);
+    return subscriptions.some((row: any) =>
+      row.status === 'ACTIVE' ||
+      row.status === 'EXPIRED' ||
+      (row.status === 'PAYMENT_FAILED' && row.startedAt),
+    );
+  }
+
   async referralInfo(userId: string) {
     const code = await this.ensureReferralCode(userId);
     const snapshot = await this.firestore.db.collection('referrals').where('referrerId', '==', userId).get();
@@ -122,6 +131,13 @@ export class SubscriptionService {
     const referrerId = String(codeDoc.data()?.userId ?? '');
     if (!referrerId) throw new ConflictException('Referral code is not available.');
     if (referrerId === userId) throw new ConflictException('You cannot use your own referral code.');
+
+    // A referral code only becomes usable after its owner has successfully
+    // subscribed at least once. There is no limit on how many users can use
+    // one qualified referrer's code.
+    if (!await this.hasSuccessfulSubscription(referrerId)) {
+      throw new ConflictException('This referral code is not active yet. The referrer must complete a subscription first.');
+    }
 
     const existing = await this.firestore.db.collection('referrals').doc(userId).get();
     if (existing.exists) {
@@ -169,12 +185,43 @@ export class SubscriptionService {
     const row = snap.data() as any;
     if (row.status === 'VALID') return;
 
+    // Both sides must have completed at least one successful subscription.
+    // This also protects older PENDING referral records created before the
+    // current referrer qualification rule was enforced.
+    if (!row.referrerId || !await this.hasSuccessfulSubscription(String(row.referrerId))) {
+      return;
+    }
+
     await ref.set({
       status: 'VALID',
       subscriptionId,
       qualifiedAt: new Date(),
       updatedAt: new Date(),
     }, { merge: true });
+  }
+
+  private async activatePendingReferralsForReferrer(referrerId: string) {
+    if (!await this.hasSuccessfulSubscription(referrerId)) return;
+
+    const snapshot = await this.firestore.db
+      .collection('referrals')
+      .where('referrerId', '==', referrerId)
+      .where('status', '==', 'PENDING')
+      .get();
+
+    for (const doc of snapshot.docs) {
+      const row = doc.data() as any;
+      if (!row.referredUserId || !await this.hasSuccessfulSubscription(String(row.referredUserId))) {
+        continue;
+      }
+
+      await doc.ref.set({
+        status: 'VALID',
+        subscriptionId: row.subscriptionId ?? null,
+        qualifiedAt: new Date(),
+        updatedAt: new Date(),
+      }, { merge: true });
+    }
   }
 
 
@@ -260,6 +307,7 @@ export class SubscriptionService {
     });
     try {
       await this.markReferralValid(userId, subscription.id);
+      await this.activatePendingReferralsForReferrer(userId);
     } catch {
       // Referral qualification is secondary; a verified payment must still
       // activate the subscription even when referral storage is temporarily unavailable.
@@ -582,6 +630,7 @@ export class SubscriptionService {
         data: { status: 'ACTIVE', startedAt: now, expiresAt },
       });
       await this.markReferralValid(payment.userId, payment.subscriptionId);
+      await this.activatePendingReferralsForReferrer(payment.userId);
       return { received: true };
     }
 
