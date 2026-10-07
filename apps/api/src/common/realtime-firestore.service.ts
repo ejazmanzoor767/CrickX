@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { cert, getApps, initializeApp, type App } from 'firebase-admin/app';
-import { Firestore, getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 
 @Injectable()
 export class RealtimeFirestoreService implements OnModuleInit {
