@@ -1,6 +1,4 @@
-import { Inject, Injectable, Optional } from '@nestjs/common';
-import { getApps, initializeApp, cert, App } from 'firebase-admin/app';
-import { Firestore, getFirestore } from 'firebase-admin/firestore';
+import { Injectable } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
 import { AsyncLocalStorage } from 'async_hooks';
 import type { Pool, PoolClient, QueryResultRow } from 'pg';
@@ -463,9 +461,7 @@ class SqlPersistenceDb implements DatabaseCompat {
 
 @Injectable()
 export class FirestoreService {
-  readonly realtimeDb: Firestore;
-  private readonly app: App;
-  private readonly postgres: PostgresService | null;
+  private readonly postgres: PostgresService;
   private sqlDb: SqlPersistenceDb | null = null;
 
   readonly user: Delegate;
@@ -490,20 +486,8 @@ export class FirestoreService {
   readonly cachedFixture: Delegate;
   readonly cachedPlayer: Delegate;
 
-  constructor(@Optional() @Inject(PostgresService) postgres: PostgresService | null = null) {
+  constructor(postgres: PostgresService) {
     this.postgres = postgres;
-
-    if (getApps().length) this.app = getApps()[0]!;
-    else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-      this.app = initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)) });
-    } else if (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
-      const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'crickx-3d806';
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
-      this.app = initializeApp({ credential: cert({ projectId, clientEmail: process.env.FIREBASE_CLIENT_EMAIL, privateKey }) });
-    } else {
-      this.app = initializeApp({ projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'crickx-3d806' });
-    }
-    this.realtimeDb = getFirestore(this.app);
 
     this.user = this.delegate('user');
     this.refreshToken = this.delegate('refreshToken');
@@ -529,8 +513,7 @@ export class FirestoreService {
   }
 
   private primaryEnabled() {
-    const mode = String(process.env.CRICKX_PRIMARY_STORAGE ?? process.env.CRICKX_CONTEST_STORAGE ?? '').trim().toLowerCase();
-    return Boolean(this.postgres?.isEnabled()) && ['postgres', 'postgresql', 'neon', 'cloudsql', 'true'].includes(mode);
+    return this.postgres.isEnabled();
   }
 
   private primaryDb() {
@@ -540,7 +523,11 @@ export class FirestoreService {
   }
 
   get db(): DatabaseCompat {
-    return (this.primaryDb() ?? (this.realtimeDb as unknown as DatabaseCompat));
+    const primary = this.primaryDb();
+    if (!primary) {
+      throw new Error('Neon/PostgreSQL is required. Configure DATABASE_URL or NEON_DATABASE_URL.');
+    }
+    return primary;
   }
 
   private delegate(model: string): Delegate {
@@ -591,45 +578,6 @@ export class FirestoreService {
     return null;
   }
 
-  private legacyFindRows(model: string, args: any = {}) {
-    const collection = this.realtimeDb.collection(COLLECTIONS[model] ?? (model + 's'));
-    const where = this.expandWhere(args?.where);
-    let query: any = collection;
-    const entries = where && typeof where === 'object' ? Object.entries(where) : [];
-    const canUseServerFilter = entries.length > 0 && !('AND' in where) && !('OR' in where);
-    if (canUseServerFilter) {
-      for (const [field, expected] of entries) {
-        if (expected && typeof expected === 'object' && !(expected instanceof Date) && !Array.isArray(expected) && !(expected instanceof FirestoreDecimal)) {
-          if ('in' in expected) query = query.where(field, 'in', (expected as any).in);
-          else if ('notIn' in expected) query = query.where(field, 'not-in', (expected as any).notIn);
-          else if ('lt' in expected) query = query.where(field, '<', (expected as any).lt);
-          else if ('lte' in expected) query = query.where(field, '<=', (expected as any).lte);
-          else if ('gt' in expected) query = query.where(field, '>', (expected as any).gt);
-          else if ('gte' in expected) query = query.where(field, '>=', (expected as any).gte);
-          else if ('equals' in expected) query = query.where(field, '==', (expected as any).equals);
-        } else if (expected instanceof FirestoreDecimal) query = query.where(field, '==', expected.toNumber());
-        else if (expected instanceof Date) query = query.where(field, '==', expected);
-        else query = query.where(field, '==', expected);
-      }
-    }
-    return query.get().then((snapshot: any) => {
-      let rows = snapshot.docs.map((d: any) => decorateRecord(model, { id: d.id, ...(d.data() as any) }));
-      rows = rows.filter((r: any) => whereMatches(r, where));
-      return sortRows(rows, args?.orderBy);
-    });
-  }
-
-  private async migrateLegacyRows(model: string, rows: any[]) {
-    if (!this.primaryEnabled() || !rows.length) return;
-    const collection = this.col(model);
-    for (const row of rows) {
-      const id = String(row.id ?? randomUUID());
-      const data = { ...row };
-      delete data.id;
-      await collection.doc(id).set(data, { merge: false });
-    }
-  }
-
   private async findRows(model: string, args: any = {}) {
     const where = this.expandWhere(args?.where);
     const query = this.col(model);
@@ -660,20 +608,6 @@ export class FirestoreService {
     return rows;
   }
 
-  private async maybeMigrateOnMiss(model: string, args: any, rows: any[]) {
-    if (this.primaryEnabled() || rows.length || ['cachedFixture', 'cachedPlayer'].includes(model)) return rows;
-    try {
-      const legacy = await this.legacyFindRows(model, args);
-      if (legacy.length) {
-        await this.migrateLegacyRows(model, legacy);
-        return legacy;
-      }
-    } catch {
-      // Migration is best-effort. The SQL store remains authoritative.
-    }
-    return rows;
-  }
-
   async findUnique(model: string, args: any) {
     const where = this.expandWhere(args?.where);
     const direct = this.uniqueDirectId(model, where);
@@ -683,13 +617,11 @@ export class FirestoreService {
       row = snap.exists ? decorateRecord(model, { id: snap.id, ...(snap.data() as any) }) : null;
     }
     if (!row) row = (await this.findRows(model, { where }))[0] ?? null;
-    if (!row) row = (await this.maybeMigrateOnMiss(model, { where }, []))[0] ?? null;
     return row ? this.hydrate(model, row, args?.include, args?.select) : null;
   }
 
   async findFirstOp(model: string, args: any) {
     let rows = await this.findRows(model, args);
-    rows = await this.maybeMigrateOnMiss(model, args, rows);
     const row = rows[0] ?? null;
     return row ? this.hydrate(model, row, args?.include, args?.select) : null;
   }
@@ -798,12 +730,9 @@ export class FirestoreService {
 
   async $transaction<T>(arg: ((tx: this) => Promise<T>) | Array<Promise<T>>): Promise<T | T[]> {
     const primary = this.primaryDb();
+    if (!primary) throw new Error('Neon/PostgreSQL is required for transactions.');
     if (Array.isArray(arg)) return Promise.all(arg);
-    if (primary) return primary.runTransaction(() => arg(this));
-    return this.realtimeDb.runTransaction((t: any) => {
-      // Legacy mode is retained only when Cloud SQL is not enabled.
-      return Promise.resolve(arg(this));
-    }) as Promise<T>;
+    return primary.runTransaction(() => arg(this));
   }
 
   async rawDelete(model: string, id: string) {
@@ -813,29 +742,13 @@ export class FirestoreService {
   async transactionGet(collectionName: string, id: string) {
     const primary = this.primaryDb();
     if (primary) return primary.transactionGet(collectionName, id);
-    throw new Error('transactionGet is only available inside a Cloud SQL transaction when primary storage is enabled.');
+    throw new Error('transactionGet requires an active Neon/PostgreSQL transaction.');
   }
 
   async transactionSet(collectionName: string, id: string, data: Record<string, unknown>, merge = true) {
     const primary = this.primaryDb();
     if (primary) return primary.transactionSet(collectionName, id, data, merge);
-    throw new Error('transactionSet is only available inside a Cloud SQL transaction when primary storage is enabled.');
-  }
-
-  private async migrateLegacyDoc(model: string, id: string) {
-    try {
-      const snap = await this.realtimeDb.collection(COLLECTIONS[model] ?? (model + 's')).doc(id).get();
-      if (!snap.exists) return null;
-      const row = decorateRecord(model, { id: snap.id, ...(snap.data() as any) });
-      if (this.primaryEnabled()) {
-        const data = { ...row };
-        delete data.id;
-        await this.ref(model, id).set(data, { merge: false });
-      }
-      return row;
-    } catch {
-      return null;
-    }
+    throw new Error('transactionSet requires an active Neon/PostgreSQL transaction.');
   }
 
   private async hydrate(model: string, row: any, include?: any, select?: any): Promise<any> {
@@ -854,4 +767,5 @@ export class FirestoreService {
   }
 }
 
+// Kept under the legacy service name for module compatibility; persistence is Neon/PostgreSQL-only.
 export { FirestoreService as PrismaService };
