@@ -217,7 +217,7 @@ export default function WalletPage() {
     </div>
 
     {!address ? (
-      <div className="card" style={{ padding: 28 }}>
+      <div className="card wallet-connect-card" style={{ padding: 28 }}>
         <h2>Connect your wallet</h2>
         <p className="section-subtitle">Connect through Reown AppKit. Reown handles supported browser extensions, WalletConnect/mobile wallets, and its full wallet directory from one connection flow.</p>
 
@@ -229,8 +229,8 @@ export default function WalletPage() {
         </p>
       </div>
     ) : <>
-      <div className="panel-grid" style={{ marginBottom: 14 }}>
-        <div className="card" style={{ padding: 28, background: 'linear-gradient(135deg,rgba(155,255,71,.10),rgba(18,23,34,.96))' }}>
+      <div className="panel-grid wallet-overview-grid" style={{ marginBottom: 14 }}>
+        <div className="card wallet-balance-card" style={{ padding: 28, background: 'linear-gradient(135deg,rgba(155,255,71,.10),rgba(18,23,34,.96))' }}>
           <p className="eyebrow">AVAILABLE CRX</p>
           <div style={{ fontFamily: 'Barlow Condensed', fontSize: 58, fontWeight: 900 }}>
             {wallet ? wallet.balance.toLocaleString(undefined, { maximumFractionDigits: 6 }) : '—'} <span style={{ fontSize: 24 }}>CRX</span>
@@ -242,7 +242,7 @@ export default function WalletPage() {
           </div>
 
         </div>
-        <div className="card" style={{ padding: 28 }}>
+        <div className="card wallet-connected-card" style={{ padding: 28 }}>
           <p className="eyebrow">CONNECTED WALLET</p>
           <h2>{walletName}</h2>
           <p className="section-subtitle" style={{ wordBreak: 'break-all' }}>{address}</p>
@@ -250,7 +250,7 @@ export default function WalletPage() {
         </div>
       </div>
 
-      <div className="card" style={{ padding: 24, marginBottom: 14, background: 'linear-gradient(145deg,rgba(155,255,71,.09),rgba(18,23,34,.98) 52%,rgba(10,13,19,.98))', border: '1px solid rgba(155,255,71,.15)' }}>
+      <div className="card wallet-early-buy-card" style={{ padding: 24, marginBottom: 14, background: 'linear-gradient(145deg,rgba(155,255,71,.09),rgba(18,23,34,.98) 52%,rgba(10,13,19,.98))', border: '1px solid rgba(155,255,71,.15)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div>
             <p className="eyebrow">EARLY ACCESS</p>
@@ -260,8 +260,8 @@ export default function WalletPage() {
           <span className="badge-live">$0.002 / CRX</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginTop: 18 }}>
-          <div className="card" style={{ padding: 16, background: 'rgba(0,0,0,.16)', border: '1px solid rgba(255,255,255,.07)' }}>
+        <div className="wallet-buy-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginTop: 18 }}>
+          <div className="card wallet-buy-card" style={{ padding: 16, background: 'rgba(0,0,0,.16)', border: '1px solid rgba(255,255,255,.07)' }}>
             <small style={{ color: 'var(--muted)', fontWeight: 900, letterSpacing: '.12em' }}>YOU PAY</small>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 7 }}>
               <span style={{ color: 'var(--muted)', fontSize: 20 }}>$</span>
@@ -293,7 +293,7 @@ export default function WalletPage() {
         </p>
       </div>
 
-      <div className="card" style={{ padding: 24 }}>
+      <div className="card wallet-send-card" style={{ padding: 24 }}>
         <p className="eyebrow">SEND CRX</p>
         <h2>Transfer CRX to another wallet</h2>
         <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
