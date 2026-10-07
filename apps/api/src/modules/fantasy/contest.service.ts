@@ -26,7 +26,9 @@ export class ContestService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    void this.bootstrapCloudSql();
+    // Cloud SQL is now the primary store. Firestore is used only as a realtime projection.
+    // The old automatic contest bootstrap queried Firestore on every startup and could exhaust
+    // the Firestore no-cost quota before Cloud SQL was even needed.
     void this.provisionUpcomingChainContests();
   }
 
@@ -54,11 +56,7 @@ export class ContestService implements OnModuleInit {
 
   private async projectContestEntry(entry: any) {
     try {
-      await this.prisma.contestEntry.upsert({
-        where: { id: entry.id },
-        update: entry,
-        create: entry,
-      });
+      await this.prisma.realtimeDb.collection('contestEntries').doc(String(entry.id)).set({ id: entry.id, ...entry }, { merge: true });
     } catch (error) {
       this.logger.warn(`Firestore contest-entry projection failed entry=${String(entry.id)}: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -66,7 +64,7 @@ export class ContestService implements OnModuleInit {
 
   private async projectContestState(contestId: string, data: Record<string, any>) {
     try {
-      await this.prisma.contest.update({ where: { id: contestId }, data });
+      await this.prisma.realtimeDb.collection('contests').doc(String(contestId)).set({ id: contestId, ...data }, { merge: true });
     } catch (error) {
       this.logger.warn(`Firestore contest projection failed contest=${contestId}: ${error instanceof Error ? error.message : String(error)}`);
     }
