@@ -620,7 +620,7 @@ export class ContestService implements OnModuleInit {
   async myEntries(userId: string) {
     if (this.cloudSql.isEnabled()) {
       const entries = await this.cloudSql.listUserContestEntries(userId);
-      return Promise.all(entries.map(async (entry) => ({
+      return Promise.all(entries.map(async (entry: any) => ({
         ...entry,
         contest: await this.readContest(entry.contestId),
         fantasyTeam: await this.prisma.fantasyTeam.findUnique({
