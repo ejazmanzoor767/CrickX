@@ -32,15 +32,6 @@ export class ContestService implements OnModuleInit {
     void this.provisionUpcomingChainContests();
   }
 
-  private async bootstrapCloudSql() {
-    if (!this.cloudSql.isEnabled()) return;
-    try {
-      await this.cloudSql.bootstrapFromFirestore(this.prisma.db);
-    } catch (error) {
-      this.logger.warn(`Cloud SQL contest bootstrap skipped: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
   private async readContest(contestId: string) {
     if (this.cloudSql.isEnabled()) {
       const contest = await this.cloudSql.getContest(contestId);
