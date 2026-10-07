@@ -89,7 +89,7 @@ function decorateRecord(model: string, data: Record<string, any>): Record<string
   return out;
 }
 
-function scalar(v: unknown): unknown {
+function scalar(v: unknown): any {
   return v instanceof FirestoreDecimal ? v.toNumber() : v;
 }
 
@@ -183,6 +183,7 @@ type TransactionLike = {
   set(ref: DocumentRefLike, data: any, options?: { merge?: boolean }): Promise<void> | void;
   update(ref: DocumentRefLike, data: any): Promise<void> | void;
   delete(ref: DocumentRefLike): Promise<void> | void;
+  create(ref: DocumentRefLike, data: any): Promise<void> | void;
 };
 
 type BatchLike = {
@@ -458,7 +459,7 @@ class SqlPersistenceDb implements DatabaseCompat {
 export class FirestoreService {
   readonly realtimeDb: Firestore;
   private readonly app: App;
-  private readonly cloudSql: CloudSqlService;
+  private readonly cloudSql: CloudSqlService | null;
   private sqlDb: SqlPersistenceDb | null = null;
 
   readonly user: Delegate;
@@ -483,7 +484,7 @@ export class FirestoreService {
   readonly cachedFixture: Delegate;
   readonly cachedPlayer: Delegate;
 
-  constructor(cloudSql: CloudSqlService) {
+  constructor(cloudSql: CloudSqlService | null = null) {
     this.cloudSql = cloudSql;
 
     if (getApps().length) this.app = getApps()[0]!;
@@ -523,7 +524,7 @@ export class FirestoreService {
 
   private primaryEnabled() {
     const mode = String(process.env.CRICKX_PRIMARY_STORAGE ?? process.env.CRICKX_CONTEST_STORAGE ?? '').trim().toLowerCase();
-    return this.cloudSql.isEnabled() && ['cloudsql', 'true'].includes(mode);
+    return Boolean(this.cloudSql?.isEnabled()) && ['cloudsql', 'true'].includes(mode);
   }
 
   private primaryDb() {
