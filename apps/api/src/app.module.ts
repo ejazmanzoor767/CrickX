@@ -14,16 +14,16 @@ import { ScoringModule } from './modules/scoring/scoring.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { PredictionModule } from './modules/prediction/prediction.module';
-import { FirestoreService } from './common/firestore.service';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { HealthController } from './health.controller';
-import { PostgresModule } from './common/postgres.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     ScheduleModule.forRoot(),
+    CommonModule,
     SportmonksModule,
     AuthModule,
     MatchesModule,
@@ -34,14 +34,12 @@ import { PostgresModule } from './common/postgres.module';
     ProfileModule,
     ScoringModule,
     AdminModule,
-    PostgresModule,
   ],
   controllers: [HealthController],
   providers: [
-    FirestoreService,
     JwtAuthGuard,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
-  exports: [FirestoreService, JwtAuthGuard],
+  exports: [JwtAuthGuard],
 })
 export class AppModule {}
