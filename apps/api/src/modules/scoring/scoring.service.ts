@@ -5,6 +5,7 @@ import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { OnchainContestService } from '../onchain/onchain-contest.service';
 import { LeaderboardService } from './leaderboard.service';
 import { ScoringRules, computePlayerScoreBreakdown, rulesForFormat } from './scoring.rules';
+import { CloudSqlService } from '../../common/cloud-sql.service';
 
 function isFinished(status: string | null | undefined, live: 0 | 1) {
   // Sportmonks can briefly keep the live flag set while publishing a terminal
@@ -67,9 +68,15 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     private readonly sportmonks: SportmonksDataService,
     private readonly onchain: OnchainContestService,
     private readonly leaderboard: LeaderboardService,
+    private readonly cloudSql: CloudSqlService,
   ) {}
 
   onModuleInit() {
+    if (this.cloudSql.isEnabled()) {
+      void this.cloudSql.bootstrapFromFirestore(this.prisma.db).catch((error) => {
+        this.logger.warn(`Cloud SQL scoring bootstrap skipped: ${error instanceof Error ? error.message : String(error)}`);
+      });
+    }
     // Recovery is intentionally infrequent. The main 30-second scoring loop
     // handles live contests; this sweep is only a terminal-state safety net.
     void this.runFinishedContestSweep();
@@ -866,6 +873,35 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async pollLiveContests() {
+    if (this.cloudSql.isEnabled()) {
+      try {
+        let activeContests = await this.cloudSql.listStartedActiveContests();
+        if (!activeContests.length) {
+          await this.cloudSql.bootstrapFromFirestore(this.prisma.db);
+          activeContests = await this.cloudSql.listStartedActiveContests();
+        }
+        const fixtureIds = new Set<number>(
+          activeContests.map((contest: any) => Number(contest.sportmonksFixtureId)),
+        );
+        for (const fixtureId of fixtureIds) {
+          if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
+          try {
+            const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+            if (isFinished(fixture.status, fixture.live)) continue;
+            await this.scoreFixture(fixtureId);
+          } catch (error) {
+            this.logger.error(
+              `SQL-first scoring failed for fixture ${fixtureId}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        }
+      } catch (error) {
+        this.logger.warn(
+          `SQL-first contest poll failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      return;
+    }
     // Contest documents are the source of truth for fantasy scoring.
     // Do not scan the entire fantasyTeams collection every 30 seconds just to
     // discover fixture IDs; score only contests that are actually UPCOMING/LIVE.
