@@ -72,11 +72,8 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    if (this.cloudSql.isEnabled()) {
-      void this.cloudSql.bootstrapFromFirestore(this.prisma.db).catch((error) => {
-        this.logger.warn(`Cloud SQL scoring bootstrap skipped: ${error instanceof Error ? error.message : String(error)}`);
-      });
-    }
+    // Cloud SQL is authoritative when enabled. Firestore remains a realtime
+    // projection, so scoring startup must not scan Firestore for bootstrap data.
     // Recovery is intentionally infrequent. The main 30-second scoring loop
     // handles live contests; this sweep is only a terminal-state safety net.
     void this.runFinishedContestSweep();
@@ -955,10 +952,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     if (this.cloudSql.isEnabled()) {
       try {
         let activeContests = await this.cloudSql.listStartedActiveContests();
-        if (!activeContests.length) {
-          await this.cloudSql.bootstrapFromFirestore(this.prisma.db);
-          activeContests = await this.cloudSql.listStartedActiveContests();
-        }
+        // Do not bootstrap from Firestore here. Cloud SQL is authoritative.
         const fixtureIds = new Set<number>(
           activeContests.map((contest: any) => Number(contest.sportmonksFixtureId)),
         );
