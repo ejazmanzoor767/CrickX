@@ -6,6 +6,7 @@ import { OnchainContestService } from '../onchain/onchain-contest.service';
 import { LeaderboardService } from './leaderboard.service';
 import { ScoringRules, computePlayerScoreBreakdown, rulesForFormat } from './scoring.rules';
 import { PostgresService } from '../../common/postgres.service';
+import { RealtimeFirestoreService } from '../../common/realtime-firestore.service';
 
 function isFinished(status: string | null | undefined, live: 0 | 1) {
   // Sportmonks can briefly keep the live flag set while publishing a terminal
@@ -69,6 +70,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     private readonly onchain: OnchainContestService,
     private readonly leaderboard: LeaderboardService,
     private readonly postgres: PostgresService,
+    private readonly realtime: RealtimeFirestoreService,
   ) {}
 
   onModuleInit() {
@@ -283,11 +285,39 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async projectContestState(contestId: string, data: Record<string, any>) {
+    if (!this.realtime.isEnabled()) return;
     try {
-      await this.prisma.contest.update({ where: { id: contestId }, data });
+      await this.realtime.db.collection('contests').doc(String(contestId)).set({
+        id: String(contestId),
+        ...data,
+        updatedAt: new Date(),
+      }, { merge: true });
     } catch (error) {
       this.logger.warn(
-        `Firestore contest projection failed contest=${contestId}: ${error instanceof Error ? error.message : String(error)}`,
+        `Firestore contest realtime projection failed contest=${contestId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async projectContestLeaderboard(contestId: string, ranked: any[]) {
+    if (!this.realtime.isEnabled()) return;
+    try {
+      await Promise.all(
+        ranked.slice(0, 200).map((entry: any, index: number) =>
+          this.realtime.db.collection('contestEntries').doc(String(entry.id)).set({
+            id: String(entry.id),
+            contestId: String(contestId),
+            fantasyTeamId: String(entry.fantasyTeamId ?? ''),
+            totalPoints: Number(entry.totalPoints ?? 0),
+            rank: index + 1,
+            prizeWon: entry.prizeWon == null ? 0 : Number(entry.prizeWon),
+            updatedAt: new Date(),
+          }, { merge: true }),
+        ),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Firestore contest leaderboard projection failed contest=${contestId}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -571,6 +601,13 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
           await this.postgres.updateContestEntry(entry.id, { rank: index + 1 });
         }
       }
+
+      void this.projectContestLeaderboard(contest.id, ranked);
+      void this.projectContestState(contest.id, {
+        status: final ? 'COMPLETED' : (actuallyLive ? 'LIVE' : contest.status),
+        filledSpots: ranked.length,
+        prizePoolTotal: Number(contest.prizePoolTotal ?? ranked.length * 10),
+      });
 
       if (!final && actuallyLive && contest.status === 'UPCOMING') {
         await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE' } });
