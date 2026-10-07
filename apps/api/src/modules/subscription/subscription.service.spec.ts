@@ -125,6 +125,50 @@ describe('SubscriptionService payment recovery', () => {
     );
   });
 
+  it('allows an existing subscriber to apply another user\'s referral code and marks it valid', async () => {
+    const referralSet = jest.fn().mockResolvedValue(undefined);
+    const referralCodeGet = jest.fn().mockResolvedValue({
+      exists: true,
+      data: () => ({ userId: 'referrer-1', code: 'CRXABC12345' }),
+    });
+    const existingReferralGet = jest.fn().mockResolvedValue({ exists: false });
+
+    const { service, firestore } = buildService();
+    firestore.subscription.findMany.mockResolvedValue([
+      {
+        id: 'sub-current',
+        userId: 'user-1',
+        status: 'ACTIVE',
+        startedAt: new Date(Date.now() - 60_000),
+        createdAt: new Date(Date.now() - 60_000),
+      },
+    ]);
+    firestore.db.collection.mockImplementation((name: string) => {
+      if (name === 'referralCodes') {
+        return { doc: jest.fn(() => ({ get: referralCodeGet })) };
+      }
+      if (name === 'referrals') {
+        return { doc: jest.fn(() => ({ get: existingReferralGet, set: referralSet })) };
+      }
+      throw new Error(`Unexpected collection: ${name}`);
+    });
+
+    const result = await service.applyReferral('user-1', 'CRXABC12345', 'user@example.com');
+
+    expect(result).toEqual({ applied: true, status: 'VALID', referrerId: 'referrer-1' });
+    expect(referralSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        referrerId: 'referrer-1',
+        referredUserId: 'user-1',
+        referralCode: 'CRXABC12345',
+        status: 'VALID',
+        subscriptionId: 'sub-current',
+        qualifiedAt: expect.any(Date),
+      }),
+      { merge: false },
+    );
+  });
+
   it('does not activate a pending subscription when the gateway order does not match', async () => {
     const createdAt = new Date(Date.now() - 60_000);
     const subscription = {
