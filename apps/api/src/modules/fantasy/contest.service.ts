@@ -394,7 +394,7 @@ export class ContestService implements OnModuleInit {
 
   async prepareJoin(userId: string, dto: PrepareJoinContestDto) {
     await this.assertActiveSubscription(userId);
-    let contest = await this.prisma.contest.findUnique({ where: { id: dto.contestId } });
+    let contest = await this.readContest(dto.contestId);
     if (!contest) throw new NotFoundException('Contest not found.');
 
     const liveFixture = await this.sportmonks.getFixture(contest.sportmonksFixtureId, { forceLive: true });
@@ -480,6 +480,49 @@ export class ContestService implements OnModuleInit {
     // Firestore records +10 CRX immediately so the prize pool persists across refreshes.
     // No blockchain transaction is made during join; the complete pool is transferred
     // once when the match starts.
+
+    if (this.cloudSql.isEnabled()) {
+      try {
+        const sqlResult = await this.cloudSql.joinContest({
+          entryId: `entry_${contest.id}_${userId}`,
+          contestId: contest.id,
+          userId,
+          fantasyTeamId: team.id,
+          walletAddress: wallet,
+        });
+
+        void this.projectContestEntry(sqlResult.entry);
+        void this.projectContestState(contest.id, {
+          filledSpots: sqlResult.participantCount,
+          prizePoolTotal: sqlResult.participantCount * CRX_PRIZE_PER_PARTICIPANT,
+          entryFee: 0,
+        });
+
+        return {
+          ...sqlResult.entry,
+          freeEntry: true,
+          participantCount: sqlResult.participantCount,
+          prizePoolTotal: sqlResult.participantCount * CRX_PRIZE_PER_PARTICIPANT,
+          prizePoolPerParticipant: CRX_PRIZE_PER_PARTICIPANT,
+          poolFundingTxHash: null,
+          poolFundingAlreadyRecorded: false,
+          poolFundingStatus: 'PENDING_MATCH_START',
+        };
+      } catch (error) {
+        if (error instanceof CloudSqlContestError) {
+          if (['ALREADY_JOINED', 'WALLET_USED', 'TEAM_USED'].includes(error.code)) {
+            throw new ForbiddenException(error.message);
+          }
+          if (error.code === 'CONTEST_STARTED') {
+            throw new ForbiddenException('Entries are closed because the match has started.');
+          }
+          if (error.code === 'CONTEST_CLOSED') {
+            throw new ForbiddenException('Contest is already closed.');
+          }
+        }
+        throw error;
+      }
+    }
 
     const entryId = `entry_${contest.id}_${userId}`;
     const walletLockId = `${contest.id}_${wallet.toLowerCase()}`;
