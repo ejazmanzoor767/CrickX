@@ -64,3 +64,11 @@ services:
         sync: false
       - key: CRICKX_WEB_URL
         value: https://crickxfantasy.site
+      - key: CLOUD_SQL_DATABASE_URL
+        sync: false
+      - key: CLOUD_SQL_SSL
+        value: 'true'
+      - key: CLOUD_SQL_POOL_MAX
+        value: '5'
+      - key: CRICKX_CONTEST_STORAGE
+        value: auto
