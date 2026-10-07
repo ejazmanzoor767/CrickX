@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
-import { connectWallet, signContestJoinMessage } from '../../lib/web3';
+import { connectWallet, getCurrentWallet, signContestJoinMessage } from '../../lib/web3';
 import type { Address } from 'viem';
 
 function ContestContent() {
@@ -62,6 +62,20 @@ function ContestContent() {
     };
   }, [fixtureId]);
 
+  useEffect(() => {
+    let active = true;
+    void getCurrentWallet()
+      .then((currentWallet) => {
+        if (active && currentWallet) setAddress(currentWallet);
+      })
+      .catch(() => {
+        // Wallet restoration is best-effort; the join action can still connect a wallet.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   async function join() {
     if (!contest?.id) return setError('No contest is configured for this match.');
     if (!teamId) return setError('Select your fantasy team first.');
@@ -77,19 +91,31 @@ function ContestContent() {
         throw new Error('An active CrickX subscription is required to join this contest.');
       }
 
-      const prepared: any = await api.prepareContestJoin(contest.id, teamId);
       setMessage('Connect your wallet to continue…');
-      const connected: Address = address || await connectWallet();
+      const restoredWallet = address || await getCurrentWallet();
+      const connected: Address = restoredWallet || await connectWallet();
       setAddress(connected);
+
+      // Prepare the signed message immediately after the wallet is known so the
+      // five-minute backend signature window cannot expire while the wallet picker is open.
+      const prepared: any = await api.prepareContestJoin(contest.id, teamId);
 
       setMessage('Confirm your free entry in your wallet…');
       const signed = await signContestJoinMessage(prepared.walletMessage);
+
+      // The wallet selected in the UI can change inside the wallet app while the
+      // signing prompt is open. Always submit the address that actually produced
+      // the signature instead of trusting stale component state.
+      const signerAddress = signed.account as Address;
+      if (signerAddress.toLowerCase() !== connected.toLowerCase()) {
+        setAddress(signerAddress);
+      }
 
       setMessage('Confirming your entry…');
       const result: any = await api.confirmContestJoin(
         contest.id,
         teamId,
-        connected,
+        signerAddress,
         signed.signature,
         prepared.walletMessageTimestamp,
       );
@@ -121,8 +147,10 @@ function ContestContent() {
 
   const open = contest.entriesOpen !== false && contest.status === 'UPCOMING';
   const participantCount = Number(contest.filledSpots || 0);
-  const prizePool = participantCount * 10;
+  const prizePool = Number(contest.prizePoolTotal ?? participantCount * 10);
   const subscriptionActive = Boolean(subscription?.active);
+  const statusLabel = contest.matchStarted ? 'LIVE' : open ? 'OPEN' : 'CLOSED';
+  const statusClass = contest.matchStarted ? 'live' : open ? 'open' : 'closed';
   const expires = subscription?.expiresAt ? new Date(subscription.expiresAt).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' }) : null;
 
   return <section className="app-page contest-page" style={{ maxWidth: 980, paddingBottom: 96 }}>
@@ -135,12 +163,28 @@ function ContestContent() {
       <Link className="secondary-button" href={`/matches/detail?fixtureId=${fixtureId}`}>Match</Link>
     </div>
 
-    <div className="card" style={{ padding: 24, marginBottom: 14, background: 'linear-gradient(135deg,rgba(244,197,66,.10),rgba(18,23,34,.96))' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 12 }}>
-        <div><span className="muted-label">ENTRY</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>FREE</strong><small className="section-subtitle">0 CRX charged</small></div>
-        <div><span className="muted-label">PARTICIPANTS</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{participantCount}</strong><small className="section-subtitle">{participantCount === 1 ? '1 participant joined' : 'participants joined'} · Unlimited</small></div>
-        <div><span className="muted-label">PRIZE POOL</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{prizePool} CRX</strong><small className="section-subtitle">10 CRX per participant</small></div>
-        <div><span className="muted-label">STATUS</span><strong style={{ display: 'block', fontSize: 28, marginTop: 4 }}>{open ? 'OPEN' : 'CLOSED'}</strong></div>
+    <div className="card contest-overview-card">
+      <div className="contest-overview-grid">
+        <div className="contest-stat">
+          <span className="muted-label">ENTRY</span>
+          <strong>FREE</strong>
+          <small>0 CRX charged</small>
+        </div>
+        <div className="contest-stat">
+          <span className="muted-label">PARTICIPANTS</span>
+          <strong>{participantCount.toLocaleString()}</strong>
+          <small>{participantCount === 1 ? '1 participant joined' : participantCount.toLocaleString() + ' participants joined'} · Unlimited</small>
+        </div>
+        <div className="contest-stat">
+          <span className="muted-label">PRIZE POOL</span>
+          <strong>{prizePool.toLocaleString()} CRX</strong>
+          <small>10 CRX per participant</small>
+        </div>
+        <div className="contest-stat contest-status-stat">
+          <span className="muted-label">STATUS</span>
+          <span className={'contest-status-pill ' + statusClass}>{statusLabel}</span>
+          <small>{open ? 'Entries are open' : contest.matchStarted ? 'Match is live' : 'Entries are closed'}</small>
+        </div>
       </div>
     </div>
 
@@ -180,7 +224,7 @@ function ContestContent() {
       <div className="card" style={{ padding: 24 }}>
         <p className="eyebrow">FREE CONTEST ENTRY</p>
         <h2>Join with 0 CRX</h2>
-        <p className="section-subtitle">Your wallet is used to confirm ownership. No CRX or gas is charged.</p>
+        <p className="section-subtitle">Your wallet only signs ownership of the payout address. No CRX is transferred and no gas transaction is requested when joining.</p>
         {address && <p className="section-subtitle">Payout wallet: {address.slice(0, 6)}…{address.slice(-4)}</p>}
         <button
           className="primary-button full"
