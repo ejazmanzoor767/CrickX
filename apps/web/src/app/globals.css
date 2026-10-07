@@ -1118,3 +1118,203 @@ html.crickx-native-app .notice{border-radius:14px !important;font-size:12px !imp
 .fantasy-player-card .fantasy-player-select{background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.10);color:#e9edf5}
 @media(max-width:640px){.fantasy-player-select{width:30px;height:30px;min-width:30px;min-height:30px;font-size:14px !important}}
 @media(max-width:390px){.fantasy-player-select{width:28px;height:28px;min-width:28px;min-height:28px;font-size:13px !important}}
+
+/* PROFILE — MOBILE WEB FINISH */
+.profile-page-mobile{min-width:0;padding-bottom:110px}
+.profile-page-mobile .profile-hero{overflow:hidden}
+.profile-page-mobile .profile-hero-copy{min-width:0}
+.profile-page-mobile .profile-hero-copy h1{overflow-wrap:anywhere}
+.profile-page-mobile .profile-edit-card,
+.profile-page-mobile .profile-details-card,
+.profile-page-mobile .profile-whitepaper-card,
+.profile-page-mobile .profile-session-card{min-width:0;overflow:hidden}
+.profile-photo-editor{min-width:0}
+.profile-photo-editor > div:last-child{min-width:0}
+.profile-photo-editor small{line-height:1.45}
+.profile-edit-fields > div{min-width:0}
+.profile-edit-fields input{min-width:0}
+.profile-details-grid > div{min-width:0}
+.profile-details-grid strong{overflow-wrap:anywhere}
+.profile-page-mobile .referral-card{min-width:0}
+.profile-page-mobile .referral-card input{min-width:0}
+.profile-page-mobile .referral-stat-card{flex:0 0 auto}
+.profile-page-mobile .profile-whitepaper-card > div:last-child,
+.profile-page-mobile .profile-session-card > div{min-width:0}
+@media(max-width:640px){
+  .profile-page-mobile{padding-bottom:118px !important}
+  .profile-page-mobile .profile-hero{
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    gap:12px !important;
+    padding:18px !important;
+    text-align:center;
+    align-items:center !important;
+    margin-bottom:0 !important;
+  }
+  .profile-page-mobile .profile-hero .avatar-large{
+    width:82px !important;
+    height:82px !important;
+    min-width:82px !important;
+    margin:0 auto;
+    border-radius:24px !important;
+    font-size:32px !important;
+  }
+  .profile-page-mobile .profile-hero-copy h1{
+    font-size:36px !important;
+    line-height:.92 !important;
+    margin:0 0 7px !important;
+  }
+  .profile-page-mobile .profile-hero-copy > p{
+    font-size:11px !important;
+    margin:0 0 9px !important;
+    overflow-wrap:anywhere;
+  }
+  .profile-page-mobile .profile-badges{
+    justify-content:center !important;
+    gap:5px !important;
+  }
+  .profile-page-mobile .profile-badges span{
+    padding:5px 7px !important;
+    font-size:8px !important;
+  }
+  .profile-page-mobile .profile-hero > .primary-button{
+    width:100% !important;
+    min-width:0 !important;
+    min-height:46px !important;
+  }
+  .profile-page-mobile .profile-edit-card,
+  .profile-page-mobile .profile-details-card,
+  .profile-page-mobile .profile-session-card{
+    margin-top:10px !important;
+    padding:14px !important;
+  }
+  .profile-page-mobile .profile-edit-card h2,
+  .profile-page-mobile .profile-details-card h2,
+  .profile-page-mobile .profile-session-card h2{
+    font-size:21px !important;
+  }
+  .profile-photo-editor{
+    grid-template-columns:1fr !important;
+    gap:12px !important;
+    margin-bottom:14px !important;
+    text-align:center;
+  }
+  .profile-photo-editor .avatar-large{
+    width:88px !important;
+    height:88px !important;
+    min-width:88px !important;
+    margin:0 auto;
+    border-radius:24px !important;
+  }
+  .profile-photo-editor .form-label{
+    margin-top:0 !important;
+    text-align:center;
+  }
+  .profile-photo-editor .secondary-button{
+    width:100% !important;
+    min-height:46px !important;
+  }
+  .profile-photo-editor small{
+    display:block;
+    font-size:10px !important;
+    margin-top:6px !important;
+  }
+  .profile-edit-fields,
+  .profile-details-grid{
+    grid-template-columns:1fr !important;
+    gap:11px !important;
+  }
+  .profile-edit-fields .form-label{margin-top:0}
+  .profile-edit-card form > div:last-of-type{
+    flex-direction:column !important;
+    gap:8px !important;
+  }
+  .profile-edit-card form > div:last-of-type button{
+    width:100% !important;
+    min-height:45px !important;
+  }
+  .profile-details-grid > div{
+    padding:10px 11px;
+    border-radius:12px;
+    background:rgba(255,255,255,.025);
+    border:1px solid rgba(255,255,255,.055);
+  }
+  .profile-page-mobile .referral-card{
+    margin-top:10px !important;
+  }
+  .profile-page-mobile .referral-card > div:first-child{
+    padding:16px 15px !important;
+  }
+  .profile-page-mobile .referral-card > div:first-child > div{
+    gap:12px !important;
+  }
+  .profile-page-mobile .referral-card h2{
+    font-size:23px !important;
+    line-height:1.02 !important;
+  }
+  .profile-page-mobile .referral-card .referral-stat-card{
+    width:100% !important;
+    min-width:0 !important;
+    padding:13px !important;
+  }
+  .profile-page-mobile .referral-card > div:nth-last-child(1){
+    padding:16px !important;
+  }
+  .profile-page-mobile .referral-card .referral-code-card{
+    padding:13px !important;
+  }
+  .profile-page-mobile .referral-card .referral-code-card strong{
+    font-size:16px !important;
+  }
+  .profile-page-mobile .referral-card .referral-code-card button{
+    min-height:40px !important;
+    padding:8px 9px !important;
+    font-size:11px !important;
+  }
+  .profile-page-mobile .referral-card .referral-row-card{
+    align-items:flex-start !important;
+    gap:7px !important;
+    flex-wrap:wrap !important;
+  }
+  .profile-page-mobile .referral-card .referral-row-card > div{
+    flex:1 1 160px !important;
+  }
+  .profile-page-mobile .referral-card .referral-apply-row{
+    grid-template-columns:1fr !important;
+    gap:8px !important;
+  }
+  .profile-page-mobile .referral-card .referral-apply-row input,
+  .profile-page-mobile .referral-card .referral-apply-row button{
+    width:100% !important;
+    min-height:46px !important;
+  }
+  .profile-whitepaper-card > div{
+    padding:15px !important;
+  }
+  .profile-whitepaper-card > div:first-child{
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-start !important;
+    gap:12px !important;
+  }
+  .profile-whitepaper-card > div:first-child > div{
+    width:100%;
+  }
+  .profile-whitepaper-card .primary-button{
+    width:100% !important;
+  }
+  .profile-session-card > div{
+    align-items:flex-start !important;
+    flex-direction:column !important;
+    gap:12px !important;
+  }
+  .profile-session-card .secondary-button{
+    width:100% !important;
+  }
+}
+@media(max-width:390px){
+  .profile-page-mobile .profile-hero-copy h1{font-size:32px !important}
+  .profile-page-mobile .profile-hero{padding:15px !important}
+  .profile-page-mobile .referral-card h2{font-size:21px !important}
+  .profile-page-mobile .referral-card .referral-code-card strong{font-size:14px !important}
+}
