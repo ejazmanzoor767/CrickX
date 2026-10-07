@@ -295,9 +295,21 @@ export class ContestService implements OnModuleInit {
     const started = Number.isFinite(startingAtMs) && Date.now() >= startingAtMs;
     const isOpen = !providerFinished && !started && contest.status !== 'COMPLETED' && contest.status !== 'CANCELLED';
     if (isOpen && contest.status !== 'UPCOMING') {
-      contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING', entryFee: 0 } });
+      if (this.cloudSql.isEnabled()) {
+        await this.cloudSql.updateContest(contest.id, { status: 'UPCOMING', entryFee: 0 });
+        contest = (await this.cloudSql.getContest(contest.id)) ?? contest;
+        void this.projectContestState(contest.id, { status: 'UPCOMING', entryFee: 0 });
+      } else {
+        contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING', entryFee: 0 } });
+      }
     } else if (started && !providerFinished && contest.status === 'UPCOMING') {
-      contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE', entryFee: 0 } });
+      if (this.cloudSql.isEnabled()) {
+        await this.cloudSql.updateContest(contest.id, { status: 'LIVE', entryFee: 0 });
+        contest = (await this.cloudSql.getContest(contest.id)) ?? contest;
+        void this.projectContestState(contest.id, { status: 'LIVE', entryFee: 0 });
+      } else {
+        contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE', entryFee: 0 } });
+      }
     }
 
     // Backend-owned chain operations remain bounded by the contest state.
