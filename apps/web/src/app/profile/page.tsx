@@ -62,6 +62,7 @@ export default function ProfilePage() {
   const [photoError, setPhotoError] = useState('');
   const [referral, setReferral] = useState<any>(null);
   const [referralError, setReferralError] = useState('');
+  const [referralSuccess, setReferralSuccess] = useState('');
   const [referralCodeInput, setReferralCodeInput] = useState('');
   const [referralApplying, setReferralApplying] = useState(false);
   const [referralCopied, setReferralCopied] = useState<'code' | ''>('');
@@ -142,10 +143,14 @@ export default function ProfilePage() {
     }
     setReferralApplying(true);
     setReferralError('');
+    setReferralSuccess('');
     try {
-      await api.applyReferral(code);
+      const result = await api.applyReferral(code);
       setReferralCodeInput('');
       setReferral(await api.referralInfo());
+      setReferralSuccess(result?.status === 'VALID'
+        ? 'Referral code applied successfully. Your referral is now valid.'
+        : 'Referral code applied successfully. It will become valid after your subscription is confirmed.');
     } catch (err) {
       setReferralError(err instanceof Error ? err.message : 'Unable to apply referral code.');
     } finally {
@@ -315,6 +320,7 @@ export default function ProfilePage() {
         </div>
 
         {referralError && <div style={{ margin: '14px 24px 0' }}><p className="error-text">{referralError}</p></div>}
+        {referralSuccess && <div style={{ margin: '14px 24px 0' }}><p className="success-text">{referralSuccess}</p></div>}
 
         <div style={{ padding: 24, display: 'grid', gap: 18 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
