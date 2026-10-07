@@ -452,7 +452,7 @@ export class ContestService implements OnModuleInit {
 
   async confirmJoin(userId: string, dto: JoinContestDto) {
     await this.assertActiveSubscription(userId);
-    let contest = await this.prisma.contest.findUnique({ where: { id: dto.contestId } });
+    let contest = await this.readContest(dto.contestId);
     if (!contest) throw new NotFoundException('Contest not found.');
     if (contest.status === 'COMPLETED' || contest.status === 'CANCELLED') throw new ForbiddenException('Contest is already closed.');
 
@@ -617,7 +617,24 @@ export class ContestService implements OnModuleInit {
     };
   }
 
-  async myEntries(userId: string) { return this.prisma.contestEntry.findMany({ where: { userId }, include: { contest: true, fantasyTeam: { include: { players: true } } }, orderBy: { createdAt: 'desc' } }); }
+  async myEntries(userId: string) {
+    if (this.cloudSql.isEnabled()) {
+      const entries = await this.cloudSql.listUserContestEntries(userId);
+      return Promise.all(entries.map(async (entry) => ({
+        ...entry,
+        contest: await this.readContest(entry.contestId),
+        fantasyTeam: await this.prisma.fantasyTeam.findUnique({
+          where: { id: entry.fantasyTeamId },
+          include: { players: true },
+        }),
+      })));
+    }
+    return this.prisma.contestEntry.findMany({
+      where: { userId },
+      include: { contest: true, fantasyTeam: { include: { players: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 
   async leaderboard(contestId: string) {
     const snap = await this.prisma.db.collection('contestEntries')
