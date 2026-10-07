@@ -1,8 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { cert, getApps, getApp, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import { randomUUID } from 'crypto';
+import { FirestoreService } from '../firestore.service';
 
 const USER_CACHE_TTL_MS = 5_000;
 const MAX_USER_CACHE_ENTRIES = 5_000;
@@ -50,6 +49,8 @@ function putUserCache(firebaseUid: string, user: CachedUser) {
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  constructor(private readonly prisma: FirestoreService) {}
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const header = request.headers?.authorization;
@@ -77,76 +78,97 @@ export class JwtAuthGuard implements CanActivate {
         return true;
       }
 
-      const db = getFirestore(app);
-      const users = db.collection('users');
-      const uidRef = users.doc(decoded.uid);
-      let userSnap = await uidRef.get();
+      // Firebase is the authentication provider, while Neon/PostgreSQL is the
+      // application source of truth. Ensure every authenticated Firebase user
+      // has the corresponding application user/profile/wallet records in Neon.
+      let user = await this.prisma.user.findUnique({ where: { id: decoded.uid } });
+      if (!user) {
+        user = await this.prisma.user.findFirst({ where: { email } });
+      }
 
-      if (!userSnap.exists) {
-        const byEmail = await users.where('email', '==', email).limit(1).get();
-        if (!byEmail.empty) {
-          const existing = byEmail.docs[0];
-          const existingData = existing.data() as { firebaseUid?: string; emailVerifiedAt?: unknown };
-          // Never claim an existing account solely because the Firebase token
-          // contains the same email. Email-linking is only allowed for a
-          // previously verified account and a verified Firebase identity.
-          if (
-            !decoded.email_verified ||
-            existingData.firebaseUid ||
-            !existingData.emailVerifiedAt
-          ) {
-            throw new UnauthorizedException('Please use the original sign-in method for this account.');
-          }
-          await existing.ref.set({
-            firebaseUid: decoded.uid,
-            emailVerifiedAt: new Date(),
-            lastLoginAt: new Date(),
-          }, { merge: true });
-          userSnap = await existing.ref.get();
-        } else {
-          const now = new Date();
-          await uidRef.set({
-            id: decoded.uid,
-            email,
-            passwordHash: 'FIREBASE_AUTH_MANAGED',
-            role: 'USER',
-            status: 'ACTIVE',
-            emailVerifiedAt: decoded.email_verified ? now : null,
-            createdAt: now,
-            updatedAt: now,
-            lastLoginAt: new Date(),
+      const now = new Date();
+      if (!user) {
+        try {
+          user = await this.prisma.user.create({
+            data: {
+              id: decoded.uid,
+              email,
+              passwordHash: 'FIREBASE_AUTH_MANAGED',
+              role: 'USER',
+              status: 'ACTIVE',
+              emailVerifiedAt: decoded.email_verified ? now : null,
+              lastLoginAt: now,
+              profile: {
+                create: {
+                  displayName: decoded.name || email.split('@')[0] || 'Player',
+                  country: 'PK',
+                },
+              },
+              wallet: {
+                create: {
+                  id: decoded.uid,
+                  depositBalance: 0,
+                  winningsBalance: 0,
+                  bonusBalance: 0,
+                  currency: 'CRX',
+                  version: 0,
+                },
+              },
+            },
           });
-          const profileId = randomUUID();
-          await db.collection('profiles').doc(profileId).set({
-            id: profileId,
-            userId: decoded.uid,
+        } catch {
+          // A concurrent first request may have created the same user.
+          user = await this.prisma.user.findUnique({ where: { id: decoded.uid } })
+            ?? await this.prisma.user.findFirst({ where: { email } });
+          if (!user) throw new UnauthorizedException('Unable to initialize your CrickX account.');
+        }
+      }
+
+      if (user.status === 'SUSPENDED' || user.status === 'BANNED') {
+        throw new UnauthorizedException(`Account is ${String(user.status).toLowerCase()}.`);
+      }
+
+      // Repair legacy/incomplete records without overwriting existing profile data.
+      const profile = await this.prisma.profile.findUnique({ where: { userId: user.id } });
+      if (!profile) {
+        await this.prisma.profile.create({
+          data: {
+            userId: user.id,
             displayName: decoded.name || email.split('@')[0] || 'Player',
             country: 'PK',
-            createdAt: now,
-            updatedAt: now,
-          });
-          await db.collection('wallets').doc(decoded.uid).set({
-            id: decoded.uid,
-            userId: decoded.uid,
+          },
+        });
+      }
+
+      const wallet = await this.prisma.wallet.findUnique({ where: { userId: user.id } });
+      if (!wallet) {
+        await this.prisma.wallet.create({
+          data: {
+            id: user.id,
+            userId: user.id,
             depositBalance: 0,
             winningsBalance: 0,
             bonusBalance: 0,
             currency: 'CRX',
             version: 0,
-            createdAt: now,
-            updatedAt: now,
-          });
-          userSnap = await uidRef.get();
-        }
+          },
+        });
       }
 
-      const user = userSnap.data() as any;
-      if (user?.status === 'SUSPENDED' || user?.status === 'BANNED') {
-        throw new UnauthorizedException(`Account is ${String(user.status).toLowerCase()}.`);
+      if (user.email !== email || !user.lastLoginAt) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            emailVerifiedAt: decoded.email_verified ? (user.emailVerifiedAt ?? now) : user.emailVerifiedAt,
+            lastLoginAt: now,
+          },
+        });
+      } else {
+        await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: now } });
       }
 
       const currentUser = putUserCache(decoded.uid, {
-        userId: userSnap.id,
+        userId: user.id,
         email: user.email || email,
         role: user.role || 'USER',
         status: user.status,
