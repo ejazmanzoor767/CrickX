@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
+import { subscribeLiveMatches } from '../../lib/realtime';
 
 const list = (x:any) => Array.isArray(x) ? x : (x?.data ?? []);
 const fmtTime = (v:string) => new Date(v).toLocaleString('en-PK',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -71,8 +72,24 @@ export default function FantasyHomePage() {
       finally{ if(active)setLoading(false); }
     }
     void refresh();
+    let unsubscribe = () => undefined;
+    try {
+      unsubscribe = subscribeLiveMatches((rows) => {
+        const liveRows = rows
+          .filter((row: any) => row?.active !== false)
+          .sort((a: any, b: any) => new Date(a.starting_at ?? 0).getTime() - new Date(b.starting_at ?? 0).getTime());
+        if (liveRows.length) {
+          setMatches((current) => {
+            const nonLive = current.filter((item: any) => !isLive(item));
+            return [...liveRows, ...nonLive.filter((item: any) => !liveRows.some((live: any) => Number(live.id) === Number(item.id)))];
+          });
+        }
+      }, () => undefined);
+    } catch {
+      // API polling remains the fallback when browser Firestore configuration is unavailable.
+    }
     const timer=window.setInterval(()=>void refresh(),15000);
-    return()=>{active=false;window.clearInterval(timer)};
+    return()=>{active=false;unsubscribe();window.clearInterval(timer)};
   },[user?.uid]);
 
   const teamByFixture=useMemo(()=>{ const map=new Map<number,any>(); for(const t of teams){const id=Number(t.sportmonksFixtureId);if(!map.has(id))map.set(id,t);} return map; },[teams]);
