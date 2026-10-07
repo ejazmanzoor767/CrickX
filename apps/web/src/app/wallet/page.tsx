@@ -267,13 +267,7 @@ export default function WalletPage() {
               <span style={{ color: 'var(--muted)', fontSize: 20 }}>$</span>
               <input className="text-input" inputMode="decimal" value={buyUsd} onChange={e => setBuyUsd(e.target.value)} placeholder="1.00" style={{ fontSize: 28, fontWeight: 900 }} />
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 10 }}>
-              {[1, 5, 10, 25].map(amount => (
-                <button key={amount} type="button" className="secondary-button" style={{ padding: '7px 10px' }} onClick={() => setBuyUsd(amount.toFixed(2))}>
-                  {'$' + amount}
-                </button>
-              ))}
-            </div>
+
           </div>
 
           <div className="card" style={{ padding: 16, background: 'rgba(0,0,0,.16)', border: '1px solid rgba(255,255,255,.07)' }}>
