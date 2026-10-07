@@ -134,9 +134,9 @@ function CaptainPicker() {
         const id = Number(player.player_id); const isCaptain = captain === id; const isVice = viceCaptain === id;
         return <article key={id} className="card captain-player-card" style={{ padding: 13, border: isCaptain || isVice ? '1px solid rgba(155,255,71,.55)' : '1px solid rgba(255,255,255,.07)' }}>
           <div className="captain-player-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', alignItems: 'center', gap: 10 }}>
-            <div><strong>{player.fullname ?? `Player ${id}`}</strong><div className="section-subtitle">{player.teamName} · {player.position_name ?? player.role ?? 'Player'}</div></div>
-            <button className={isCaptain ? 'primary-button' : 'secondary-button'} onClick={() => { setCaptain(isCaptain ? null : id); if (viceCaptain === id) setViceCaptain(null); }}>{isCaptain ? '✓ C' : 'C'}</button>
-            <button className={isVice ? 'primary-button' : 'secondary-button'} onClick={() => { setViceCaptain(isVice ? null : id); if (captain === id) setCaptain(null); }}>{isVice ? '✓ VC' : 'VC'}</button>
+            <div className="captain-player-copy"><strong>{player.fullname ?? `Player ${id}`}</strong><div className="section-subtitle">{player.teamName} · {player.position_name ?? player.role ?? 'Player'}</div></div>
+            <button className={(isCaptain ? 'primary-button' : 'secondary-button') + ' captain-choice-button'} onClick={() => { setCaptain(isCaptain ? null : id); if (viceCaptain === id) setViceCaptain(null); }}>{isCaptain ? '✓ C' : 'C'}</button>
+            <button className={(isVice ? 'primary-button' : 'secondary-button') + ' captain-choice-button'} onClick={() => { setViceCaptain(isVice ? null : id); if (captain === id) setCaptain(null); }}>{isVice ? '✓ VC' : 'VC'}</button>
           </div>
         </article>;
       })}
