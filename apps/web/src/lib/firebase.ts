@@ -2,6 +2,7 @@
 
 import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,17 +15,27 @@ const firebaseConfig = {
 
 let firebaseApp: FirebaseApp | null = null;
 let auth: Auth | null = null;
+let db: Firestore | null = null;
 
 if (typeof window !== 'undefined') {
   firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(firebaseApp);
+  db = getFirestore(firebaseApp);
 }
 
-export { firebaseApp, auth };
+export { firebaseApp, auth, db };
 
 export function getClientAuth(): Auth {
   if (typeof window === 'undefined' || !auth) {
     throw new Error('Authentication is only available in the browser.');
   }
   return auth;
+}
+
+
+export function getClientFirestore(): Firestore {
+  if (typeof window === 'undefined' || !db) {
+    throw new Error('Realtime Firestore is only available in the browser.');
+  }
+  return db;
 }
