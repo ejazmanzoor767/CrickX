@@ -223,7 +223,7 @@ export class ContestService implements OnModuleInit {
       throw new ServiceUnavailableException(`Unable to create the CRX prize-pool contest: ${error instanceof Error ? error.message : String(error)}`);
     }
 
-    return this.prisma.contest.create({
+    const createdContest = await this.prisma.contest.create({
       data: {
         id: `contest_${dto.sportmonksFixtureId}`,
         sportmonksFixtureId: dto.sportmonksFixtureId,
@@ -243,6 +243,8 @@ export class ContestService implements OnModuleInit {
         maxTeamsPerUser: 1,
       },
     });
+    if (this.cloudSql.isEnabled()) await this.cloudSql.upsertContestFromRecord(createdContest);
+    return createdContest;
   }
 
   async listForFixture(fixtureId: number) {
