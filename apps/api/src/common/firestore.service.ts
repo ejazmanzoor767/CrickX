@@ -179,7 +179,7 @@ type CollectionLike = QueryLike & {
 };
 
 type TransactionLike = {
-  get(target: DocumentRefLike | QueryLike): Promise<DocumentSnapshotLike | QuerySnapshotLike>;
+  get(target: DocumentRefLike | QueryLike): Promise<any>;
   set(ref: DocumentRefLike, data: any, options?: { merge?: boolean }): Promise<void> | void;
   update(ref: DocumentRefLike, data: any): Promise<void> | void;
   delete(ref: DocumentRefLike): Promise<void> | void;
