@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import { getApps, initializeApp, cert, App } from 'firebase-admin/app';
 import { Firestore, getFirestore } from 'firebase-admin/firestore';
 import { createHash, randomUUID } from 'crypto';
@@ -460,6 +461,7 @@ class SqlPersistenceDb implements DatabaseCompat {
   }
 }
 
+@Injectable()
 export class FirestoreService {
   readonly realtimeDb: Firestore;
   private readonly app: App;
