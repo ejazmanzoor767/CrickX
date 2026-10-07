@@ -7,7 +7,7 @@ import { OnchainContestService } from '../onchain/onchain-contest.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { CreateContestDto, JoinContestDto, PrepareJoinContestDto, CRX_PRIZE_PER_PARTICIPANT } from './dto';
 import { T20_RULES, T10_RULES, ODI_RULES } from '../scoring/scoring.rules';
-import { PostgresContestError, PostgresService } from '../../common/cloud-sql.service';
+import { PostgresContestError, PostgresService } from '../../common/postgres.service';
 
 const SIGNATURE_WINDOW_SECONDS = 300;
 
@@ -34,15 +34,10 @@ export class ContestService implements OnModuleInit {
 
   private async readContest(contestId: string) {
     if (this.postgres.isEnabled()) {
-      const contest = await this.postgres.getContest(contestId);
-      if (contest) return contest;
+      return this.postgres.getContest(contestId);
     }
-    const contest = await this.prisma.contest.findUnique({ where: { id: contestId } });
-    if (contest && this.postgres.isEnabled()) {
-      await this.postgres.upsertContestFromRecord(contest);
-      return (await this.postgres.getContest(contestId)) ?? contest;
-    }
-    return contest;
+    // Local/dev fallback only when PostgreSQL is not configured.
+    return this.prisma.contest.findUnique({ where: { id: contestId } });
   }
 
   private async projectContestEntry(entry: any) {
