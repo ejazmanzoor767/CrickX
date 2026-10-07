@@ -17,7 +17,7 @@ import { PredictionModule } from './modules/prediction/prediction.module';
 import { FirestoreService } from './common/firestore.service';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { HealthController } from './health.controller';
-import { CloudSqlModule } from './common/cloud-sql.module';
+import { PostgresModule } from './common/postgres.module';
 
 @Module({
   imports: [
@@ -34,7 +34,7 @@ import { CloudSqlModule } from './common/cloud-sql.module';
     ProfileModule,
     ScoringModule,
     AdminModule,
-    CloudSqlModule,
+    PostgresModule,
   ],
   controllers: [HealthController],
   providers: [
