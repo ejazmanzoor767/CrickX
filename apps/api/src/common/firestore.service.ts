@@ -283,6 +283,10 @@ class SqlTransaction implements TransactionLike {
   delete(ref: SqlDocumentRef) {
     return ref.delete();
   }
+
+  create(ref: SqlDocumentRef, data: any) {
+    return ref.set(data, { merge: false });
+  }
 }
 
 class SqlBatch implements BatchLike {
