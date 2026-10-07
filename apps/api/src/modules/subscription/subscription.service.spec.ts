@@ -185,8 +185,9 @@ describe('SubscriptionService payment recovery', () => {
     const first = await service.applyReferral('user-a', 'CRXABC12345', 'a@example.com');
     expect(first).toEqual({ applied: true, status: 'PENDING', referrerId: 'referrer-1' });
 
-    const second = await service.applyReferral('user-b', 'CRXABC12345', 'b@example.com');
-    await expect(Promise.resolve(second)).rejects.toThrow('This code has already been added by another user.');
+    await expect(service.applyReferral('user-b', 'CRXABC12345', 'b@example.com'))
+      .rejects
+      .toThrow('This code has already been added by another user.');
   });
 
   it('rejects a referral code until the referrer has completed a subscription', async () => {
