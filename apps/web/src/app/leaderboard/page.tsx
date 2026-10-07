@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
+import { subscribeFixtureLeaderboard, subscribeGlobalLeaderboard } from '../../lib/realtime';
 
 const unwrap = (value: any) => value?.data ?? value;
 const list = (value: any) => Array.isArray(value) ? value : (value?.data ?? []);
@@ -173,8 +174,48 @@ function LeaderboardPageInner() {
       }
     };
     void load(true);
+
+    let unsubscribe = () => undefined;
+    try {
+      unsubscribe = scopedToFixture
+        ? subscribeFixtureLeaderboard(fixtureId, (liveRows) => {
+            if (!liveRows.length) return;
+            const mapped = liveRows
+              .map((row: any, index: number) => ({
+                ...row,
+                rank: Number(row?.rank ?? index + 1),
+                points: Number(row?.points ?? 0),
+                displayName: row?.displayName ?? 'CrickX Player',
+                avatarUrl: row?.avatarUrl ?? null,
+              }))
+              .sort((a: any, b: any) => Number(a.rank) - Number(b.rank));
+            setRows(mapped);
+          }, () => undefined)
+        : subscribeGlobalLeaderboard((liveRows) => {
+            if (!liveRows.length) return;
+            const mapped = liveRows
+              .slice()
+              .sort((a: any, b: any) => Number(b?.totalPoints ?? 0) - Number(a?.totalPoints ?? 0))
+              .slice(0, 200)
+              .map((row: any, index: number) => ({
+                ...row,
+                rank: index + 1,
+                points: Number(row?.totalPoints ?? 0),
+                displayName: row?.displayName ?? 'CrickX Player',
+                avatarUrl: row?.avatarUrl ?? null,
+              }));
+            setRows(mapped);
+          }, () => undefined);
+    } catch {
+      // API polling remains the fallback when browser Firestore configuration is unavailable.
+    }
+
     const timer = window.setInterval(() => void load(false), 60000);
-    return () => { active = false; window.clearInterval(timer); };
+    return () => {
+      active = false;
+      unsubscribe();
+      window.clearInterval(timer);
+    };
   }, [fixtureId, scopedToFixture]);
 
   const squadMap = useMemo(() => {
