@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { FirestoreService } from '../../common/firestore.service';
+import { RealtimeFirestoreService } from '../../common/realtime-firestore.service';
 
 type MatchScore = {
   userId: string;
@@ -13,7 +14,10 @@ export class LeaderboardService {
   private readonly matchScores = 'leaderboardMatchScores';
   private readonly users = 'leaderboardUsers';
 
-  constructor(private readonly firestore: FirestoreService) {}
+  constructor(
+    private readonly firestore: FirestoreService,
+    private readonly realtime: RealtimeFirestoreService,
+  ) {}
 
   private matchScoreId(userId: string, fixtureId: number) {
     return `${userId}_${fixtureId}`;
@@ -143,6 +147,40 @@ export class LeaderboardService {
           }
         }
         await profileBatch.commit();
+      }
+    }
+
+    if (this.realtime.isEnabled()) {
+      try {
+        await Promise.all(normalized.map(async (score) => {
+          const userDoc = await this.firestore.db.collection(this.users).doc(score.userId).get();
+          const matchDoc = await this.firestore.db.collection(this.matchScores).doc(this.matchScoreId(score.userId, score.fixtureId)).get();
+          const user = userDoc.exists ? (userDoc.data() as any) : {};
+          const match = matchDoc.exists ? (matchDoc.data() as any) : {};
+
+          await this.realtime.db.collection(this.users).doc(score.userId).set({
+            userId: score.userId,
+            displayName: user.displayName ?? match.displayName ?? 'CrickX Player',
+            avatarUrl: user.avatarUrl ?? match.avatarUrl ?? null,
+            totalPoints: Number(user.totalPoints ?? 0),
+            matchesPlayed: Number(user.matchesPlayed ?? 0),
+            lastMatchPoints: Number(user.lastMatchPoints ?? score.points),
+            lastFixtureId: Number(user.lastFixtureId ?? score.fixtureId),
+            updatedAt: new Date(),
+          }, { merge: true });
+
+          await this.realtime.db.collection(this.matchScores).doc(this.matchScoreId(score.userId, score.fixtureId)).set({
+            userId: score.userId,
+            fixtureId: score.fixtureId,
+            format: score.format,
+            points: Number(match.points ?? score.points),
+            displayName: user.displayName ?? match.displayName ?? 'CrickX Player',
+            avatarUrl: user.avatarUrl ?? match.avatarUrl ?? null,
+            updatedAt: new Date(),
+          }, { merge: true });
+        }));
+      } catch (error) {
+        // Firestore is a UI projection only. Canonical leaderboard writes above remain in Neon.
       }
     }
 
