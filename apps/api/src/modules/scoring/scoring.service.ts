@@ -304,6 +304,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       }
 
       for (const contest of contests) {
+        if (!contest) continue;
         const participantCount = await this.cloudSql.countContestEntries(contest.id);
         this.logger.log(
           `SQL contest funding check fixture=${fixtureId} contest=${contest.id} participants=${participantCount} chainContestId=${String(contest.chainContestId ?? '')}`,
