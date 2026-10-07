@@ -345,6 +345,28 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {referral?.incomingReferral && (
+            <div style={{ padding: '14px 15px', borderRadius: 15, background: 'rgba(255,255,255,.028)', border: '1px solid rgba(255,255,255,.07)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ minWidth: 0 }}>
+                  <span className="eyebrow">YOUR REFERRAL</span>
+                  <strong style={{ display: 'block', marginTop: 4, fontSize: 14 }}>
+                    {referral.incomingReferral.status === 'VALID' ? 'Subscription confirmed' : 'Waiting for subscription'}
+                  </strong>
+                  <span className="section-subtitle" style={{ display: 'block', marginTop: 4 }}>
+                    Code {referral.incomingReferral.referralCode}
+                  </span>
+                </div>
+                <span
+                  className={referral.incomingReferral.status === 'VALID' ? 'badge-live' : 'demo-pill'}
+                  style={{ flexShrink: 0 }}
+                >
+                  {referral.incomingReferral.status === 'VALID' ? 'VALID' : 'PENDING'}
+                </span>
+              </div>
+            </div>
+          )}
+
           {referral?.totalReferrals > 0 ? (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
