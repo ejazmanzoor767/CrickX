@@ -126,14 +126,14 @@ function CaptainPicker() {
     </div>
   </div></section>;
 
-  return <section className="app-page" style={{ paddingBottom: 96 }}>
-    <div className="page-intro"><div><p className="eyebrow">CRICKX FANTASY · STEP 2</p><h1 className="section-title">Captain & Vice-captain</h1><p className="section-subtitle">Choose your captain and vice-captain from your selected XI.</p></div><Link className="secondary-button" href={`/fantasy?fixtureId=${fixtureId}`}>← Back to XI</Link></div>
-    <div className="card" style={{ padding: 12 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}><div><strong>Captain</strong><div className="section-subtitle">2× points</div></div><div><strong>Vice-captain</strong><div className="section-subtitle">1.5× points</div></div></div></div>
+  return <section className="app-page captain-picker-page" style={{ paddingBottom: 96 }}>
+    <div className="page-intro captain-picker-intro"><div><p className="eyebrow">CRICKX FANTASY · STEP 2</p><h1 className="section-title">Captain & Vice-captain</h1><p className="section-subtitle">Choose your captain and vice-captain from your selected XI.</p></div><Link className="secondary-button captain-back-button" href={`/fantasy?fixtureId=${fixtureId}`}>← Back to XI</Link></div>
+    <div className="card captain-rules-card" style={{ padding: 12 }}><div className="captain-rules-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}><div><strong>Captain</strong><div className="section-subtitle">2× points</div></div><div><strong>Vice-captain</strong><div className="section-subtitle">1.5× points</div></div></div></div>
     <div className="match-list">
       {players.map((player: any) => {
         const id = Number(player.player_id); const isCaptain = captain === id; const isVice = viceCaptain === id;
-        return <article key={id} className="card" style={{ padding: 13, border: isCaptain || isVice ? '1px solid rgba(155,255,71,.55)' : '1px solid rgba(255,255,255,.07)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', alignItems: 'center', gap: 10 }}>
+        return <article key={id} className="card captain-player-card" style={{ padding: 13, border: isCaptain || isVice ? '1px solid rgba(155,255,71,.55)' : '1px solid rgba(255,255,255,.07)' }}>
+          <div className="captain-player-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', alignItems: 'center', gap: 10 }}>
             <div><strong>{player.fullname ?? `Player ${id}`}</strong><div className="section-subtitle">{player.teamName} · {player.position_name ?? player.role ?? 'Player'}</div></div>
             <button className={isCaptain ? 'primary-button' : 'secondary-button'} onClick={() => { setCaptain(isCaptain ? null : id); if (viceCaptain === id) setViceCaptain(null); }}>{isCaptain ? '✓ C' : 'C'}</button>
             <button className={isVice ? 'primary-button' : 'secondary-button'} onClick={() => { setViceCaptain(isVice ? null : id); if (captain === id) setCaptain(null); }}>{isVice ? '✓ VC' : 'VC'}</button>
@@ -143,7 +143,7 @@ function CaptainPicker() {
       {players.length === 0 && <div className="card empty-state"><strong>No saved XI found.</strong><span>Go back to the player selection step and select 11 players.</span><Link className="primary-button" href={`/fantasy?fixtureId=${fixtureId}`}>Back to XI</Link></div>}
     </div>
     {message && <div className="notice">{message}</div>}
-    <div className="card" style={{ position: 'sticky', bottom: 12, zIndex: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 12 }}>
+    <div className="card captain-save-bar" style={{ position: 'sticky', bottom: 12, zIndex: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 12 }}>
       <div><strong>{captain ? 'Captain selected' : 'Captain missing'}</strong><span className="section-subtitle" style={{ display: 'block' }}>{viceCaptain ? 'Vice-captain selected' : 'Vice-captain missing'}</span></div>
       <button className="primary-button" onClick={saveTeam} disabled={locked || saving || selectedIds.length !== 11 || players.length !== 11 || !selectedIds.includes(Number(captain)) || !selectedIds.includes(Number(viceCaptain)) || !captain || !viceCaptain || captain === viceCaptain}>{saving ? 'Saving…' : 'Save XI'}</button>
     </div>
