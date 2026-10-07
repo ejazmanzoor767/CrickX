@@ -286,6 +286,60 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async fundStartedContestPrizePools(fixtureId: number) {
+    if (this.cloudSql.isEnabled()) {
+      let contests = await this.cloudSql.listContestsByFixture(fixtureId, true);
+      if (!contests.length) {
+        await this.cloudSql.bootstrapFromFirestore(this.prisma.db, fixtureId);
+        contests = await this.cloudSql.listContestsByFixture(fixtureId, true);
+      }
+
+      for (const contest of contests) {
+        const participantCount = await this.cloudSql.countContestEntries(contest.id);
+        this.logger.log(
+          `SQL contest funding check fixture=${fixtureId} contest=${contest.id} participants=${participantCount} chainContestId=${String(contest.chainContestId ?? '')}`,
+        );
+        if (!Number.isInteger(participantCount) || participantCount <= 0) continue;
+
+        const chainContestId = Number(contest.chainContestId);
+        if (!Number.isFinite(chainContestId) || chainContestId <= 0) {
+          this.logger.warn(`SQL contest ${contest.id} has no on-chain contest ID; existing provisioning will retry.`);
+          continue;
+        }
+
+        try {
+          const funding = await this.onchain.fundContestPrizePool(chainContestId, participantCount);
+          const totalPool = Number(funding.totalPool || participantCount * 10);
+          const status = funding.skipped ? 'PENDING_MATCH_START' : 'FUNDED';
+          const state = {
+            filledSpots: participantCount,
+            prizePoolTotal: totalPool,
+            prizePoolFundingStatus: status,
+            prizePoolFundedAmount: totalPool,
+            prizePoolFundingTxHash: funding.fundingTxHash ?? contest.prizePoolFundingTxHash ?? null,
+            prizePoolFundingAt: status === 'FUNDED' ? new Date() : contest.prizePoolFundingAt ?? null,
+            prizePoolFundingError: null,
+          };
+          await this.cloudSql.updateContest(contest.id, state);
+          void this.projectContestState(contest.id, state);
+          this.logger.log(
+            `SQL contest ${contest.id} bulk CRX funding complete: participants=${participantCount}, pool=${totalPool} CRX, tokenTx=${funding.fundingTxHash ?? 'none'}, accountingTx=${funding.registrationTxHash ?? 'none'}`,
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const failureState = {
+            prizePoolFundingStatus: 'FAILED',
+            prizePoolFundingError: message.slice(0, 1000),
+          };
+          await this.cloudSql.updateContest(contest.id, failureState);
+          void this.projectContestState(contest.id, failureState);
+          this.logger.error(`SQL bulk CRX funding failed for contest ${contest.id}: ${message}`);
+        }
+      }
+      return;
+    }
+
+    if (Date.now() < this.firestoreQuotaBackoffUntil) return;
+
     if (Date.now() < this.firestoreQuotaBackoffUntil) return;
 
     // A live fixture must be able to fund its contest even if the cached
