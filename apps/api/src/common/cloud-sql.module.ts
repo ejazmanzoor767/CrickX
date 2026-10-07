@@ -1,9 +1,9 @@
 import { Global, Module } from '@nestjs/common';
-import { CloudSqlService } from './cloud-sql.service';
+import { PostgresService } from './postgres.service';
 
 @Global()
 @Module({
-  providers: [CloudSqlService],
-  exports: [CloudSqlService],
+  providers: [PostgresService],
+  exports: [PostgresService],
 })
 export class CloudSqlModule {}
