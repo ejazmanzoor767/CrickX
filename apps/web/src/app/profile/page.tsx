@@ -145,10 +145,10 @@ export default function ProfilePage() {
     setReferralError('');
     setReferralSuccess('');
     try {
-      const result = await api.applyReferral(code);
+      const result = await api.applyReferral(code) as { status?: string };
       setReferralCodeInput('');
       setReferral(await api.referralInfo());
-      setReferralSuccess(result?.status === 'VALID'
+      setReferralSuccess(result.status === 'VALID'
         ? 'Referral code applied successfully. Your referral is now valid.'
         : 'Referral code applied successfully. It will become valid after your subscription is confirmed.');
     } catch (err) {
