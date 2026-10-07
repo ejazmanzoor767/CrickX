@@ -501,29 +501,43 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       for (const entry of contest.entries) {
         const scored = this.calculateTeamScore(entry.fantasyTeam, battingByPlayer, bowlingByPlayer, fieldingByPlayer, dotBallsByPlayer, rules, fixture.winner_team_id, fixture.man_of_match_id);
         await this.prisma.contestEntry.update({ where: { id: entry.id }, data: { totalPoints: scored.total } });
+        if (this.cloudSql.isEnabled()) await this.cloudSql.updateContestEntry(entry.id, { totalPoints: scored.total });
         const previous = userFixtureScores.get(entry.userId) ?? -Infinity;
         if (scored.total > previous) userFixtureScores.set(entry.userId, scored.total);
       }
 
       const ranked = await this.prisma.contestEntry.findMany({ where: { contestId: contest.id }, orderBy: { totalPoints: 'desc' } });
       await this.prisma.$transaction(ranked.map((entry, index) => this.prisma.contestEntry.update({ where: { id: entry.id }, data: { rank: index + 1 } })));
+      if (this.cloudSql.isEnabled()) {
+        for (const [index, entry] of ranked.entries()) {
+          await this.cloudSql.updateContestEntry(entry.id, { rank: index + 1 });
+        }
+      }
 
       if (!final && actuallyLive && contest.status === 'UPCOMING') {
         await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE' } });
       }
-      await this.prisma.leaderboardSnapshot.create({
-        data: {
-          contestId: contest.id,
-          isFinal: final,
-          standings: ranked.map((entry, index) => ({ contestEntryId: entry.id, userId: entry.userId, rank: index + 1, totalPoints: Number(entry.totalPoints) || 0 })),
-        },
-      });
+      try {
+        await this.prisma.leaderboardSnapshot.create({
+          data: {
+            contestId: contest.id,
+            isFinal: final,
+            standings: ranked.map((entry, index) => ({ contestEntryId: entry.id, userId: entry.userId, rank: index + 1, totalPoints: Number(entry.totalPoints) || 0 })),
+          },
+        });
+      } catch (error) {
+        this.logger.warn(`Leaderboard snapshot projection skipped contest=${contest.id}: ${error instanceof Error ? error.message : String(error)}`);
+      }
       if (final) await this.settleContest(contest.id);
     }
 
     if (userFixtureScores.size) {
-      await this.leaderboard.recordFixtureScores([...userFixtureScores.entries()].map(([userId, points]) => ({ userId, fixtureId, format: fixture.type, points })));
-      this.logger.log(`Fixture ${fixtureId} leaderboard written: users=${userFixtureScores.size}`);
+      try {
+        await this.leaderboard.recordFixtureScores([...userFixtureScores.entries()].map(([userId, points]) => ({ userId, fixtureId, format: fixture.type, points })));
+        this.logger.log(`Fixture ${fixtureId} leaderboard written: users=${userFixtureScores.size}`);
+      } catch (error) {
+        this.logger.warn(`Fixture ${fixtureId} leaderboard projection skipped: ${error instanceof Error ? error.message : String(error)}`);
+      }
     } else {
       this.logger.log(`Fixture ${fixtureId} leaderboard write skipped: no fantasy-team users found`);
     }
