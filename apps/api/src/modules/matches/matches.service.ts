@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { FirestoreService } from '../../common/firestore.service';
+import { RealtimeFirestoreService } from '../../common/realtime-firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { SportmonksFixture } from '../sportmonks/sportmonks.types';
 
@@ -114,6 +115,7 @@ export class MatchesService {
   constructor(
     private readonly sportmonks: SportmonksDataService,
     private readonly firestore: FirestoreService,
+    private readonly realtime: RealtimeFirestoreService,
   ) {}
 
   private async persistFallOfWickets(fixture: any) {
@@ -151,13 +153,13 @@ export class MatchesService {
       writes.push({ id: docId, data: { id: docId, fixtureId: Number(fixture.id), inning: item.inning, wicketNumber, score: item.score, scoreAtWicket: item.score, playerId: Number.isFinite(item.playerId) ? item.playerId : null, player, over: item.over, updatedAt: new Date() } });
     }
 
-    const existing = await this.firestore.db.collection('fallOfWickets').where('fixtureId', '==', Number(fixture.id)).get();
+    const existing = await this.realtime.db.collection('fallOfWickets').where('fixtureId', '==', Number(fixture.id)).get();
     for (const doc of existing.docs) if (!expectedDocIds.has(doc.id)) await doc.ref.delete();
-    for (const write of writes) await this.firestore.db.collection('fallOfWickets').doc(write.id).set(write.data, { merge: true });
+    for (const write of writes) await this.realtime.db.collection('fallOfWickets').doc(write.id).set(write.data, { merge: true });
   }
 
   private async readFallOfWickets(fixtureId: number) {
-    const snapshot = await this.firestore.db.collection('fallOfWickets').where('fixtureId', '==', fixtureId).get();
+    const snapshot = await this.realtime.db.collection('fallOfWickets').where('fixtureId', '==', fixtureId).get();
     return snapshot.docs.map((doc) => doc.data() as any).sort((a, b) => Number(a.inning ?? 0) - Number(b.inning ?? 0) || Number(a.wicketNumber ?? 0) - Number(b.wicketNumber ?? 0));
   }
 
@@ -201,6 +203,43 @@ export class MatchesService {
 
     return { data, meta: { pagination: { total: data.length, count: data.length, per_page: data.length, current_page: 1, total_pages: 1 } } };
   }
+  private async projectLiveMatches(fixtures: any[]) {
+    if (!this.realtime.isEnabled()) return;
+    const activeIds = new Set<number>();
+    const now = new Date();
+
+    for (const fixture of fixtures) {
+      const fixtureId = Number(fixture?.id);
+      if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
+      activeIds.add(fixtureId);
+      await this.realtime.db.collection('liveMatches').doc(String(fixtureId)).set({
+        id: fixtureId,
+        fixtureId,
+        applicationState: 'LIVE',
+        active: true,
+        status: fixture?.status ?? null,
+        live: Number(fixture?.live) === 1 ? 1 : 0,
+        starting_at: fixture?.starting_at ?? null,
+        localteam: fixture?.localteam ?? null,
+        visitorteam: fixture?.visitorteam ?? null,
+        league: fixture?.league ?? null,
+        runs: Array.isArray(fixture?.runs) ? fixture.runs : [],
+        scoreboards: Array.isArray(fixture?.scoreboards) ? fixture.scoreboards : [],
+        updatedAt: now,
+      }, { merge: true });
+    }
+
+    const stale = await this.realtime.db.collection('liveMatches').where('active', '==', true).get();
+    const batch = this.realtime.db.batch();
+    let changed = false;
+    for (const doc of stale.docs) {
+      if (activeIds.has(Number(doc.id))) continue;
+      batch.set(doc.ref, { active: false, applicationState: 'COMPLETED', updatedAt: now }, { merge: true });
+      changed = true;
+    }
+    if (changed) await batch.commit();
+  }
+
   async listLive() {
     const liveResult = await this.sportmonks.listLiveFixtures();
     const liveRows = Array.isArray(liveResult.data) ? liveResult.data : [];
@@ -249,6 +288,9 @@ export class MatchesService {
     }
 
     const data = [...byId.values()];
+    await this.projectLiveMatches(data).catch((error) => {
+      console.warn('Live-match Firestore projection skipped:', error instanceof Error ? error.message : String(error));
+    });
 
     return {
       ...liveResult,
