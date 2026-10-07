@@ -533,7 +533,7 @@ export class FirestoreService {
 
   private primaryDb() {
     if (!this.primaryEnabled()) return null;
-    if (!this.sqlDb) this.sqlDb = new SqlPersistenceDb(this.cloudSql.getPool());
+    if (!this.sqlDb) this.sqlDb = new SqlPersistenceDb(this.cloudSql!.getPool());
     return this.sqlDb;
   }
 
