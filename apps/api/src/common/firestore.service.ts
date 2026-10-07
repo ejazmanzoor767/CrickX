@@ -3,7 +3,7 @@ import { Firestore, getFirestore } from 'firebase-admin/firestore';
 import { createHash, randomUUID } from 'crypto';
 import { AsyncLocalStorage } from 'async_hooks';
 import type { Pool, PoolClient, QueryResultRow } from 'pg';
-import { CloudSqlService } from './cloud-sql.service';
+import { PostgresService } from './postgres.service';
 
 export class FirestoreDecimal {
   constructor(private readonly value: number) {}
@@ -463,7 +463,7 @@ class SqlPersistenceDb implements DatabaseCompat {
 export class FirestoreService {
   readonly realtimeDb: Firestore;
   private readonly app: App;
-  private readonly cloudSql: CloudSqlService | null;
+  private readonly postgres: PostgresService | null;
   private sqlDb: SqlPersistenceDb | null = null;
 
   readonly user: Delegate;
@@ -488,8 +488,8 @@ export class FirestoreService {
   readonly cachedFixture: Delegate;
   readonly cachedPlayer: Delegate;
 
-  constructor(cloudSql: CloudSqlService | null = null) {
-    this.cloudSql = cloudSql;
+  constructor(postgres: PostgresService | null = null) {
+    this.postgres = postgres;
 
     if (getApps().length) this.app = getApps()[0]!;
     else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
@@ -528,12 +528,12 @@ export class FirestoreService {
 
   private primaryEnabled() {
     const mode = String(process.env.CRICKX_PRIMARY_STORAGE ?? process.env.CRICKX_CONTEST_STORAGE ?? '').trim().toLowerCase();
-    return Boolean(this.cloudSql?.isEnabled()) && ['cloudsql', 'true'].includes(mode);
+    return Boolean(this.postgres?.isEnabled()) && ['postgres', 'postgresql', 'neon', 'cloudsql', 'true'].includes(mode);
   }
 
   private primaryDb() {
     if (!this.primaryEnabled()) return null;
-    if (!this.sqlDb) this.sqlDb = new SqlPersistenceDb(this.cloudSql!.getPool());
+    if (!this.sqlDb) this.sqlDb = new SqlPersistenceDb(this.postgres!.getPool());
     return this.sqlDb;
   }
 
@@ -659,7 +659,7 @@ export class FirestoreService {
   }
 
   private async maybeMigrateOnMiss(model: string, args: any, rows: any[]) {
-    if (!this.primaryEnabled() || rows.length || ['cachedFixture', 'cachedPlayer'].includes(model)) return rows;
+    if (this.primaryEnabled() || rows.length || ['cachedFixture', 'cachedPlayer'].includes(model)) return rows;
     try {
       const legacy = await this.legacyFindRows(model, args);
       if (legacy.length) {
