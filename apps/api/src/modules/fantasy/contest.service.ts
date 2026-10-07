@@ -246,7 +246,7 @@ export class ContestService implements OnModuleInit {
 
   async active(fixtureId: number) {
     const contestId = `contest_${fixtureId}`;
-    let contest = await this.prisma.contest.findUnique({ where: { id: contestId } });
+    let contest = await this.readContest(contestId);
     let fixtureForClock: any = null;
 
     try {
@@ -286,6 +286,7 @@ export class ContestService implements OnModuleInit {
           maxTeamsPerUser: 1,
         },
       });
+      if (this.cloudSql.isEnabled()) await this.cloudSql.upsertContestFromRecord(contest);
     }
 
     const startingAtMs = new Date((contest as any).lineupLockAt ?? fixtureForClock?.starting_at).getTime();
