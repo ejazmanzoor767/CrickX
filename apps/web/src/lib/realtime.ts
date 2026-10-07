@@ -3,6 +3,8 @@ import {
   onSnapshot,
   where,
   query,
+  orderBy,
+  limit,
   type DocumentData,
   type QuerySnapshot,
   type Unsubscribe,
@@ -19,7 +21,8 @@ export function subscribeLiveMatches(onData: (rows: any[]) => void, onError?: (e
 }
 
 export function subscribeGlobalLeaderboard(onData: (rows: any[]) => void, onError?: (error: Error) => void): Unsubscribe {
-  return onSnapshot(collection(getClientFirestore(), 'leaderboardUsers'), (snapshot) => onData(rows(snapshot)), (error) => onError?.(error));
+  const q = query(collection(getClientFirestore(), 'leaderboardUsers'), orderBy('totalPoints', 'desc'), limit(100));
+  return onSnapshot(q, (snapshot) => onData(rows(snapshot)), (error) => onError?.(error));
 }
 
 export function subscribeFixtureLeaderboard(fixtureId: number, onData: (rows: any[]) => void, onError?: (error: Error) => void): Unsubscribe {
