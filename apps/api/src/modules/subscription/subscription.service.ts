@@ -136,7 +136,7 @@ export class SubscriptionService {
     // subscribed at least once. There is no limit on how many users can use
     // one qualified referrer's code.
     if (!await this.hasSuccessfulSubscription(referrerId)) {
-      throw new ConflictException('This referral code is not active yet. The referrer must complete a subscription first.');
+      throw new ConflictException('The referrer must complete a subscription first before this referral code can be used.');
     }
 
     const existing = await this.firestore.db.collection('referrals').doc(userId).get();
