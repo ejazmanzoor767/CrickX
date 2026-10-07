@@ -596,7 +596,7 @@ export class ContestService implements OnModuleInit {
       return { entry, participantCount: currentCount + 1 };
     }) as { entry: any; participantCount: number };
 
-    const latestContest = await this.prisma.contest.findUnique({ where: { id: contest.id } });
+    const latestContest = await this.readContest(contest.id);
 
     const joinDeadlineUnix = Math.floor(
       new Date((latestContest as any)?.lineupLockAt ?? contest.lineupLockAt).getTime() / 1000,
@@ -637,6 +637,10 @@ export class ContestService implements OnModuleInit {
   }
 
   async leaderboard(contestId: string) {
+    if (this.cloudSql.isEnabled()) {
+      return this.cloudSql.listContestEntries(contestId, 200);
+    }
+
     const snap = await this.prisma.db.collection('contestEntries')
       .where('contestId', '==', contestId)
       .orderBy('totalPoints', 'desc')
