@@ -233,32 +233,32 @@ function FantasyBuilder() {
   const countB = teamCounts[teamIdFor(teamB)] ?? 0;
 
   return <section className="app-page fantasy-builder-page" style={{ paddingBottom: 96 }}>
-    <div className="page-intro" style={{ alignItems: 'flex-start' }}>
+    <div className="page-intro fantasy-builder-intro" style={{ alignItems: 'flex-start' }}>
       <div><p className="eyebrow">CRICKX FANTASY</p><h1 className="section-title">Build your XI</h1><p className="section-subtitle">Select players from the Sportmonks squad for this match.</p></div>
-      <div className="card" style={{ minWidth: 180, padding: 14, textAlign: 'right' }}><span className="eyebrow">CREDITS</span><strong style={{ display: 'block', fontSize: 24, marginTop: 3 }}>{totalCredits.toFixed(1)} / 100</strong><span className="section-subtitle">{remainingCredits.toFixed(1)} remaining</span></div>
+      <div className="card fantasy-credit-card" style={{ minWidth: 180, padding: 14, textAlign: 'right' }}><span className="eyebrow">CREDITS</span><strong style={{ display: 'block', fontSize: 24, marginTop: 3 }}>{totalCredits.toFixed(1)} / 100</strong><span className="section-subtitle">{remainingCredits.toFixed(1)} remaining</span></div>
     </div>
 
-    <div className="card" style={{ padding: 14 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'center' }}>
-        <div><TeamBadge team={teamA} align="left" /><div className="section-subtitle" style={{ marginTop: 7 }}>{countA} selected</div></div>
-        <strong style={{ color: '#98a0b3', fontSize: 16 }}>{countA} - {countB}</strong>
-        <div><TeamBadge team={teamB} align="right" /><div className="section-subtitle" style={{ marginTop: 7, textAlign: 'right' }}>{countB} selected</div></div>
+    <div className="card fantasy-team-card" style={{ padding: 14 }}>
+      <div className="fantasy-team-summary-grid" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'center' }}>
+        <div className="fantasy-team-side"><TeamBadge team={teamA} align="left" /><div className="section-subtitle" style={{ marginTop: 7 }}>{countA} selected</div></div>
+        <strong className="fantasy-team-vs" style={{ color: '#98a0b3', fontSize: 16 }}>{countA} - {countB}</strong>
+        <div className="fantasy-team-side"><TeamBadge team={teamB} align="right" /><div className="section-subtitle" style={{ marginTop: 7, textAlign: 'right' }}>{countB} selected</div></div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.06)' }}><span className="section-subtitle">Maximum 7 players from one team</span><strong style={{ fontSize: 13 }}>{selected.length}/11</strong></div>
     </div>
 
-    <div className="card" style={{ padding: 8 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
-        {CATEGORIES.map((item) => <button key={item} className={category === item ? 'primary-button' : 'secondary-button'} onClick={() => { setCategory(item); setError(''); }} style={{ minHeight: 44, fontSize: 12 }}>{item}</button>)}
+    <div className="card fantasy-category-tabs" style={{ padding: 8 }}>
+      <div className="fantasy-category-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
+        {CATEGORIES.map((item) => <button key={item} className={(category === item ? 'primary-button' : 'secondary-button') + ' fantasy-category-button'} onClick={() => { setCategory(item); setError(''); }} style={{ minHeight: 44, fontSize: 12 }}>{item}</button>)}
       </div>
     </div>
 
     {error && <div className="card"><p className="error-text">{error}</p></div>}
     {message && <div className="notice">{message}</div>}
 
-    <div className="card" style={{ padding: 14 }}>
-      <div className="section-mini-row" style={{ marginBottom: 10 }}><div><p className="eyebrow">{category}</p><h2>{displayedPlayers.length} players</h2></div><span className="demo-pill">{selected.length}/11</span></div>
-      <div style={{ display: 'grid', gap: 8 }}>
+    <div className="card fantasy-player-list" style={{ padding: 14 }}>
+      <div className="section-mini-row fantasy-player-list-head" style={{ marginBottom: 10 }}><div><p className="eyebrow">{category}</p><h2>{displayedPlayers.length} players</h2></div><span className="demo-pill">{selected.length}/11</span></div>
+      <div className="fantasy-player-grid" style={{ display: 'grid', gap: 8 }}>
         {displayedPlayers.map((player: any) => {
           const id = Number(player.player_id);
           const isSelected = selected.includes(id);
@@ -266,10 +266,10 @@ function FantasyBuilder() {
           const atTeamLimit = !isSelected && teamCount >= MAX_TEAM_PLAYERS;
           const cost = Number(player.creditValue ?? DEFAULT_CREDITS);
           return <button key={id} onClick={() => togglePlayer(player)} className="card" style={{ width: '100%', textAlign: 'left', cursor: atTeamLimit ? 'not-allowed' : 'pointer', padding: 12, border: isSelected ? '1px solid rgba(155,255,71,.55)' : '1px solid rgba(255,255,255,.07)', background: isSelected ? 'rgba(155,255,71,.07)' : undefined, opacity: atTeamLimit ? .48 : 1 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 12, alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>{player.teamImage ? <img src={player.teamImage} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'contain', background: 'rgba(255,255,255,.06)', padding: 4 }} /> : player.teamFlag ? <span style={{ fontSize: 22 }}>{player.teamFlag}</span> : <span style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,.06)' }} />}<div style={{ minWidth: 0 }}><strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player.fullname ?? `Player ${id}`}</strong><span className="section-subtitle">{player.realTeamName} · {player.category}</span></div></div>
-              <strong style={{ whiteSpace: 'nowrap' }}>{cost.toFixed(1)}</strong>
-              <span className={isSelected ? 'badge-live' : 'demo-pill'}>{isSelected ? '✓' : '+'}</span>
+            <div className="fantasy-player-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 12, alignItems: 'center' }}>
+              <div className="fantasy-player-main" style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>{player.teamImage ? <img src={player.teamImage} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'contain', background: 'rgba(255,255,255,.06)', padding: 4 }} /> : player.teamFlag ? <span style={{ fontSize: 22 }}>{player.teamFlag}</span> : <span style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,.06)' }} />}<div className="fantasy-player-copy" style={{ minWidth: 0 }}><strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player.fullname ?? `Player ${id}`}</strong><span className="section-subtitle">{player.realTeamName} · {player.category}</span></div></div>
+              <strong className="fantasy-player-cost" style={{ whiteSpace: 'nowrap' }}>{cost.toFixed(1)}</strong>
+              <span className={(isSelected ? 'badge-live' : 'demo-pill') + ' fantasy-player-select'}>{isSelected ? '✓' : '+'}</span>
             </div>
           </button>;
         })}
@@ -277,7 +277,7 @@ function FantasyBuilder() {
       </div>
     </div>
 
-    <div className="card" style={{ position: 'sticky', bottom: 12, zIndex: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 12 }}>
+    <div className="card fantasy-bottom-bar" style={{ position: 'sticky', bottom: 12, zIndex: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 12 }}>
       <div><strong>{selected.length}/11</strong><span className="section-subtitle" style={{ marginLeft: 8 }}>{savingDraft ? 'Saving…' : 'players selected'}</span></div>
       <button className={selected.length === 11 && !savingDraft ? 'primary-button' : 'secondary-button'} style={{ padding: '11px 20px', opacity: selected.length === 11 && !savingDraft ? 1 : .65 }} disabled={selected.length !== 11 || savingDraft} onClick={async () => {
         if (selected.length !== 11) {
