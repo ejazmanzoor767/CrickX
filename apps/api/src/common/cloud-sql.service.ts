@@ -25,6 +25,11 @@ export class CloudSqlService implements OnModuleInit, OnModuleDestroy {
     return this.ready;
   }
 
+  getPool(): Pool {
+    if (!this.pool || !this.ready) throw new Error('Cloud SQL pool is not ready.');
+    return this.pool;
+  }
+
   async onModuleInit() {
     if (!this.configured) {
       if (this.required) throw new Error('CRICKX_CONTEST_STORAGE requires CLOUD_SQL_DATABASE_URL or DATABASE_URL.');
