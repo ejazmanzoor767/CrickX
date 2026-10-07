@@ -5,7 +5,7 @@ import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { OnchainContestService } from '../onchain/onchain-contest.service';
 import { LeaderboardService } from './leaderboard.service';
 import { ScoringRules, computePlayerScoreBreakdown, rulesForFormat } from './scoring.rules';
-import { PostgresService } from '../../common/cloud-sql.service';
+import { PostgresService } from '../../common/postgres.service';
 
 function isFinished(status: string | null | undefined, live: 0 | 1) {
   // Sportmonks can briefly keep the live flag set while publishing a terminal
