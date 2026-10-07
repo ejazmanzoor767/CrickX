@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { Cron } from '@nestjs/schedule';
 import { verifyMessage, getAddress, type Address } from 'viem';
 import { FirestoreService } from '../../common/firestore.service';
+import { RealtimeFirestoreService } from '../../common/realtime-firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { OnchainContestService } from '../onchain/onchain-contest.service';
 import { SubscriptionService } from '../subscription/subscription.service';
@@ -23,6 +24,7 @@ export class ContestService implements OnModuleInit {
     private readonly onchain: OnchainContestService,
     private readonly subscriptions: SubscriptionService,
     private readonly postgres: PostgresService,
+    private readonly realtime: RealtimeFirestoreService,
   ) {}
 
   onModuleInit() {
@@ -36,6 +38,45 @@ export class ContestService implements OnModuleInit {
     }
     // Local/dev fallback only when PostgreSQL is not configured.
     return this.prisma.contest.findUnique({ where: { id: contestId } });
+  }
+
+  private async projectContestState(contestId: string, data: Record<string, any>) {
+    if (!this.realtime.isEnabled()) return;
+    try {
+      await this.realtime.db.collection('contests').doc(String(contestId)).set({
+        id: String(contestId),
+        sportmonksFixtureId: data.sportmonksFixtureId ?? null,
+        name: data.name ?? null,
+        status: data.status ?? null,
+        filledSpots: Number(data.filledSpots ?? 0),
+        prizePoolTotal: Number(data.prizePoolTotal ?? 0),
+        prizePoolFundingStatus: data.prizePoolFundingStatus ?? null,
+        prizePoolFundedAmount: Number(data.prizePoolFundedAmount ?? 0),
+        prizePoolFundingTxHash: data.prizePoolFundingTxHash ?? null,
+        lineupLockAt: data.lineupLockAt ?? null,
+        chainContestId: data.chainContestId == null ? null : Number(data.chainContestId),
+        updatedAt: new Date(),
+      }, { merge: true });
+    } catch (error) {
+      this.logger.warn('Firestore contest realtime projection failed contest=' + String(contestId) + ': ' + (error instanceof Error ? error.message : String(error)));
+    }
+  }
+
+  private async projectContestEntry(entry: any) {
+    if (!this.realtime.isEnabled() || !entry?.id) return;
+    try {
+      await this.realtime.db.collection('contestEntries').doc(String(entry.id)).set({
+        id: String(entry.id),
+        contestId: String(entry.contestId),
+        fantasyTeamId: String(entry.fantasyTeamId),
+        totalPoints: Number(entry.totalPoints ?? 0),
+        rank: entry.rank == null ? null : Number(entry.rank),
+        prizeWon: entry.prizeWon == null ? 0 : Number(entry.prizeWon),
+        updatedAt: new Date(),
+      }, { merge: true });
+    } catch (error) {
+      this.logger.warn('Firestore contest-entry realtime projection failed entry=' + String(entry.id) + ': ' + (error instanceof Error ? error.message : String(error)));
+    }
   }
 
   @Cron('0 */2 * * * *')
@@ -210,6 +251,7 @@ export class ContestService implements OnModuleInit {
       },
     });
     if (this.postgres.isEnabled()) await this.postgres.upsertContestFromRecord(createdContest);
+    void this.projectContestState(createdContest.id, createdContest);
     return createdContest;
   }
 
@@ -275,6 +317,7 @@ export class ContestService implements OnModuleInit {
       } else {
         contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'UPCOMING', entryFee: 0 } });
       }
+      void this.projectContestState(contest.id, contest);
     } else if (started && !providerFinished && contest.status === 'UPCOMING') {
       if (this.postgres.isEnabled()) {
         await this.postgres.updateContest(contest.id, { status: 'LIVE', entryFee: 0 });
@@ -282,6 +325,7 @@ export class ContestService implements OnModuleInit {
       } else {
         contest = await this.prisma.contest.update({ where: { id: contest.id }, data: { status: 'LIVE', entryFee: 0 } });
       }
+      void this.projectContestState(contest.id, contest);
     }
 
     // Backend-owned chain operations remain bounded by the contest state.
@@ -326,6 +370,12 @@ export class ContestService implements OnModuleInit {
       void this.queueLiveContestFunding(contest.id, storedChainContestId, participantCount);
     }
     const actualPool = Number(contest.prizePoolTotal || 0);
+    void this.projectContestState(contest.id, {
+      ...contest,
+      filledSpots: participantCount,
+      prizePoolTotal: actualPool,
+      chainContestId: storedChainContestId > 0 ? storedChainContestId : contest.chainContestId,
+    });
 
     return {
       ...contest,
@@ -463,6 +513,9 @@ export class ContestService implements OnModuleInit {
           walletAddress: wallet,
         });
 
+        const sqlContest = await this.postgres.getContest(contest.id);
+        void this.projectContestEntry(sqlResult.entry);
+        if (sqlContest) void this.projectContestState(contest.id, sqlContest);
 
         return {
           ...sqlResult.entry,
@@ -554,6 +607,9 @@ export class ContestService implements OnModuleInit {
     }) as { entry: any; participantCount: number };
 
     const latestContest = await this.readContest(contest.id);
+
+    void this.projectContestEntry(result.entry);
+    if (latestContest) void this.projectContestState(contest.id, latestContest);
 
     const joinDeadlineUnix = Math.floor(
       new Date((latestContest as any)?.lineupLockAt ?? contest.lineupLockAt).getTime() / 1000,
