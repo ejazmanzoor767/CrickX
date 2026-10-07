@@ -10,29 +10,38 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const AVATAR_SIZE = 512;
 
 async function compressAvatar(file: File) {
-  if (!file.type.startsWith('image/')) throw new Error('Please choose an image file.');
+  if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
+    throw new Error('Please choose a JPG, PNG or WebP image.');
+  }
   if (file.size > MAX_IMAGE_BYTES) throw new Error('Profile photo must be 5 MB or smaller.');
   const source = URL.createObjectURL(file);
   try {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Unable to read that image.'));
+      img.onerror = () => reject(new Error('Unable to read that image. Please choose a JPG, PNG or WebP photo.'));
       img.src = source;
     });
+    if (!image.naturalWidth || !image.naturalHeight) {
+      throw new Error('Unable to read that image.');
+    }
     const canvas = document.createElement('canvas');
     canvas.width = AVATAR_SIZE;
     canvas.height = AVATAR_SIZE;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Your browser cannot process this photo.');
-    const scale = Math.min(AVATAR_SIZE / image.width, AVATAR_SIZE / image.height);
-    const width = Math.max(1, Math.round(image.width * scale));
-    const height = Math.max(1, Math.round(image.height * scale));
+    context.fillStyle = '#10151f';
+    context.fillRect(0, 0, AVATAR_SIZE, AVATAR_SIZE);
+    const scale = Math.min(AVATAR_SIZE / image.naturalWidth, AVATAR_SIZE / image.naturalHeight);
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
     context.drawImage(image, Math.round((AVATAR_SIZE - width) / 2), Math.round((AVATAR_SIZE - height) / 2), width, height);
-    let dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-    if (dataUrl.length > 700_000) dataUrl = canvas.toDataURL('image/jpeg', 0.68);
-    if (dataUrl.length > 850_000) throw new Error('Photo is still too large after compression. Choose a simpler image.');
-    return dataUrl;
+
+    for (const quality of [0.78, 0.68, 0.58, 0.48]) {
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      if (dataUrl.length <= 700_000) return dataUrl;
+    }
+    throw new Error('Photo is still too large after compression. Choose a simpler image.');
   } finally {
     URL.revokeObjectURL(source);
   }
@@ -170,7 +179,7 @@ export default function ProfilePage() {
     .toUpperCase();
 
   return (
-    <section className="profile-page">
+    <section className="profile-page profile-page-mobile">
       <div className="profile-hero card">
         <div className="avatar-large">
           {profile.avatarUrl ? <img src={profile.avatarUrl} alt="Profile" /> : initials}
@@ -201,7 +210,7 @@ export default function ProfilePage() {
       </div>
 
       {editing && (
-        <div className="card" style={{ marginTop: 16 }}>
+        <div className="card profile-edit-card" style={{ marginTop: 16 }}>
           <div className="section-mini-row">
             <div>
               <p className="eyebrow">EDIT PROFILE</p>
@@ -209,7 +218,7 @@ export default function ProfilePage() {
             </div>
           </div>
           <form onSubmit={save}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 18, alignItems: 'center', marginBottom: 20 }}>
+            <div className="profile-photo-editor" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 18, alignItems: 'center', marginBottom: 20 }}>
               <div className="avatar-large" style={{ width: 92, height: 92, minWidth: 92 }}>
                 {profile.avatarUrl ? <img src={profile.avatarUrl} alt="Profile preview" /> : initials}
               </div>
@@ -224,7 +233,7 @@ export default function ProfilePage() {
                 {photoSaved && <p className="success-text">Profile photo saved.</p>}
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+            <div className="profile-edit-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
               <div>
                 <label className="form-label">Display name</label>
                 <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your cricket name" />
@@ -248,14 +257,14 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <div className="card" style={{ marginTop: 16 }}>
+      <div className="card profile-session-card" style={{ marginTop: 16 }}>
           <div className="section-mini-row">
             <div>
               <p className="eyebrow">PLAYER IDENTITY</p>
               <h2>Profile details</h2>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+          <div className="profile-details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
             <div>
               <small style={{ color: 'var(--muted)' }}>DISPLAY NAME</small>
               <strong style={{ display: 'block', marginTop: 5 }}>{profile.displayName || 'CrickX Player'}</strong>
@@ -377,7 +386,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16, padding: 0, overflow: 'hidden' }}>
+      <div className="card profile-whitepaper-card" style={{ marginTop: 16, padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', background: 'linear-gradient(135deg, rgba(155,255,71,.08), rgba(18,23,34,.96))' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 46, height: 46, borderRadius: 14, display: 'grid', placeItems: 'center', background: 'rgba(155,255,71,.12)', border: '1px solid rgba(155,255,71,.14)', fontSize: 22 }}>📄</div>
