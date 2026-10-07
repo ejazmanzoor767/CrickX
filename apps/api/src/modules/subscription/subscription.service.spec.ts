@@ -210,7 +210,7 @@ describe('SubscriptionService payment recovery', () => {
 
     await expect(service.applyReferral('user-a', 'CRXNEW12345', 'a@example.com'))
       .rejects
-      .toThrow('The referrer must complete a subscription first.');
+      .toThrow('The referrer must complete a subscription first before this referral code can be used.');
   });
 
   it('keeps a referral pending until the referred user subscribes', async () => {
@@ -234,7 +234,14 @@ describe('SubscriptionService payment recovery', () => {
         return { doc: jest.fn(() => ({ get: referralCodeGet })) };
       }
       if (name === 'referrals') {
-        return { doc: jest.fn(() => ({ get: existingReferralGet, set: referralSet })) };
+        return {
+          doc: jest.fn(() => ({ get: existingReferralGet, set: referralSet })),
+          where: jest.fn(() => ({
+            limit: jest.fn(() => ({
+              get: jest.fn().mockResolvedValue({ empty: true, docs: [] }),
+            })),
+          })),
+        };
       }
       throw new Error(`Unexpected collection: ${name}`);
     });
