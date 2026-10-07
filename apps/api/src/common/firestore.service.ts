@@ -628,7 +628,7 @@ export class FirestoreService {
 
   async findMany(model: string, args: any = {}) {
     let rows = await this.findRows(model, args);
-    rows = await this.maybeMigrateOnMiss(model, args, rows);
+    // Neon is the only application persistence source; no legacy Firestore fallback is used.
     return Promise.all(rows.map((r) => this.hydrate(model, r, args?.include, args?.select)));
   }
 
