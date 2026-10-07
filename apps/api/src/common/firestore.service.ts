@@ -145,7 +145,60 @@ type Delegate = {
 
 type Filter = [string, string, any];
 
-class SqlDocumentSnapshot {
+type DocumentSnapshotLike = {
+  id: string;
+  exists: boolean;
+  data(): any;
+  ref: DocumentRefLike;
+};
+
+type QuerySnapshotLike = {
+  docs: DocumentSnapshotLike[];
+  empty: boolean;
+  size: number;
+};
+
+type DocumentRefLike = {
+  id: string;
+  get(): Promise<DocumentSnapshotLike>;
+  set(data: any, options?: { merge?: boolean }): Promise<void>;
+  update(data: any): Promise<void>;
+  delete(): Promise<void>;
+};
+
+type QueryLike = {
+  where(field: string, op: string, value: any): QueryLike;
+  orderBy(field: string, direction?: 'asc' | 'desc'): QueryLike;
+  limit(count: number): QueryLike;
+  select(...fields: string[]): QueryLike;
+  get(): Promise<QuerySnapshotLike>;
+};
+
+type CollectionLike = QueryLike & {
+  doc(id: string): DocumentRefLike;
+};
+
+type TransactionLike = {
+  get(target: DocumentRefLike | QueryLike): Promise<DocumentSnapshotLike | QuerySnapshotLike>;
+  set(ref: DocumentRefLike, data: any, options?: { merge?: boolean }): Promise<void> | void;
+  update(ref: DocumentRefLike, data: any): Promise<void> | void;
+  delete(ref: DocumentRefLike): Promise<void> | void;
+};
+
+type BatchLike = {
+  set(ref: DocumentRefLike, data: any, options?: { merge?: boolean }): BatchLike;
+  update(ref: DocumentRefLike, data: any): BatchLike;
+  delete(ref: DocumentRefLike): BatchLike;
+  commit(): Promise<void>;
+};
+
+type DatabaseCompat = {
+  collection(name: string): CollectionLike;
+  batch(): BatchLike;
+  runTransaction<T>(fn: (tx: TransactionLike) => Promise<T>): Promise<T>;
+};
+
+class SqlDocumentSnapshot implements DocumentSnapshotLike {
   constructor(
     public readonly id: string,
     private readonly value: any,
@@ -161,7 +214,7 @@ class SqlQuerySnapshot {
   get size() { return this.docs.length; }
 }
 
-class SqlDocumentRef {
+class SqlDocumentRef implements DocumentRefLike {
   constructor(
     private readonly db: SqlPersistenceDb,
     public readonly collectionName: string,
@@ -173,7 +226,7 @@ class SqlDocumentRef {
   async delete() { await this.db.deleteDoc(this.collectionName, this.id); }
 }
 
-class SqlQuery {
+class SqlQuery implements QueryLike {
   protected readonly filters: Filter[] = [];
   protected readonly ordering: Array<[string, 'asc' | 'desc']> = [];
   protected takeCount: number | undefined;
@@ -206,11 +259,11 @@ class SqlQuery {
   }
 }
 
-class SqlCollectionRef extends SqlQuery {
+class SqlCollectionRef extends SqlQuery implements CollectionLike {
   doc(id: string) { return new SqlDocumentRef(this.db, this.collectionName, String(id)); }
 }
 
-class SqlTransaction {
+class SqlTransaction implements TransactionLike {
   constructor(private readonly db: SqlPersistenceDb) {}
 
   async get(target: SqlDocumentRef | SqlQuery) {
@@ -231,7 +284,7 @@ class SqlTransaction {
   }
 }
 
-class SqlBatch {
+class SqlBatch implements BatchLike {
   private readonly operations: Array<(tx: SqlTransaction) => Promise<void>> = [];
 
   constructor(private readonly db: SqlPersistenceDb) {}
@@ -259,7 +312,7 @@ class SqlBatch {
   }
 }
 
-class SqlPersistenceDb {
+class SqlPersistenceDb implements DatabaseCompat {
   private readonly txContext = new AsyncLocalStorage<PoolClient>();
 
   constructor(private readonly pool: Pool) {}
@@ -479,8 +532,8 @@ export class FirestoreService {
     return this.sqlDb;
   }
 
-  get db(): any {
-    return this.primaryDb() ?? this.realtimeDb;
+  get db(): DatabaseCompat {
+    return (this.primaryDb() ?? (this.realtimeDb as unknown as DatabaseCompat));
   }
 
   private delegate(model: string): Delegate {
