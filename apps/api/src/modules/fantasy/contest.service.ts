@@ -97,6 +97,9 @@ export class ContestService implements OnModuleInit {
             data: { chainContestId: created.chainContestId },
           });
         }
+        if (this.cloudSql.isEnabled()) {
+          await this.cloudSql.updateContest(key, { chainContestId: created.chainContestId });
+        }
         this.logger.log(`Chain contest provisioned contest=${key}, chainContestId=${created.chainContestId}, tx=${created.createTxHash}`);
       } catch (error) {
         this.logger.warn(
@@ -185,6 +188,9 @@ export class ContestService implements OnModuleInit {
                 where: { id: contest.id },
                 data: { chainContestId: created.chainContestId },
               });
+            }
+            if (this.cloudSql.isEnabled()) {
+              await this.cloudSql.updateContest(contest.id, { chainContestId: created.chainContestId });
             }
           } catch (error) {
             this.logger.warn(
