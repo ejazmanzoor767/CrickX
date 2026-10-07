@@ -13,9 +13,9 @@ export class PostgresContestError extends Error {
 export class PostgresService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PostgresService.name);
   private readonly connectionString = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || '';
-  private readonly mode = String(process.env.CRICKX_CONTEST_STORAGE ?? 'auto').trim().toLowerCase();
+  private readonly mode = String(process.env.CRICKX_PRIMARY_STORAGE ?? process.env.CRICKX_CONTEST_STORAGE ?? 'auto').trim().toLowerCase();
   private readonly configured = Boolean(this.connectionString);
-  private readonly required = ['postgres', 'true'].includes(this.mode);
+  private readonly required = ['postgres', 'postgresql', 'neon', 'true'].includes(this.mode);
   private pool: Pool | null = null;
   private ready = false;
   private lastBootstrapAt = 0;
