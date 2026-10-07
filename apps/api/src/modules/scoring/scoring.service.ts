@@ -294,11 +294,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
   private async fundStartedContestPrizePools(fixtureId: number) {
     if (this.cloudSql.isEnabled()) {
-      let contests = await this.cloudSql.listContestsByFixture(fixtureId, true);
-      if (!contests.length) {
-        await this.cloudSql.bootstrapFromFirestore(this.prisma.db, fixtureId);
-        contests = await this.cloudSql.listContestsByFixture(fixtureId, true);
-      }
+      const contests = await this.cloudSql.listContestsByFixture(fixtureId, true);
 
       for (const contest of contests) {
         if (!contest) continue;
