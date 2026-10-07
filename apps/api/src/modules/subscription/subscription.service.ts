@@ -98,10 +98,25 @@ export class SubscriptionService {
 
   async referralInfo(userId: string) {
     const code = await this.ensureReferralCode(userId);
-    const snapshot = await this.firestore.db.collection('referrals').where('referrerId', '==', userId).get();
-    const referrals = snapshot.docs
+    const [networkSnapshot, incomingSnapshot] = await Promise.all([
+      this.firestore.db.collection('referrals').where('referrerId', '==', userId).get(),
+      this.firestore.db.collection('referrals').doc(userId).get(),
+    ]);
+    const referrals = networkSnapshot.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }) as any)
       .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+
+    const incoming = incomingSnapshot.exists ? (incomingSnapshot.data() as any) : null;
+    const incomingReferral = incoming && String(incoming.referrerId ?? '') !== userId
+      ? {
+          id: incomingSnapshot.id,
+          referrerId: String(incoming.referrerId ?? ''),
+          referralCode: incoming.referralCode ?? null,
+          status: incoming.status ?? 'PENDING',
+          createdAt: this.isoDate(incoming.createdAt),
+          qualifiedAt: this.isoDate(incoming.qualifiedAt),
+        }
+      : null;
 
     return {
       code,
@@ -115,6 +130,7 @@ export class SubscriptionService {
         createdAt: this.isoDate(row.createdAt),
         qualifiedAt: this.isoDate(row.qualifiedAt),
       })),
+      incomingReferral,
       rewardText: 'At launch, rewards will be distributed according to the number of valid referrals.',
     };
   }
