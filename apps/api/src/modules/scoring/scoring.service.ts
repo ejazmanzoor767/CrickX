@@ -285,6 +285,16 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  private async projectContestState(contestId: string, data: Record<string, any>) {
+    try {
+      await this.prisma.contest.update({ where: { id: contestId }, data });
+    } catch (error) {
+      this.logger.warn(
+        `Firestore contest projection failed contest=${contestId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   private async fundStartedContestPrizePools(fixtureId: number) {
     if (this.cloudSql.isEnabled()) {
       let contests = await this.cloudSql.listContestsByFixture(fixtureId, true);
