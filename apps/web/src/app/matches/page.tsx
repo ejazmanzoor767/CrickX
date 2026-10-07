@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
+import { subscribeLiveMatches } from '../../lib/realtime';
 
 const asList = (result: any) => Array.isArray(result) ? result : (result?.data ?? []);
 const formatTime = (value: string) => new Date(value).toLocaleString('en-PK', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -97,7 +98,20 @@ export default function MatchesPage() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { void refreshAll(true); const timer = window.setInterval(() => void refreshAll(false), 15000); return () => window.clearInterval(timer); }, [user?.uid]);
+  useEffect(() => {
+    void refreshAll(true);
+    const unsubscribe = subscribeLiveMatches((rows) => {
+      const liveRows = rows
+        .filter((row: any) => row?.active !== false && String(row?.applicationState ?? 'LIVE').toUpperCase() === 'LIVE')
+        .sort((a: any, b: any) => new Date(a.starting_at ?? 0).getTime() - new Date(b.starting_at ?? 0).getTime());
+      setLive(liveRows);
+    }, () => undefined);
+    const timer = window.setInterval(() => void refreshAll(false), 15000);
+    return () => {
+      unsubscribe();
+      window.clearInterval(timer);
+    };
+  }, [user?.uid]);
 
   const nextFour = useMemo(() => {
     const seen = new Set<number>();
