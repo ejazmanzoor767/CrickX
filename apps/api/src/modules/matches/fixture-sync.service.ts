@@ -36,4 +36,16 @@ export class FixtureSyncService {
       this.logger.error('Fixture sync failed', err instanceof Error ? err.stack : String(err));
     }
   }
+
+  @Cron('0 */10 * * * *')
+  async reconcileCompletedMatches() {
+    try {
+      const result = await this.matches.reconcileRecentlyCompleted();
+      this.logger.log(
+        'Completed-match reconciliation: checked=' + result.checked + ', completed=' + result.completed + ', candidates=' + result.candidates + '.',
+      );
+    } catch (err) {
+      this.logger.error('Completed-match reconciliation failed', err instanceof Error ? err.stack : String(err));
+    }
+  }
 }
