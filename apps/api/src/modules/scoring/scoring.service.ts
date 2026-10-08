@@ -21,6 +21,152 @@ function isFinished(status: string | null | undefined, live: 0 | 1) {
   );
 }
 
+function longFormatInningKey(row: any, fallback = 0) {
+  const raw = row?.scoreboard ?? row?.inning ?? row?.score_id;
+  const match = String(raw ?? '').match(/(?:^|[^0-9])S?([0-9]+)(?:$|[^0-9])/i);
+  const value = match ? Number(match[1]) : Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function buildLongFormatPerformance(batting: any[], bowling: any[], balls: any[]) {
+  const battingByPlayer = new Map<number, any>();
+  const bowlingByPlayer = new Map<number, any>();
+  const fieldingByPlayer = new Map<number, any>();
+
+  for (const row of batting) {
+    const playerId = Number(row?.player_id);
+    if (!Number.isFinite(playerId)) continue;
+    const current = battingByPlayer.get(playerId) ?? {
+      score: 0,
+      ball: 0,
+      four_x: 0,
+      six_x: 0,
+      rate: 0,
+      duckInnings: 0,
+      notOutInnings: 0,
+    };
+    const runs = Number(row?.score ?? 0);
+    const ballsFaced = Number(row?.ball ?? 0);
+    current.score += Number.isFinite(runs) ? runs : 0;
+    current.ball += Number.isFinite(ballsFaced) ? ballsFaced : 0;
+    current.four_x += Number(row?.four_x ?? 0) || 0;
+    current.six_x += Number(row?.six_x ?? 0) || 0;
+    if (runs === 0 && ballsFaced > 0) current.duckInnings += 1;
+    if (row?.active === true || Number(row?.active) === 1) current.notOutInnings += 1;
+    battingByPlayer.set(playerId, current);
+  }
+
+  for (const row of bowling) {
+    const playerId = Number(row?.player_id);
+    if (!Number.isFinite(playerId)) continue;
+    const current = bowlingByPlayer.get(playerId) ?? {
+      wickets: 0,
+      medians: 0,
+      runs: 0,
+      overs: 0,
+      bowledWickets: 0,
+      lbwWickets: 0,
+      wicketsByInningsMap: new Map<number, number>(),
+    };
+    current.wickets += Number(row?.wickets ?? 0) || 0;
+    current.medians += Number(row?.medians ?? 0) || 0;
+    current.runs += Number(row?.runs ?? 0) || 0;
+    current.overs += Number(row?.overs ?? 0) || 0;
+    const inning = longFormatInningKey(row);
+    if (inning > 0 && Number(row?.wickets ?? 0) > 0) {
+      current.wicketsByInningsMap.set(inning, Number(row.wickets) + (current.wicketsByInningsMap.get(inning) ?? 0));
+    }
+    bowlingByPlayer.set(playerId, current);
+  }
+
+  let fieldingEvents = 0;
+
+  const addFielding = (playerId: number, inning: number, kind: string) => {
+    if (!Number.isFinite(playerId) || playerId <= 0) return;
+    const current = fieldingByPlayer.get(playerId) ?? {
+      catches: 0,
+      stumpings: 0,
+      directHitRunOuts: 0,
+      runOutAssists: 0,
+      catchesByInningsMap: new Map<number, number>(),
+    };
+    if (kind === 'stump') current.stumpings += 1;
+    else if (kind === 'catch') {
+      current.catches += 1;
+      current.catchesByInningsMap.set(inning, (current.catchesByInningsMap.get(inning) ?? 0) + 1);
+    } else if (kind === 'direct') current.directHitRunOuts += 1;
+    else if (kind === 'assist') current.runOutAssists += 1;
+    fieldingByPlayer.set(playerId, current);
+    fieldingEvents += 1;
+  };
+
+  for (const ball of balls) {
+    const score = ball?.score ?? {};
+    if (!score?.is_wicket) continue;
+
+    const text = String(score?.name ?? '').toLowerCase();
+    const inning = longFormatInningKey(ball);
+    const bowlerId = Number(ball?.bowling_player_id);
+    const isRunOut = text.includes('run out');
+    const isBowlerWicket = !isRunOut && Number.isFinite(bowlerId) && bowlerId > 0;
+
+    if (isBowlerWicket) {
+      const current = bowlingByPlayer.get(bowlerId) ?? {
+        wickets: 0, medians: 0, runs: 0, overs: 0,
+        bowledWickets: 0, lbwWickets: 0, wicketsByInningsMap: new Map<number, number>(),
+      };
+      if (!current.wicketsByInningsMap.has(inning) && inning > 0) current.wicketsByInningsMap.set(inning, 0);
+      current.wicketsByInningsMap.set(inning, (current.wicketsByInningsMap.get(inning) ?? 0) + 1);
+      if (text.includes('bowled')) current.bowledWickets += 1;
+      if (text.includes('lbw')) current.lbwWickets += 1;
+      bowlingByPlayer.set(bowlerId, current);
+    }
+
+    const fielderId = Number(
+      score?.catch_stump_player_id ??
+      score?.fielder_id ??
+      score?.fielder_player_id ??
+      score?.player_out_id ??
+      0,
+    );
+    if (isRunOut) {
+      if (/direct(?: hit)?/i.test(text)) addFielding(fielderId, inning, 'direct');
+      else if (/assist|throw|thrown/i.test(text)) addFielding(fielderId, inning, 'assist');
+    } else if (text.includes('stump')) {
+      addFielding(fielderId, inning, 'stump');
+    } else if (text.includes('catch')) {
+      addFielding(fielderId, inning, 'catch');
+    }
+  }
+
+  if (fieldingEvents === 0) {
+    for (const row of batting) {
+      const fielderId = Number(row?.catch_stump_player_id);
+      if (!Number.isFinite(fielderId) || fielderId <= 0) continue;
+      const text = String(row?.dismissal_type ?? '').toLowerCase();
+      const inning = longFormatInningKey(row);
+      if (text.includes('stump')) addFielding(fielderId, inning, 'stump');
+      else if (text.includes('catch')) addFielding(fielderId, inning, 'catch');
+    }
+  }
+
+  for (const current of bowlingByPlayer.values()) {
+    current.wicketsByInnings = [...current.wicketsByInningsMap.values()];
+    delete current.wicketsByInningsMap;
+  }
+  for (const current of fieldingByPlayer.values()) {
+    current.catchesByInnings = [...current.catchesByInningsMap.values()];
+    delete current.catchesByInningsMap;
+  }
+
+  return {
+    battingByPlayer,
+    bowlingByPlayer,
+    fieldingByPlayer,
+    dotBallsByPlayer: new Map<number, number>(),
+  };
+}
+
 function isFirestoreQuotaError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? '');
   return /RESOURCE_EXHAUSTED|Quota exceeded/i.test(message);
@@ -508,50 +654,54 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const battingByPlayer = new Map(batting.map((row) => [Number(row.player_id), row]));
-    const bowlingByPlayer = new Map(bowling.map((row) => [Number(row.player_id), row]));
-    const fieldingByPlayer = new Map<number, { catches: number; stumpings: number; runOuts: number }>();
-    const dotBallsByPlayer = new Map<number, number>();
+    const formatRules = rulesForFormat(fixture.type);
+    const longPerformance = formatRules.long_format
+      ? buildLongFormatPerformance(batting, bowling, balls)
+      : null;
+    const battingByPlayer = longPerformance?.battingByPlayer ?? new Map(batting.map((row) => [Number(row.player_id), row]));
+    const bowlingByPlayer = longPerformance?.bowlingByPlayer ?? new Map(bowling.map((row) => [Number(row.player_id), row]));
+    const fieldingByPlayer = longPerformance?.fieldingByPlayer ?? new Map<number, { catches: number; stumpings: number; runOuts: number }>();
+    const dotBallsByPlayer = longPerformance?.dotBallsByPlayer ?? new Map<number, number>();
 
-    for (const row of batting) {
-      if (!row.catch_stump_player_id) continue;
-      const name = String((row as any).dismissal_type ?? '').toLowerCase();
-      const fielderId = Number(row.catch_stump_player_id);
-      const current = fieldingByPlayer.get(fielderId) ?? { catches: 0, stumpings: 0, runOuts: 0 };
-      if (name.includes('stump')) current.stumpings += 1;
-      else current.catches += 1;
-      fieldingByPlayer.set(fielderId, current);
-    }
+    if (!formatRules.long_format) {
+      for (const row of batting) {
+        if (!row.catch_stump_player_id) continue;
+        const name = String((row as any).dismissal_type ?? '').toLowerCase();
+        const fielderId = Number(row.catch_stump_player_id);
+        const current = fieldingByPlayer.get(fielderId) ?? { catches: 0, stumpings: 0, runOuts: 0 };
+        if (name.includes('stump')) current.stumpings += 1;
+        else current.catches += 1;
+        fieldingByPlayer.set(fielderId, current);
+      }
 
-    for (const ball of balls) {
-      const score = ball.score ?? {};
-      const wide = Number(score.wide ?? 0);
-      const noball = Number(score.noball ?? 0);
-      const bye = Number(score.bye ?? 0);
-      const legBye = Number(score.leg_bye ?? 0);
-      const isLegalDot = Number(score.runs ?? 0) === 0 && wide === 0 && noball === 0 && bye === 0 && legBye === 0;
-      const bowlerId = Number(ball.bowling_player_id);
-      if (isLegalDot && Number.isFinite(bowlerId)) dotBallsByPlayer.set(bowlerId, (dotBallsByPlayer.get(bowlerId) ?? 0) + 1);
+      for (const ball of balls) {
+        const score = ball.score ?? {};
+        const wide = Number(score.wide ?? 0);
+        const noball = Number(score.noball ?? 0);
+        const bye = Number(score.bye ?? 0);
+        const legBye = Number(score.leg_bye ?? 0);
+        const isLegalDot = Number(score.runs ?? 0) === 0 && wide === 0 && noball === 0 && bye === 0 && legBye === 0;
+        const bowlerId = Number(ball.bowling_player_id);
+        if (isLegalDot && Number.isFinite(bowlerId)) dotBallsByPlayer.set(bowlerId, (dotBallsByPlayer.get(bowlerId) ?? 0) + 1);
 
-      if (score.is_wicket) {
-        const text = String(score.name ?? '').toLowerCase();
-        const playerId = Number(ball.batsman_id);
-        const fielderId = Number((score as any).player_out_id ?? (score as any).catch_stump_player_id ?? 0);
-        if (fielderId) {
-          const current = fieldingByPlayer.get(fielderId) ?? { catches: 0, stumpings: 0, runOuts: 0 };
-          if (text.includes('stump')) current.stumpings += 1;
-          else if (text.includes('run out')) current.runOuts += 1;
-          else if (text.includes('catch')) current.catches += 1;
-          fieldingByPlayer.set(fielderId, current);
-        } else if (text.includes('run out') && playerId) {
-          const current = fieldingByPlayer.get(playerId) ?? { catches: 0, stumpings: 0, runOuts: 0 };
-          current.runOuts += 1;
-          fieldingByPlayer.set(playerId, current);
+        if (score.is_wicket) {
+          const text = String(score.name ?? '').toLowerCase();
+          const playerId = Number(ball.batsman_id);
+          const fielderId = Number((score as any).player_out_id ?? (score as any).catch_stump_player_id ?? 0);
+          if (fielderId) {
+            const current = fieldingByPlayer.get(fielderId) ?? { catches: 0, stumpings: 0, runOuts: 0 };
+            if (text.includes('stump')) current.stumpings += 1;
+            else if (text.includes('run out')) current.runOuts += 1;
+            else if (text.includes('catch')) current.catches += 1;
+            fieldingByPlayer.set(fielderId, current);
+          } else if (text.includes('run out') && playerId) {
+            const current = fieldingByPlayer.get(playerId) ?? { catches: 0, stumpings: 0, runOuts: 0 };
+            current.runOuts += 1;
+            fieldingByPlayer.set(playerId, current);
+          }
         }
       }
     }
-
-    const formatRules = rulesForFormat(fixture.type);
     const userFixtureScores = new Map<string, number>();
 
     // Every saved fantasy team is a leaderboard participant, including before
@@ -669,68 +819,72 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     const bowling = fixture.bowling ?? [];
     const balls = fixture.balls ?? [];
 
-    const battingByPlayer = new Map(batting.map((row) => [Number(row.player_id), row]));
-    const bowlingByPlayer = new Map(bowling.map((row) => [Number(row.player_id), row]));
-    const fieldingByPlayer = new Map<number, { catches: number; stumpings: number; runOuts: number }>();
-    const dotBallsByPlayer = new Map<number, number>();
+    const formatRules = rulesForFormat(fixture.type);
+    const longPerformance = formatRules.long_format
+      ? buildLongFormatPerformance(batting, bowling, balls)
+      : null;
+    const battingByPlayer = longPerformance?.battingByPlayer ?? new Map(batting.map((row) => [Number(row.player_id), row]));
+    const bowlingByPlayer = longPerformance?.bowlingByPlayer ?? new Map(bowling.map((row) => [Number(row.player_id), row]));
+    const fieldingByPlayer = longPerformance?.fieldingByPlayer ?? new Map<number, { catches: number; stumpings: number; runOuts: number }>();
+    const dotBallsByPlayer = longPerformance?.dotBallsByPlayer ?? new Map<number, number>();
 
-    for (const row of batting) {
-      if (!row.catch_stump_player_id) continue;
-      const name = String((row as any).dismissal_type ?? '').toLowerCase();
-      const fielderId = Number(row.catch_stump_player_id);
-      const current = fieldingByPlayer.get(fielderId) ?? { catches: 0, stumpings: 0, runOuts: 0 };
-      if (name.includes('stump')) current.stumpings += 1;
-      else current.catches += 1;
-      fieldingByPlayer.set(fielderId, current);
-    }
-
-    for (const ball of balls) {
-      const score = ball.score ?? {};
-      const wide = Number(score.wide ?? 0);
-      const noball = Number(score.noball ?? 0);
-      const bye = Number(score.bye ?? 0);
-      const legBye = Number(score.leg_bye ?? 0);
-      const isLegalDot =
-        Number(score.runs ?? 0) === 0 &&
-        wide === 0 &&
-        noball === 0 &&
-        bye === 0 &&
-        legBye === 0;
-      const bowlerId = Number(ball.bowling_player_id);
-      if (isLegalDot && Number.isFinite(bowlerId)) {
-        dotBallsByPlayer.set(
-          bowlerId,
-          (dotBallsByPlayer.get(bowlerId) ?? 0) + 1,
-        );
+    if (!formatRules.long_format) {
+      for (const row of batting) {
+        if (!row.catch_stump_player_id) continue;
+        const name = String((row as any).dismissal_type ?? '').toLowerCase();
+        const fielderId = Number(row.catch_stump_player_id);
+        const current = fieldingByPlayer.get(fielderId) ?? { catches: 0, stumpings: 0, runOuts: 0 };
+        if (name.includes('stump')) current.stumpings += 1;
+        else current.catches += 1;
+        fieldingByPlayer.set(fielderId, current);
       }
 
-      if (score.is_wicket) {
-        const text = String(score.name ?? '').toLowerCase();
-        const playerId = Number(ball.batsman_id);
-        const fielderId = Number(
-          (score as any).player_out_id ??
-            (score as any).catch_stump_player_id ??
-            0,
-        );
-        if (fielderId) {
-          const current =
-            fieldingByPlayer.get(fielderId) ??
-            { catches: 0, stumpings: 0, runOuts: 0 };
-          if (text.includes('stump')) current.stumpings += 1;
-          else if (text.includes('run out')) current.runOuts += 1;
-          else if (text.includes('catch')) current.catches += 1;
-          fieldingByPlayer.set(fielderId, current);
-        } else if (text.includes('run out') && playerId) {
-          const current =
-            fieldingByPlayer.get(playerId) ??
-            { catches: 0, stumpings: 0, runOuts: 0 };
-          current.runOuts += 1;
-          fieldingByPlayer.set(playerId, current);
+      for (const ball of balls) {
+        const score = ball.score ?? {};
+        const wide = Number(score.wide ?? 0);
+        const noball = Number(score.noball ?? 0);
+        const bye = Number(score.bye ?? 0);
+        const legBye = Number(score.leg_bye ?? 0);
+        const isLegalDot =
+          Number(score.runs ?? 0) === 0 &&
+          wide === 0 &&
+          noball === 0 &&
+          bye === 0 &&
+          legBye === 0;
+        const bowlerId = Number(ball.bowling_player_id);
+        if (isLegalDot && Number.isFinite(bowlerId)) {
+          dotBallsByPlayer.set(
+            bowlerId,
+            (dotBallsByPlayer.get(bowlerId) ?? 0) + 1,
+          );
+        }
+
+        if (score.is_wicket) {
+          const text = String(score.name ?? '').toLowerCase();
+          const playerId = Number(ball.batsman_id);
+          const fielderId = Number(
+            (score as any).player_out_id ??
+              (score as any).catch_stump_player_id ??
+              0,
+          );
+          if (fielderId) {
+            const current =
+              fieldingByPlayer.get(fielderId) ??
+              { catches: 0, stumpings: 0, runOuts: 0 };
+            if (text.includes('stump')) current.stumpings += 1;
+            else if (text.includes('run out')) current.runOuts += 1;
+            else if (text.includes('catch')) current.catches += 1;
+            fieldingByPlayer.set(fielderId, current);
+          } else if (text.includes('run out') && playerId) {
+            const current =
+              fieldingByPlayer.get(playerId) ??
+              { catches: 0, stumpings: 0, runOuts: 0 };
+            current.runOuts += 1;
+            fieldingByPlayer.set(playerId, current);
+          }
         }
       }
     }
-
-    const formatRules = rulesForFormat(fixture.type);
     const scoringRuleSetId = (contest as any).scoringRuleSetId;
     const configuredRuleSet = scoringRuleSetId
       ? await this.prisma.scoringRuleSet.findUnique({ where: { id: scoringRuleSetId } })
