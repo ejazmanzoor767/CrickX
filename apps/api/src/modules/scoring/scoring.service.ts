@@ -32,6 +32,7 @@ function buildLongFormatPerformance(batting: any[], bowling: any[], balls: any[]
   const battingByPlayer = new Map<number, any>();
   const bowlingByPlayer = new Map<number, any>();
   const fieldingByPlayer = new Map<number, any>();
+  const eventWicketsByPlayer = new Map<number, Map<number, number>>();
 
   for (const row of batting) {
     const playerId = Number(row?.player_id);
@@ -115,8 +116,9 @@ function buildLongFormatPerformance(batting: any[], bowling: any[], balls: any[]
         wickets: 0, medians: 0, runs: 0, overs: 0,
         bowledWickets: 0, lbwWickets: 0, wicketsByInningsMap: new Map<number, number>(),
       };
-      if (!current.wicketsByInningsMap.has(inning) && inning > 0) current.wicketsByInningsMap.set(inning, 0);
-      current.wicketsByInningsMap.set(inning, (current.wicketsByInningsMap.get(inning) ?? 0) + 1);
+      const eventMap = eventWicketsByPlayer.get(bowlerId) ?? new Map<number, number>();
+      if (inning > 0) eventMap.set(inning, (eventMap.get(inning) ?? 0) + 1);
+      eventWicketsByPlayer.set(bowlerId, eventMap);
       if (text.includes('bowled')) current.bowledWickets += 1;
       if (text.includes('lbw')) current.lbwWickets += 1;
       bowlingByPlayer.set(bowlerId, current);
@@ -150,9 +152,13 @@ function buildLongFormatPerformance(batting: any[], bowling: any[], balls: any[]
     }
   }
 
-  for (const current of bowlingByPlayer.values()) {
-    current.wicketsByInnings = [...current.wicketsByInningsMap.values()];
+  for (const [playerId, current] of bowlingByPlayer.entries()) {
+    const eventMap = eventWicketsByPlayer.get(playerId);
+    current.wicketsByInnings = eventMap && eventMap.size
+      ? [...eventMap.values()]
+      : [...current.wicketsByInningsMap.values()];
     delete current.wicketsByInningsMap;
+    bowlingByPlayer.set(playerId, current);
   }
   for (const current of fieldingByPlayer.values()) {
     current.catchesByInnings = [...current.catchesByInningsMap.values()];
