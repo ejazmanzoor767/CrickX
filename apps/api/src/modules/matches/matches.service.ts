@@ -304,7 +304,10 @@ export class MatchesService {
     const scheduledRows = Array.isArray(scheduledResult.data) ? scheduledResult.data : [];
 
     const liveData = [...liveById.values()]
-      .filter((fixture) => applicationState(fixture) === 'LIVE')
+      // Membership in Sportmonks' dedicated live feed is authoritative once
+      // the scheduled start time has passed, even when status/live temporarily
+      // lags during kickoff.
+      .filter((fixture) => applicationState(fixture, { providerLiveFeed: true }) === 'LIVE')
       .map((fixture) => normalize(fixture, 'LIVE'));
 
     const fallbackData = scheduledRows
