@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksClientService } from './sportmonks-client.service';
 import {
   SportmonksFixture,
@@ -18,21 +17,6 @@ const LIVE_SCORECARD_INCLUDES = 'localteam,visitorteam,scoreboards,runs';
 const MAX_FIXTURE_PAGES = 5;
 
 const asRows = (value: any): any[] => Array.isArray(value) ? value : Array.isArray(value?.data) ? value.data : [];
-
-function mergeBallHistory(previous: any[], current: any[]) {
-  const map = new Map<string, any>();
-  for (const ball of [...previous, ...current]) {
-    const inning = ball?.inning ?? ball?.score_id ?? '?';
-    const number = ball?.ball ?? ball?.id ?? `${map.size}`;
-    map.set(`${inning}-${number}`, ball);
-  }
-  return [...map.values()].sort((a, b) => {
-    const ai = Number(a?.inning ?? a?.score_id ?? 0);
-    const bi = Number(b?.inning ?? b?.score_id ?? 0);
-    if (ai !== bi) return ai - bi;
-    return Number(a?.ball ?? 0) - Number(b?.ball ?? 0);
-  });
-}
 
 function normalizeLineupPlayer(entry: any): SportmonksLineupPlayer {
   const meta = entry?.lineup ?? {};
@@ -76,7 +60,6 @@ export class SportmonksDataService {
 
   constructor(
     private readonly client: SportmonksClientService,
-    private readonly prisma: FirestoreService,
     private readonly config: ConfigService,
   ) {
     const raw = this.config.get<string>('ALLOWED_SPORTMONKS_LEAGUE_IDS', '');
