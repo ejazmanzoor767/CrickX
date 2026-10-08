@@ -27,6 +27,14 @@ export class FantasyTeamController {
   @Get()
   mine(@Req() req: Request) { return this.teams.listMine(uid(req)); }
 
+  @Get('public/:userId/:fixtureId')
+  publicTeam(
+    @Param('userId') userId: string,
+    @Param('fixtureId', ParseIntPipe) fixtureId: number,
+  ) {
+    return this.teams.getPublicForFixture(userId, fixtureId);
+  }
+
   @Get('draft/:fixtureId')
   draft(@Req() req: Request, @Param('fixtureId', ParseIntPipe) fixtureId: number) { return this.drafts.get(uid(req), fixtureId); }
 
