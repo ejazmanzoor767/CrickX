@@ -84,7 +84,13 @@ export class SportmonksDataService {
   /**
    * Block red-ball / multi-day formats at the provider boundary.
    */
-  isFixtureFormatAllowed(fixture: Pick<SportmonksFixture, 'type'>): boolean {
+  isFixtureFormatAllowed(fixture: Pick<SportmonksFixture, 'type' | 'league_id'>): boolean {
+    const leagueId = Number((fixture as any)?.league_id);
+    // Explicitly configured league IDs are the product allowlist. If an
+    // allowlisted competition is First Class/Test/multi-day, it must remain
+    // visible instead of being rejected by the generic red-ball safeguard.
+    if (this.allowedLeagueIds?.has(leagueId)) return true;
+
     const type = String(fixture?.type ?? '')
       .trim()
       .toLowerCase()
