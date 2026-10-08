@@ -48,7 +48,12 @@ export function applicationState(fixture: SportmonksFixture, options: { provider
   if (options.providerLiveFeed && started) return 'LIVE';
   if (liveStatus) return 'LIVE';
   if (fixture.live === 1) return 'LIVE';
-  if (notStartedStatus) return 'UPCOMING';
+  if (notStartedStatus) {
+    // At kickoff Sportmonks can keep status=NS/scheduled for a few polling
+    // cycles. Once the scheduled start time has passed, show the fixture as
+    // LIVE unless the provider explicitly postponed it.
+    return status.includes('postponed') ? 'UPCOMING' : 'LIVE';
+  }
 
   return 'UPCOMING';
 }
