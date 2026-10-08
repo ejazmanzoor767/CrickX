@@ -63,7 +63,7 @@ export class AdminService {
         userId: true,
         documentType: true,
         status: true,
-        rejectionReason: true,
+        reviewNote: true,
         submittedAt: true,
         reviewedAt: true,
         user: { select: { email: true } },
