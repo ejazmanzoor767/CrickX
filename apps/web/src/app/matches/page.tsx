@@ -119,8 +119,7 @@ export default function MatchesPage() {
   }, [todayScheduled, upcoming]);
 
   const savedTeamFixtureIds = useMemo(() => new Set(myTeams.map((team: any) => Number(team?.sportmonksFixtureId)).filter(Number.isFinite)), [myTeams]);
-  const completedMine = useMemo(() => completed, [completed]);
-  const visible = tab === 'LIVE' ? live : tab === 'UPCOMING' ? nextFour : completedMine;
+  const visible = tab === 'LIVE' ? live : tab === 'UPCOMING' ? nextFour : completed;
 
   return <section className="app-page match-centre-page">
     <div className="page-intro match-centre-intro"><div><p className="eyebrow">CRICKX MATCHES</p><h1 className="section-title">Match centre</h1><p className="section-subtitle">Live scores, upcoming fixtures and completed matches in one place.</p></div></div>
