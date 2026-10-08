@@ -57,6 +57,27 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
       (Number(row?.noball_runs) || 0) + (Number(row?.wide) || 0) + (Number(row?.wide_runs) || 0) +
       (Number(row?.penalty) || 0) + (Number(row?.penalty_runs) || 0), 0);
     return { run, inning, teamId, inningBatting, inningBowling, inningBalls, inningWickets, extras: ballExtras > 0 ? ballExtras : scoreboardExtras };
+  const teamGroups = new Map<number, { teamId: number; team: any; innings: any[] }>();
+  for (const item of innings) {
+    if (!item.teamId) continue;
+    const team = Number(item.teamId) === Number(fixture?.localteam_id) ? fixture?.localteam : fixture?.visitorteam;
+    const existing = teamGroups.get(item.teamId);
+    if (existing) existing.innings.push(item);
+    else teamGroups.set(item.teamId, { teamId: item.teamId, team, innings: [item] });
+  }
+
+  const orderedTeamGroups = [
+    Number(fixture?.localteam_id),
+    Number(fixture?.visitorteam_id),
+  ]
+    .filter((id, index, list) => Number.isFinite(id) && id > 0 && list.indexOf(id) === index)
+    .map((id) => teamGroups.get(id))
+    .filter(Boolean) as Array<{ teamId: number; team: any; innings: any[] }>;
+
+  for (const group of teamGroups.values()) {
+    if (!orderedTeamGroups.some((item) => item.teamId === group.teamId)) orderedTeamGroups.push(group);
+  }
+
   });
 
   return <div style={{ display: 'grid', gap: 16 }}>
@@ -65,9 +86,18 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
       <p className="section-subtitle" style={{ margin: '6px 0 0' }}>Separate innings cards for matches where each team can bat twice.</p>
     </div>
 
-    {innings.length === 0
+    {orderedTeamGroups.length === 0
       ? <div className="card"><p className="section-subtitle">Innings data is not available from the cricket feed yet.</p></div>
-      : innings.map(({ run, inning, teamId, inningBatting, inningBowling, inningBalls, inningWickets, extras }: any) => {
+      : orderedTeamGroups.map(({ teamId, team, innings: teamInnings }: any) => <div className="card" key={`team-group-${teamId}`} style={{ padding: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 6px 14px' }}>
+            <TeamBadge team={team} />
+            <div>
+              <p className="eyebrow" style={{ marginBottom: 3 }}>TEAM SCORECARD</p>
+              <h2 style={{ margin: 0, fontFamily: 'Barlow Condensed', fontSize: 28, textTransform: 'uppercase' }}>{team?.name ?? 'Team'}</h2>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gap: 14 }}>
+            {teamInnings.map(({ run, inning, inningBatting, inningBowling, inningBalls, inningWickets, extras }: any) => {
           const team = Number(teamId) === Number(fixture?.localteam_id) ? fixture?.localteam : fixture?.visitorteam;
           const score = Number(run?.score ?? 0);
           const wickets = Number(run?.wickets ?? 0);
@@ -105,7 +135,9 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
               <div className="card"><p className="eyebrow">INNINGS INFORMATION</p><div className="table-row"><span>Inning</span><strong>{inning}</strong></div><div className="table-row"><span>Team</span><strong>{team?.name ?? '—'}</strong></div><div className="table-row"><span>Ball records</span><strong>{inningBalls.length}</strong></div><div className="table-row"><span>Match status</span><strong>{fixture?.status ?? '—'}</strong></div></div>
             </div>
           </div>;
-        })}
+            })}
+          </div>
+        </div>)}
   </div>;
 }
 
