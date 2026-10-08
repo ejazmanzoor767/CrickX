@@ -6,7 +6,7 @@ import { CreateFantasyTeamDto } from './dto';
 const SQUAD_SIZE = 11;
 const MAX_CREDITS = 100;
 const MAX_PLAYERS_PER_REAL_TEAM = 7;
-const DEFAULT_PLAYER_CREDITS = 9;
+const MIN_PLAYER_CREDITS = 0;
 
 @Injectable()
 export class FantasyTeamService {
@@ -46,12 +46,14 @@ export class FantasyTeamService {
     const creditByPlayer = new Map<number, number>(credits.map((c) => [Number(c.sportmonksPlayerId), Number(c.credits)]));
     const missing = playerIds.filter((playerId) => !creditByPlayer.has(Number(playerId)));
     if (missing.length) {
-      await Promise.all(missing.map(async (playerId) => {
-        await this.prisma.playerFixtureCredit.create({
-          data: { sportmonksFixtureId: fixtureId, sportmonksPlayerId: playerId, credits: DEFAULT_PLAYER_CREDITS },
-        });
-        creditByPlayer.set(playerId, DEFAULT_PLAYER_CREDITS);
-      }));
+      throw new BadRequestException(
+        'Fantasy credit pricing is not configured for one or more selected players. An admin must price the announced lineup before teams can be submitted.',
+      );
+    }
+    for (const credits of creditByPlayer.values()) {
+      if (!Number.isFinite(credits) || credits < MIN_PLAYER_CREDITS) {
+        throw new BadRequestException('Invalid fantasy player credit pricing.');
+      }
     }
     return creditByPlayer;
   }
@@ -65,7 +67,7 @@ export class FantasyTeamService {
     if (Number(dto.captainSportmonksPlayerId) === Number(dto.viceCaptainSportmonksPlayerId)) throw new BadRequestException('Captain and vice-captain must be different players.');
     const { playerTeamMap } = await this.assertSquadEligible(dto.sportmonksFixtureId, playerIds);
     const creditByPlayer = await this.ensureCredits(dto.sportmonksFixtureId, playerIds);
-    const totalCredits = playerIds.reduce((sum, playerId) => sum + Number(creditByPlayer.get(playerId) ?? DEFAULT_PLAYER_CREDITS), 0);
+    const totalCredits = playerIds.reduce((sum, playerId) => sum + Number(creditByPlayer.get(playerId)), 0);
     if (totalCredits > MAX_CREDITS) throw new BadRequestException(`Squad costs ${totalCredits} credits, exceeds the ${MAX_CREDITS} credit cap.`);
     const teamId = `team_${userId}_${dto.sportmonksFixtureId}`;
     const existing = await this.prisma.fantasyTeam.findUnique({ where: { id: teamId }, include: { players: true } });
@@ -109,7 +111,7 @@ export class FantasyTeamService {
     const before = existing;
     const { playerTeamMap } = await this.assertSquadEligible(dto.sportmonksFixtureId, playerIds);
     const creditByPlayer = await this.ensureCredits(dto.sportmonksFixtureId, playerIds);
-    const totalCredits = playerIds.reduce((sum, playerId) => sum + Number(creditByPlayer.get(playerId) ?? DEFAULT_PLAYER_CREDITS), 0);
+    const totalCredits = playerIds.reduce((sum, playerId) => sum + Number(creditByPlayer.get(playerId)), 0);
     if (totalCredits > MAX_CREDITS) throw new BadRequestException(`Squad costs ${totalCredits} credits, exceeds the ${MAX_CREDITS} credit cap.`);
     await this.prisma.fantasyTeamPlayer.deleteMany({ where: { fantasyTeamId: teamId } });
     const updated = await this.prisma.fantasyTeam.update({
