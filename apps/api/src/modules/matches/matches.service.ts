@@ -38,6 +38,7 @@ export function applicationState(fixture: SportmonksFixture, options: { provider
 
   const notStartedStatus = ['ns', 'scheduled', 'not started', 'upcoming', 'postponed']
     .some((value) => status === value || status.includes(value));
+  const explicitlyPostponed = status.includes('postponed');
   const liveStatus = [
     'live', 'innings break', 'lunch', 'tea', 'stumps',
     'innings', 'in progress', 'drinks', 'rain delay', 'delayed',
@@ -50,7 +51,16 @@ export function applicationState(fixture: SportmonksFixture, options: { provider
   if (options.providerLiveFeed && started) return 'LIVE';
   if (liveStatus) return 'LIVE';
   if (fixture.live === 1) return 'LIVE';
-  if (notStartedStatus) return 'UPCOMING';
+
+  // Sportmonks can briefly leave a fixture in NS/scheduled immediately after
+  // its scheduled start while the live feed catches up. Once the start time
+  // has actually passed, expose it as LIVE unless the provider explicitly
+  // marks it postponed. This prevents a started match from disappearing into
+  // Upcoming for the first polling cycles.
+  if (notStartedStatus) {
+    if (explicitlyPostponed) return 'UPCOMING';
+    return started ? 'LIVE' : 'UPCOMING';
+  }
 
   return 'UPCOMING';
 }
