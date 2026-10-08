@@ -21,6 +21,17 @@ export interface ScoringRules {
   player_of_match_bonus: number;
   winning_team_bonus: number;
   dot_ball_bonus: number;
+  long_format?: boolean;
+  not_out_bonus?: number;
+  bowled_bonus?: number;
+  lbw_bonus?: number;
+  direct_hit_run_out?: number;
+  run_out_assist?: number;
+  batting_milestones?: Array<{ min: number; points: number }>;
+  wicket_haul_bonuses?: Array<{ min: number; points: number }>;
+  match_wicket_bonus?: { min: number; points: number };
+  catch_milestones?: Array<{ min: number; points: number }>;
+  all_rounder_bonuses?: Array<{ min_runs: number; min_wickets: number; points: number }>;
 }
 
 const T20_STRIKE_RATE = [
@@ -63,8 +74,67 @@ export const T20_RULES = baseRules({ strike_rate_bands: T20_STRIKE_RATE, bowling
 export const T10_RULES = baseRules({ strike_rate_bands: T10_STRIKE_RATE, bowling_economy_bands: T10_ECONOMY, milestone_runs: 20, milestone_points: 25, dot_ball_bonus: 5 });
 export const ODI_RULES = baseRules({ strike_rate_bands: ODI_STRIKE_RATE, bowling_economy_bands: ODI_ECONOMY, milestone_runs: 50, milestone_points: 20, wicket: 25, maiden_over: 10, dot_ball_bonus: 1 });
 
+export const LONG_FORMAT_RULES: ScoringRules = {
+  ...baseRules({
+    run: 2,
+    four_bonus: 5,
+    six_bonus: 8,
+    duck_penalty: -10,
+    wicket: 60,
+    maiden_over: 10,
+    catch: 25,
+    stumping: 35,
+    run_out: 20,
+    strike_rate_bands: [],
+    bowling_economy_bands: [],
+    milestone_runs: 0,
+    milestone_points: 0,
+    minimum_balls_for_strike_rate: Number.MAX_SAFE_INTEGER,
+    minimum_overs_for_economy: Number.MAX_SAFE_INTEGER,
+    player_of_match_bonus: 0,
+    winning_team_bonus: 0,
+    dot_ball_bonus: 0,
+  }),
+  long_format: true,
+  not_out_bonus: 10,
+  bowled_bonus: 15,
+  lbw_bonus: 15,
+  direct_hit_run_out: 35,
+  run_out_assist: 20,
+  batting_milestones: [
+    { min: 25, points: 10 },
+    { min: 50, points: 30 },
+    { min: 75, points: 40 },
+    { min: 100, points: 60 },
+    { min: 150, points: 80 },
+    { min: 200, points: 110 },
+    { min: 250, points: 150 },
+  ],
+  wicket_haul_bonuses: [
+    { min: 3, points: 25 },
+    { min: 4, points: 45 },
+    { min: 5, points: 70 },
+    { min: 7, points: 100 },
+  ],
+  match_wicket_bonus: { min: 10, points: 150 },
+  catch_milestones: [
+    { min: 3, points: 25 },
+    { min: 4, points: 50 },
+    { min: 5, points: 75 },
+  ],
+  all_rounder_bonuses: [
+    { min_runs: 50, min_wickets: 3, points: 40 },
+    { min_runs: 50, min_wickets: 5, points: 80 },
+    { min_runs: 100, min_wickets: 3, points: 70 },
+    { min_runs: 100, min_wickets: 5, points: 120 },
+    { min_runs: 100, min_wickets: 7, points: 180 },
+    { min_runs: 100, min_wickets: 10, points: 250 },
+  ],
+};
+
 export function rulesForFormat(format: string | null | undefined): ScoringRules {
-  const value = String(format ?? '').toUpperCase();
+  const value = String(format ?? '').toUpperCase().replace(/[-_]/g, ' ');
+  if (value.includes('TEST') || value.includes('4 DAY') || value.includes('4DAY') || value.includes('5 DAY') || value.includes('5DAY')) return LONG_FORMAT_RULES;
   if (value.includes('ODI') || value.includes('ONE DAY')) return ODI_RULES;
   if (value.includes('T10') || value.includes('TEN')) return T10_RULES;
   return T20_RULES;
@@ -94,9 +164,9 @@ export interface PlayerScoreBreakdown {
 
 export function computePlayerScoreBreakdown(
   rules: ScoringRules,
-  batting?: Pick<SportmonksBatting, 'score' | 'ball' | 'four_x' | 'six_x' | 'rate'>,
-  bowling?: Pick<SportmonksBowling, 'wickets' | 'medians' | 'runs' | 'overs'>,
-  fielding?: { catches: number; stumpings: number; runOuts: number },
+  batting?: any,
+  bowling?: any,
+  fielding?: any,
   dotBalls = 0,
   playerOfMatch = false,
   winningTeam = false,
@@ -106,35 +176,106 @@ export function computePlayerScoreBreakdown(
   let fieldingPoints = 0;
   let bonusPoints = 0;
 
-  if (batting) {
-    battingPoints += batting.score * rules.run;
-    battingPoints += batting.four_x * rules.four_bonus;
-    battingPoints += batting.six_x * rules.six_bonus;
-    if (batting.score === 0 && batting.ball > 0) battingPoints += rules.duck_penalty;
-    if (batting.ball >= rules.minimum_balls_for_strike_rate) battingPoints += bandPoints(batting.rate, rules.strike_rate_bands);
-    if (rules.milestone_runs > 0) battingPoints += Math.floor(batting.score / rules.milestone_runs) * rules.milestone_points;
-  }
+  if (rules.long_format) {
+    const battingRows = batting ?? {};
+    const totalRuns = Number(battingRows.score ?? 0);
+    const totalFours = Number(battingRows.four_x ?? 0);
+    const totalSixes = Number(battingRows.six_x ?? 0);
+    const duckInnings = Number(battingRows.duckInnings ?? 0);
+    const notOutInnings = Number(battingRows.notOutInnings ?? 0);
 
-  if (bowling) {
-    bowlingPoints += bowling.wickets * rules.wicket;
-    bowlingPoints += bowling.medians * rules.maiden_over;
-    bowlingPoints += dotBalls * rules.dot_ball_bonus;
-    if (bowling.overs >= rules.minimum_overs_for_economy) {
-      bowlingPoints += bandPoints(
-        economyFromOvers(bowling.runs, bowling.overs),
-        rules.bowling_economy_bands,
-      );
+    battingPoints += totalRuns * rules.run;
+    battingPoints += totalFours * rules.four_bonus;
+    battingPoints += totalSixes * rules.six_bonus;
+    battingPoints += duckInnings * Number(rules.duck_penalty ?? 0);
+    battingPoints += notOutInnings * Number(rules.not_out_bonus ?? 0);
+
+    const battingMilestones = [...(rules.batting_milestones ?? [])]
+      .filter((band) => totalRuns >= band.min)
+      .sort((a, b) => b.min - a.min);
+    if (battingMilestones.length) battingPoints += battingMilestones[0].points;
+
+    const bowlingRows = bowling ?? {};
+    const totalWickets = Number(bowlingRows.wickets ?? 0);
+    const maidens = Number(bowlingRows.medians ?? 0);
+    const bowledWickets = Number(bowlingRows.bowledWickets ?? 0);
+    const lbwWickets = Number(bowlingRows.lbwWickets ?? 0);
+
+    bowlingPoints += totalWickets * rules.wicket;
+    bowlingPoints += maidens * rules.maiden_over;
+    bowlingPoints += bowledWickets * Number(rules.bowled_bonus ?? 0);
+    bowlingPoints += lbwWickets * Number(rules.lbw_bonus ?? 0);
+
+    const inningsHauls = Array.isArray(bowlingRows.wicketsByInnings)
+      ? bowlingRows.wicketsByInnings
+      : [];
+    const haulBands = rules.wicket_haul_bonuses ?? [];
+    for (const haul of inningsHauls) {
+      const highest = haulBands
+        .filter((band) => Number(haul) >= band.min)
+        .sort((a, b) => b.min - a.min)[0];
+      if (highest) bowlingPoints += highest.points;
     }
-  }
 
-  if (fielding) {
-    fieldingPoints += fielding.catches * rules.catch;
-    fieldingPoints += fielding.stumpings * rules.stumping;
-    fieldingPoints += fielding.runOuts * rules.run_out;
-  }
+    if (rules.match_wicket_bonus && totalWickets >= rules.match_wicket_bonus.min) {
+      bowlingPoints += rules.match_wicket_bonus.points;
+    }
 
-  if (playerOfMatch) bonusPoints += rules.player_of_match_bonus;
-  if (winningTeam) bonusPoints += rules.winning_team_bonus;
+    const catches = Number(fielding?.catches ?? 0);
+    const stumpings = Number(fielding?.stumpings ?? 0);
+    const directHits = Number(fielding?.directHitRunOuts ?? 0);
+    const runOutAssists = Number(fielding?.runOutAssists ?? 0);
+    fieldingPoints += catches * rules.catch;
+    fieldingPoints += stumpings * rules.stumping;
+    fieldingPoints += directHits * Number(rules.direct_hit_run_out ?? 0);
+    fieldingPoints += runOutAssists * Number(rules.run_out_assist ?? rules.run_out ?? 0);
+
+    const catchesByInnings = Array.isArray(fielding?.catchesByInnings)
+      ? fielding.catchesByInnings
+      : [];
+    const catchBands = rules.catch_milestones ?? [];
+    for (const count of catchesByInnings) {
+      const highest = catchBands
+        .filter((band) => Number(count) >= band.min)
+        .sort((a, b) => b.min - a.min)[0];
+      if (highest) fieldingPoints += highest.points;
+    }
+
+    const allRounderBonus = [...(rules.all_rounder_bonuses ?? [])]
+      .filter((bonus) => totalRuns >= bonus.min_runs && totalWickets >= bonus.min_wickets)
+      .sort((a, b) => b.points - a.points)[0];
+    if (allRounderBonus) bonusPoints += allRounderBonus.points;
+  } else {
+    if (batting) {
+      battingPoints += batting.score * rules.run;
+      battingPoints += batting.four_x * rules.four_bonus;
+      battingPoints += batting.six_x * rules.six_bonus;
+      if (batting.score === 0 && batting.ball > 0) battingPoints += rules.duck_penalty;
+      if (batting.ball >= rules.minimum_balls_for_strike_rate) battingPoints += bandPoints(batting.rate, rules.strike_rate_bands);
+      if (rules.milestone_runs > 0) battingPoints += Math.floor(batting.score / rules.milestone_runs) * rules.milestone_points;
+    }
+
+    if (bowling) {
+      bowlingPoints += bowling.wickets * rules.wicket;
+      bowlingPoints += bowling.medians * rules.maiden_over;
+      bowlingPoints += dotBalls * rules.dot_ball_bonus;
+      if (bowling.overs >= rules.minimum_overs_for_economy) {
+        bowlingPoints += bandPoints(
+          economyFromOvers(bowling.runs, bowling.overs),
+          rules.bowling_economy_bands,
+        );
+      }
+    }
+
+    if (fielding) {
+      fieldingPoints += fielding.catches * rules.catch;
+      fieldingPoints += fielding.stumpings * rules.stumping;
+      fieldingPoints += fielding.runOuts * rules.run_out;
+    }
+
+    if (playerOfMatch) bonusPoints += rules.player_of_match_bonus;
+    if (winningTeam) bonusPoints += rules.winning_team_bonus;
+  }
 
   const baseTotal = battingPoints + bowlingPoints + fieldingPoints + bonusPoints;
   return {
