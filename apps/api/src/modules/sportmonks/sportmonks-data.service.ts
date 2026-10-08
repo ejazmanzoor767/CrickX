@@ -10,9 +10,11 @@ import {
 
 // The live scorecard needs the complete ball record plus the ball outcome and
 // player relationships. Sportmonks supports nested includes for ball data.
-const FIXTURE_INCLUDES = 'localteam,visitorteam,scoreboards,runs,batting,bowling,lineup,balls,balls.score,balls.batsman,balls.bowler,venue';
+// Sportmonks allows up to 10 nested includes. Live cricket data must come
+// from the livescores endpoint; fixture-by-id is not the live source.
+const FIXTURE_INCLUDES = 'localteam,visitorteam,scoreboards,runs,batting,bowling,lineup.player,balls,balls.score';
 const LIVE_FIXTURE_INCLUDES = FIXTURE_INCLUDES;
-const LIVE_SCORECARD_INCLUDES = 'localteam,visitorteam,scoreboards,runs';
+const LIVE_SCORECARD_INCLUDES = 'localteam,visitorteam,league,scoreboards,runs,batting,bowling,lineup.player,balls,balls.score';
 
 const MAX_FIXTURE_PAGES = 50;
 
@@ -213,7 +215,30 @@ export class SportmonksDataService {
   }
 
   async listLiveFixturesRaw() {
-    return this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
+    return this.client.get<SportmonksFixture[]>('/livescores/now', { include: LIVE_SCORECARD_INCLUDES });
+  }
+
+  /**
+   * Fetch one live fixture from Sportmonks' live endpoint.
+   */
+  async getLiveFixture(fixtureId: number): Promise<SportmonksFixture> {
+    const params = {
+      fixtures: String(fixtureId),
+      include: LIVE_SCORECARD_INCLUDES,
+    };
+    try {
+      const liveEnvelope = await this.client.get<SportmonksFixture[]>('/livescores/now', params);
+      const found = (liveEnvelope.data ?? []).find((row: any) => Number(row?.id) === Number(fixtureId));
+      if (found) return normalizeFixture(found);
+    } catch {
+      // Fall back to the current-day livescores endpoint below.
+    }
+
+    const dayEnvelope = await this.client.get<SportmonksFixture[]>('/livescores', params);
+    const found = (dayEnvelope.data ?? []).find((row: any) => Number(row?.id) === Number(fixtureId));
+    if (found) return normalizeFixture(found);
+
+    throw new NotFoundException('Live fixture ' + fixtureId + ' was not returned by Sportmonks livescores.');
   }
 
   async getFixture(fixtureId: number, opts: { forceLive?: boolean; allowUnlistedLeague?: boolean } = {}): Promise<SportmonksFixture> {
@@ -231,16 +256,7 @@ export class SportmonksDataService {
   }
 
   async getLiveDetail(fixtureId: number): Promise<SportmonksFixture> {
-    try {
-      const liveEnvelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
-      const liveFixture = (liveEnvelope.data ?? []).find((fixture) => Number(fixture.id) === Number(fixtureId));
-      if (liveFixture) return this.getFixture(fixtureId, { forceLive: true });
-    } catch {
-      const bareEnvelope = await this.client.get<SportmonksFixture[]>('/livescores');
-      const bareFixture = (bareEnvelope.data ?? []).find((fixture) => Number(fixture.id) === Number(fixtureId));
-      if (bareFixture) return this.getFixture(fixtureId, { forceLive: true });
-    }
-    throw new NotFoundException(`Live fixture ${fixtureId} was not returned by Sportmonks /livescores.`);
+    return this.getLiveFixture(fixtureId);
   }
 
   async getPlayer(playerId: number): Promise<SportmonksPlayer> {
