@@ -6,13 +6,32 @@ import { SportmonksFixture } from '../sportmonks/sportmonks.types';
 
 function sportmonksDate(value: Date) { return value.toISOString().slice(0, 10); }
 const STALE_NOT_STARTED_MS = 6 * 60 * 60 * 1000;
-const RECENT_COMPLETED_CACHE_MS = 60 * 1000;
+const STALE_LIVE_T20_MS = 5 * 60 * 60 * 1000;
+const STALE_LIVE_LIMITED_OVERS_MS = 10 * 60 * 60 * 1000;
+const STALE_LIVE_DEFAULT_MS = 10 * 60 * 60 * 1000;
 export function isTerminalFixture(fixture: Partial<SportmonksFixture>): boolean {
   const status = String(fixture.status ?? '').trim().toLowerCase();
   return [
     'finish', 'complete', 'completed', 'aband', 'cancelled', 'canceled',
     'no result', 'no-result', 'washout',
   ].some((value) => status.includes(value)) || fixture.draw_noresult === true;
+}
+
+function staleLiveAgeMs(fixture: SportmonksFixture) {
+  const type = String(fixture?.type ?? '').trim().toLowerCase().replace(/[_/]+/g, ' ');
+  if (/\b(?:t10|t20|hundred|20 overs|10 overs)\b/.test(type)) return STALE_LIVE_T20_MS;
+  if (/\b(?:odi|one day|list ?a|50 overs|50 over)\b/.test(type)) return STALE_LIVE_LIMITED_OVERS_MS;
+  return STALE_LIVE_DEFAULT_MS;
+}
+
+export function isStaleLiveFixture(fixture: SportmonksFixture, now = Date.now()) {
+  const status = String(fixture?.status ?? '').trim().toLowerCase();
+  const startingAt = fixture?.starting_at ? new Date(fixture.starting_at).getTime() : NaN;
+  if (!Number.isFinite(startingAt) || startingAt > now) return false;
+  if (!['live', 'in progress', 'innings break', 'lunch', 'tea', 'stumps'].some((part) => status.includes(part)) && Number(fixture?.live) !== 1) {
+    return false;
+  }
+  return now - startingAt >= staleLiveAgeMs(fixture);
 }
 
 export function applicationState(fixture: SportmonksFixture, options: { providerLiveFeed?: boolean } = {}): 'UPCOMING' | 'LIVE' | 'COMPLETED' {
@@ -33,6 +52,12 @@ export function applicationState(fixture: SportmonksFixture, options: { provider
   // has failed to transition it for many hours. This prevents abandoned or
   // dropped fixtures from reappearing forever in Live/Fantasy.
   if (staleNotStarted) return 'COMPLETED';
+
+  // The /livescores feed is current-day data, not a dedicated in-play-only
+  // feed. If Sportmonks leaves a LIVE/live=1 status stale for longer than a
+  // realistic duration for the format, stop keeping the match in Live and
+  // allow it into Completed.
+  if (isStaleLiveFixture(fixture)) return 'COMPLETED';
 
   // A match cannot be LIVE before its scheduled start time.
   if (!started) return 'UPCOMING';
@@ -118,12 +143,6 @@ function fallOfWicketsFromFixture(fixture: any) {
 
 @Injectable()
 export class MatchesService {
-  private recentCompletedDateCache: {
-    date: string;
-    expiresAt: number;
-    data: SportmonksFixture[];
-  } | null = null;
-
   constructor(
     private readonly sportmonks: SportmonksDataService,
     private readonly firestore: FirestoreService,
@@ -285,7 +304,7 @@ export class MatchesService {
     const scheduledRows = Array.isArray(scheduledResult.data) ? scheduledResult.data : [];
 
     const liveData = [...liveById.values()]
-      .filter((fixture) => applicationState(fixture, { providerLiveFeed: true }) === 'LIVE')
+      .filter((fixture) => applicationState(fixture) === 'LIVE')
       .map((fixture) => normalize(fixture, 'LIVE'));
 
     const fallbackData = scheduledRows
@@ -325,30 +344,6 @@ export class MatchesService {
     return { data, meta: { pagination: { total:data.length,count:data.length,per_page:data.length,current_page:1,total_pages:1 } } };
   }
 
-  private async listRecentCompletedDate(date: string) {
-    const cached = this.recentCompletedDateCache;
-    if (cached && cached.date === date && cached.expiresAt > Date.now()) {
-      return cached.data;
-    }
-
-    try {
-      const envelope = await this.sportmonks.listFixturesByDate(date);
-      const data = Array.isArray(envelope.data) ? envelope.data : [];
-      this.recentCompletedDateCache = {
-        date,
-        expiresAt: Date.now() + RECENT_COMPLETED_CACHE_MS,
-        data,
-      };
-      return data;
-    } catch (error) {
-      console.warn(
-        `Recent completed fixture refresh skipped for ${date}:`,
-        error instanceof Error ? error.message : String(error),
-      );
-      return [];
-    }
-  }
-
   async listCompleted(daysBack = 14) {
     const now = new Date();
     const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
@@ -365,24 +360,11 @@ export class MatchesService {
       page += 1;
     } while (page <= totalPages);
 
-    // Sportmonks /livescores contains every fixture for the current day and
-    // /livescores/now keeps an in-play fixture available for a short period
-    // around the end of the match. Reconcile both feeds on every request so
-    // Completed does not wait for the slower /fixtures history feed to catch up.
-    const previousUtcDay = new Date(now);
-    previousUtcDay.setUTCDate(previousUtcDay.getUTCDate() - 1);
-    const previousUtcDate = sportmonksDate(previousUtcDay);
-
-    const [todayEnvelope, liveEnvelope, recentDateRows] = await Promise.all([
-      this.sportmonks.listTodayFixtures(),
-      this.sportmonks.listLiveFixtures(),
-      this.listRecentCompletedDate(previousUtcDate),
-    ]);
-    const realtimeRows = [
-      ...(Array.isArray(todayEnvelope.data) ? todayEnvelope.data : []),
-      ...(Array.isArray(liveEnvelope.data) ? liveEnvelope.data : []),
-      ...recentDateRows,
-    ];
+    // /livescores is the freshest current-day snapshot. Merge it with the
+    // paginated fixture-history query so final scores/statuses are available
+    // without relying on the unavailable /fixtures/date endpoint.
+    const todayEnvelope = await this.sportmonks.listTodayFixtures();
+    const realtimeRows = Array.isArray(todayEnvelope.data) ? todayEnvelope.data : [];
 
     const byId = new Map<number, SportmonksFixture>();
     for (const fixture of [...fixtures, ...realtimeRows]) {

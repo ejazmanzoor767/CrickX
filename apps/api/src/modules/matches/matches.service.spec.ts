@@ -1,4 +1,4 @@
-import { applicationState } from './matches.service';
+import { applicationState, isStaleLiveFixture } from './matches.service';
 
 describe('applicationState', () => {
   const now = Date.now();
@@ -86,6 +86,34 @@ describe('applicationState', () => {
       starting_at: new Date(now - 60_000).toISOString(),
       draw_noresult: true,
     } as any)).toBe('COMPLETED');
+  });
+
+  it('treats a stale T20 LIVE status as completed after five hours', () => {
+    expect(isStaleLiveFixture({
+      id: 11,
+      status: 'Live',
+      live: 1,
+      type: 'T20',
+      starting_at: new Date(now - 5 * 60 * 60 * 1000 - 1).toISOString(),
+    } as any, now)).toBe(true);
+
+    expect(applicationState({
+      id: 11,
+      status: 'Live',
+      live: 1,
+      type: 'T20',
+      starting_at: new Date(now - 5 * 60 * 60 * 1000 - 1).toISOString(),
+    } as any)).toBe('COMPLETED');
+  });
+
+  it('does not expire a normal ODI before the ten-hour stale-live threshold', () => {
+    expect(isStaleLiveFixture({
+      id: 12,
+      status: 'Live',
+      live: 1,
+      type: 'ODI',
+      starting_at: new Date(now - 9 * 60 * 60 * 1000).toISOString(),
+    } as any, now)).toBe(false);
   });
 
   it('expires an old NS fixture even when the provider live flag is stale', () => {

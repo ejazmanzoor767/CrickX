@@ -18,6 +18,7 @@ const TTL_LIVE_MS = 15 * 1000;
 const TTL_UPCOMING_MS = 5 * 60 * 1000;
 const TTL_PLAYER_MS = 60 * 60 * 1000;
 const MAX_FIXTURE_PAGES = 5;
+const MAX_LIVESCORE_PAGES = 10;
 
 const asRows = (value: any): any[] => Array.isArray(value) ? value : Array.isArray(value?.data) ? value.data : [];
 
@@ -132,31 +133,23 @@ export class SportmonksDataService {
     return { ...lastEnvelope, data: rows };
   }
 
-  async listTodayFixtures() {
-    const envelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
-    return this.filterFixtureEnvelope(envelope);
-  }
-
-  async listFixturesByDate(date: string) {
+  private async listLivescorePages(include = LIVE_SCORECARD_INCLUDES) {
     const rows: SportmonksFixture[] = [];
     let page = 1;
     let totalPages = 1;
     let lastEnvelope: any = null;
 
     do {
-      const envelope = await this.client.get<SportmonksFixture[]>(
-        `/fixtures/date/${date}`,
-        {
-          include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon',
-          page,
-        },
-      );
+      const envelope = await this.client.get<SportmonksFixture[]>('/livescores', {
+        include,
+        page,
+      });
       lastEnvelope = envelope;
       const filtered = this.filterFixtureEnvelope(envelope);
       rows.push(...(filtered.data ?? []));
       totalPages = Math.max(1, Number(filtered.meta?.pagination?.total_pages ?? page));
       page += 1;
-    } while (page <= totalPages);
+    } while (page <= totalPages && page <= MAX_LIVESCORE_PAGES);
 
     return {
       ...(lastEnvelope ?? { data: [] }),
@@ -164,12 +157,19 @@ export class SportmonksDataService {
     };
   }
 
+  async listTodayFixtures() {
+    // Sportmonks /livescores returns the current day's fixtures, not only
+    // in-play fixtures. It is therefore useful as the freshest current-day
+    // snapshot, while MatchesService decides LIVE vs COMPLETED from status,
+    // live flag, start time and stale-match protection.
+    return this.listLivescorePages(LIVE_SCORECARD_INCLUDES);
+  }
+
   async listLiveFixtures() {
-    // Cricket API 2.0's /livescores feed is the compatible live source for
-    // this Sportmonks account. It contains the current day's live/in-play
-    // fixtures and remains available around kickoff and shortly after finish.
-    const envelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
-    return this.filterFixtureEnvelope(envelope);
+    // The v2 Cricket livescores feed is the compatible current-day source for
+    // this account. Do not treat feed membership itself as proof of LIVE:
+    // /livescores also contains NS/upcoming/finished fixtures for the day.
+    return this.listLivescorePages(LIVE_SCORECARD_INCLUDES);
   }
 
   async getFixture(fixtureId: number, opts: { forceLive?: boolean } = {}): Promise<SportmonksFixture> {
@@ -225,7 +225,10 @@ export class SportmonksDataService {
       // stale fixture-by-id snapshot during live play.
       const liveEnvelope = await this.client.get<SportmonksFixture[]>(
         '/livescores',
-        { include: LIVE_FIXTURE_INCLUDES },
+        {
+          fixtures: String(fixtureId),
+          include: LIVE_FIXTURE_INCLUDES,
+        },
       );
       const liveFixture = (liveEnvelope.data ?? []).find(
         (fixture) => Number(fixture.id) === Number(fixtureId),
@@ -240,7 +243,10 @@ export class SportmonksDataService {
       try {
         const scoreEnvelope = await this.client.get<SportmonksFixture[]>(
           '/livescores',
-          { include: LIVE_SCORECARD_INCLUDES },
+          {
+            fixtures: String(fixtureId),
+            include: LIVE_SCORECARD_INCLUDES,
+          },
         );
         const scoreFixture = (scoreEnvelope.data ?? []).find(
           (fixture) => Number(fixture.id) === Number(fixtureId),
