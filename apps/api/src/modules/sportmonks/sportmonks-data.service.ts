@@ -144,7 +144,14 @@ export class SportmonksDataService {
       lastEnvelope = envelope;
       rows.push(...(envelope.data ?? []));
       const pagination = envelope.meta?.pagination;
-      if (!pagination || pagination.current_page >= pagination.total_pages || (envelope.data ?? []).length === 0) break;
+      // Do not stop merely because this page became empty after applying the
+      // CrickX fixture allowlist. An allowed fixture can be present on a later
+      // Sportmonks page.
+      if (!pagination) {
+        if ((envelope.data ?? []).length === 0) break;
+      } else if (pagination.current_page >= pagination.total_pages) {
+        break;
+      }
     }
     if (!lastEnvelope) return { data: [] as SportmonksFixture[] };
     return { ...lastEnvelope, data: rows };
