@@ -10,7 +10,7 @@ const asList = (result: any) => Array.isArray(result) ? result : (result?.data ?
 const formatTime = (value: string) => new Date(value).toLocaleString('en-PK', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const hasStarted = (fixture: any) => { const start = new Date(fixture?.starting_at ?? '').getTime(); return Number.isFinite(start) && start <= Date.now(); };
 const statusText = (fixture: any, live = false) => live ? 'LIVE' : (fixture.applicationState ?? fixture.status ?? 'UPCOMING');
-const scoreText = (r: any) => `${r?.score ?? 0}/${r?.wickets ?? 0} (${r?.overs ?? 0} ov)`;
+const scoreText = (r: any) => `${r?.score ?? r?.total ?? 0}/${r?.wickets ?? 0} (${r?.overs ?? 0} ov)`;
 const isVoidFixture = (fixture: any) => fixture?.draw_noresult === true || ['abandoned', 'cancelled', 'canceled', 'no result', 'no-result', 'washout'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part));
 const isStaleNotStarted = (fixture: any) => { const start = new Date(fixture?.starting_at ?? '').getTime(); const status = String(fixture?.status ?? '').toLowerCase(); const ageExpired = Number.isFinite(start) && Date.now() - start >= 6 * 60 * 60 * 1000; const scheduledBeforeToday = Number.isFinite(start) && new Date(start).toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10); return (ageExpired || scheduledBeforeToday) && ['ns','scheduled','not started','upcoming'].some((value) => status === value || status.includes(value)); };
 const isCompletedFixture = (fixture: any) => String(fixture?.applicationState ?? '').toUpperCase() === 'COMPLETED' || isVoidFixture(fixture) || isStaleNotStarted(fixture);
