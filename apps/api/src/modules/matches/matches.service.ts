@@ -319,12 +319,50 @@ export class MatchesService {
     const fixtures: SportmonksFixture[] = [];
     let page = 1; let totalPages = 1;
     do {
-      const envelope = await this.sportmonks.listFixtures({ startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) }, page, include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon' });
+      const envelope = await this.sportmonks.listFixtures({
+        startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) },
+        page,
+        include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon',
+      });
       fixtures.push(...(Array.isArray(envelope.data) ? envelope.data : []));
-      totalPages = Math.max(1, Number(envelope.meta?.pagination?.total_pages ?? page)); page += 1;
+      totalPages = Math.max(1, Number(envelope.meta?.pagination?.total_pages ?? page));
+      page += 1;
     } while (page <= totalPages);
-    const data = fixtures.filter((f) => applicationState(f) === 'COMPLETED').sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime()).map((fixture) => normalize(fixture));
-    return { data, meta: { pagination: { total:data.length,count:data.length,per_page:data.length,current_page:1,total_pages:1 } } };
+
+    // Sportmonks /livescores contains every fixture for the current day and
+    // /livescores/now keeps an in-play fixture available for a short period
+    // around the end of the match. Reconcile both feeds on every request so
+    // Completed does not wait for the slower /fixtures history feed to catch up.
+    const [todayEnvelope, liveEnvelope] = await Promise.all([
+      this.sportmonks.listTodayFixtures(),
+      this.sportmonks.listLiveFixtures(),
+    ]);
+    const realtimeRows = [
+      ...(Array.isArray(todayEnvelope.data) ? todayEnvelope.data : []),
+      ...(Array.isArray(liveEnvelope.data) ? liveEnvelope.data : []),
+    ];
+
+    const byId = new Map<number, SportmonksFixture>();
+    for (const fixture of [...fixtures, ...realtimeRows]) {
+      const id = Number(fixture?.id);
+      if (Number.isFinite(id) && id > 0) byId.set(id, fixture);
+    }
+
+    const data = [...byId.values()]
+      .filter((fixture) => {
+        const startMs = new Date(fixture.starting_at).getTime();
+        return Number.isFinite(startMs) &&
+          startMs >= start.getTime() &&
+          startMs <= now.getTime() &&
+          applicationState(fixture) === 'COMPLETED';
+      })
+      .sort((a, b) => new Date(b.starting_at).getTime() - new Date(a.starting_at).getTime())
+      .map((fixture) => normalize(fixture, 'COMPLETED'));
+
+    return {
+      data,
+      meta: { pagination: { total: data.length, count: data.length, per_page: data.length, current_page: 1, total_pages: 1 } },
+    };
   }
 
   async getDetail(fixtureId: number) {
