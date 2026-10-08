@@ -20,6 +20,24 @@ export class FixtureSyncService {
     private readonly sportmonks: SportmonksDataService,
   ) {}
 
+
+  /**
+   * Re-check active live fixtures directly against Sportmonks every 30 seconds.
+   * This keeps the Live -> Completed transition working even when no browser
+   * is currently polling the match-centre page.
+   */
+  @Cron(CronExpression.EVERY_30_SECONDS)
+  async syncLiveCompletion() {
+    try {
+      const completed = await this.matches.syncLiveProjection();
+      if (completed.length > 0) {
+        this.logger.log(`Projected ${completed.length} newly completed fixture(s): ${completed.join(', ')}`);
+      }
+    } catch (err) {
+      this.logger.error('Live completion sync failed', err instanceof Error ? err.stack : String(err));
+    }
+  }
+
   @Cron(CronExpression.EVERY_5_MINUTES)
   async syncUpcoming() {
     try {
