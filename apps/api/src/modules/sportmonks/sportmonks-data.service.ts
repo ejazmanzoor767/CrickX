@@ -107,8 +107,9 @@ export class SportmonksDataService {
   private assertFixtureAllowed(
     fixture: Pick<SportmonksFixture, 'league_id' | 'type'>,
     fixtureId: number,
+    options: { allowUnlistedLeague?: boolean } = {},
   ) {
-    if (!this.isLeagueAllowed(Number(fixture?.league_id))) {
+    if (!options.allowUnlistedLeague && !this.isLeagueAllowed(Number(fixture?.league_id))) {
       throw new NotFoundException(
         'Fixture ' + fixtureId + ' is not in an enabled CrickX league.',
       );
@@ -212,14 +213,16 @@ export class SportmonksDataService {
     return this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
   }
 
-  async getFixture(fixtureId: number, opts: { forceLive?: boolean } = {}): Promise<SportmonksFixture> {
+  async getFixture(fixtureId: number, opts: { forceLive?: boolean; allowUnlistedLeague?: boolean } = {}): Promise<SportmonksFixture> {
     const includes = opts.forceLive ? LIVE_FIXTURE_INCLUDES : FIXTURE_INCLUDES;
     const envelope = await this.client.get<SportmonksFixture>(
       `/fixtures/${fixtureId}`,
       { include: includes },
     );
     const incoming = normalizeFixture(envelope.data);
-    this.assertFixtureAllowed(incoming, fixtureId);
+    this.assertFixtureAllowed(incoming, fixtureId, {
+      allowUnlistedLeague: opts.allowUnlistedLeague,
+    });
 
     return incoming;
   }
