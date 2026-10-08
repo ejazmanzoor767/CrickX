@@ -440,8 +440,15 @@ export class MatchesService {
   }
 
   async listLive() {
-    const liveResult = await this.sportmonks.listLiveFixtures();
-    const liveRows = Array.isArray(liveResult.data) ? liveResult.data : [];
+    // The standard provider method applies the configured league allowlist.
+    // Live/current-day matches must also be allowed to appear when a newly
+    // started short-format competition is not yet present in that env list.
+    const liveResult = await this.sportmonks.listLiveFixturesRaw();
+    const liveRows = Array.isArray(liveResult.data)
+      ? liveResult.data.filter((fixture: SportmonksFixture) =>
+          this.sportmonks.isFixtureFormatAllowed(fixture),
+        )
+      : [];
 
     // /livescores is the primary source for Live Matches. During kickoff,
     // Sportmonks can briefly return an NS/live=0 snapshot even though the
@@ -462,14 +469,18 @@ export class MatchesService {
     const endOfDay = new Date(startOfDay);
     endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
 
-    const scheduledResult = await this.sportmonks.listFixturesPaginated({
+    const scheduledResult = await this.sportmonks.listFixturesPaginatedRaw({
       startsBetween: {
         start: sportmonksDate(startOfDay),
         end: sportmonksDate(endOfDay),
       },
       include: 'localteam,visitorteam,league,season,stage,runs,scoreboards',
     });
-    const scheduledRows = Array.isArray(scheduledResult.data) ? scheduledResult.data : [];
+    const scheduledRows = Array.isArray(scheduledResult.data)
+      ? scheduledResult.data.filter((fixture: SportmonksFixture) =>
+          this.sportmonks.isFixtureFormatAllowed(fixture),
+        )
+      : [];
 
     const liveData = [...liveById.values()]
       .filter((fixture) => applicationState(fixture, { providerLiveFeed: true }) === 'LIVE')
@@ -520,14 +531,37 @@ export class MatchesService {
   async listCompleted(daysBack = 14) {
     const now = new Date();
     const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+    const recentStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const fixtures: SportmonksFixture[] = [];
     let page = 1; let totalPages = 1;
     do {
-      const envelope = await this.sportmonks.listFixtures({ startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) }, page, include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon' });
+      const envelope = await this.sportmonks.listFixtures({
+        startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) },
+        page,
+        include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon',
+      });
       fixtures.push(...(Array.isArray(envelope.data) ? envelope.data : []));
       totalPages = Math.max(1, Number(envelope.meta?.pagination?.total_pages ?? page)); page += 1;
     } while (page <= totalPages);
-    const providerData = fixtures
+
+    // Normal completed history remains governed by the configured league
+    // allowlist. For the most recent 24h, also inspect the raw provider feed so
+    // newly completed competitions are not missing simply because their league
+    // ID has not yet been added to the deployment environment.
+    const recentEnvelope = await this.sportmonks.listFixturesPaginatedRaw({
+      startsBetween: { start: sportmonksDate(recentStart), end: sportmonksDate(now) },
+      include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon',
+    });
+    const recentProviderRows = Array.isArray(recentEnvelope.data)
+      ? recentEnvelope.data.filter((fixture: SportmonksFixture) =>
+          this.sportmonks.isFixtureFormatAllowed(fixture),
+        )
+      : [];
+
+    const providerData = [...fixtures, ...recentProviderRows]
+      .filter((fixture, index, all) =>
+        all.findIndex((candidate) => Number(candidate?.id) === Number(fixture?.id)) === index,
+      )
       .filter((f) => applicationState(f) === 'COMPLETED')
       .map((fixture) => normalize(fixture, 'COMPLETED'));
     const projectedData = await this.listProjectedCompleted(start);
