@@ -137,6 +137,15 @@ export class FantasyTeamService {
   }
 
   async listMine(userId: string) { return this.prisma.fantasyTeam.findMany({ where: { userId }, include: { players: true }, orderBy: { createdAt: 'desc' } }); }
+
+  async getPublicForFixture(userId: string, fixtureId: number) {
+    const team = await this.prisma.fantasyTeam.findFirst({
+      where: { userId: String(userId), sportmonksFixtureId: Number(fixtureId) },
+      include: { players: true },
+    });
+    if (!team) throw new NotFoundException('No fantasy team was found for this user and match.');
+    return team;
+  }
   async getOne(userId: string, teamId: string) {
     const team = await this.prisma.fantasyTeam.findUnique({ where: { id: teamId }, include: { players: true } });
     if (!team || team.userId !== userId) throw new NotFoundException('Fantasy team not found.');
