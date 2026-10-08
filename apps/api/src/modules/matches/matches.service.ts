@@ -403,37 +403,124 @@ export class MatchesService {
     const fixtures: SportmonksFixture[] = [];
     let page = 1; let totalPages = 1;
     do {
-      const envelope = await this.sportmonks.listFixtures({ startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) }, page, include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon' });
+      const envelope = await this.sportmonks.listFixtures({
+        startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) },
+        page,
+        include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon',
+      });
       fixtures.push(...(Array.isArray(envelope.data) ? envelope.data : []));
-      totalPages = Math.max(1, Number(envelope.meta?.pagination?.total_pages ?? page)); page += 1;
+      totalPages = Math.max(1, Number(envelope.meta?.pagination?.total_pages ?? page));
+      page += 1;
     } while (page <= totalPages);
-    const providerData = fixtures.filter((f) => applicationState(f) === 'COMPLETED').sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime()).map((fixture) => normalize(fixture));
 
-    let projectedData: any[] = [];
-    if (this.realtime.isEnabled()) {
-      try {
-        const snapshot = await this.realtime.db.collection('completedMatches').limit(200).get();
-        projectedData = snapshot.docs
-          .map((doc) => doc.data() as any)
-          .filter((fixture: any) => {
-            const started = new Date(fixture?.starting_at ?? '').getTime();
-            return Number.isFinite(started) && started >= start.getTime() && started <= now.getTime() && isTerminalFixture(fixture);
-          })
-          .map((fixture: any) => normalize(fixture, 'COMPLETED'));
-      } catch (error) {
-        console.warn('Completed-match projection read skipped:', error instanceof Error ? error.message : String(error));
-      }
-    }
+    const providerData = fixtures
+      .filter((f) => applicationState(f) === 'COMPLETED')
+      .map((fixture) => normalize(fixture));
 
     const byId = new Map<number, any>();
-    for (const fixture of [...providerData, ...projectedData]) {
+    for (const fixture of providerData) {
       const id = Number(fixture?.id);
       if (Number.isFinite(id) && id > 0) byId.set(id, fixture);
     }
-    const data = [...byId.values()].sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime());
-    return { data, meta: { pagination: { total:data.length,count:data.length,per_page:data.length,current_page:1,total_pages:1 } } };
-  }
 
+    if (this.realtime.isEnabled()) {
+      try {
+        // A match can disappear from /livescores before Sportmonks' schedule
+        // feed publishes its terminal status. Treat removed-live fixtures as
+        // candidates, but verify every candidate against Sportmonks before
+        // exposing it as COMPLETED.
+        const liveSnapshot = await this.realtime.db
+          .collection('liveMatches')
+          .limit(COMPLETION_RECONCILE_MAX_CANDIDATES)
+          .get();
+
+        const candidateIds = new Set<number>();
+        for (const doc of liveSnapshot.docs) {
+          const row = doc.data() as any;
+          const fixtureId = Number(row?.fixtureId ?? row?.id ?? doc.id);
+          const startedAt = new Date(row?.starting_at ?? '').getTime();
+          const updatedAt = new Date(row?.updatedAt ?? '').getTime();
+          const removedFromLive =
+            row?.active === false ||
+            String(row?.applicationState ?? '').toUpperCase() === 'COMPLETED';
+
+          if (!removedFromLive || !Number.isFinite(fixtureId) || fixtureId <= 0) continue;
+          if (!Number.isFinite(startedAt) || startedAt < start.getTime() || startedAt > now.getTime()) continue;
+          if (Number.isFinite(updatedAt) && updatedAt < start.getTime()) continue;
+          candidateIds.add(fixtureId);
+        }
+
+        const completedSnapshot = await this.realtime.db
+          .collection('completedMatches')
+          .limit(COMPLETION_RECONCILE_MAX_CANDIDATES)
+          .get();
+
+        for (const doc of completedSnapshot.docs) {
+          const row = doc.data() as any;
+          const fixtureId = Number(row?.fixtureId ?? row?.id ?? doc.id);
+          const startedAt = new Date(row?.starting_at ?? '').getTime();
+          if (
+            Number.isFinite(fixtureId) &&
+            fixtureId > 0 &&
+            Number.isFinite(startedAt) &&
+            startedAt >= start.getTime() &&
+            startedAt <= now.getTime()
+          ) {
+            candidateIds.add(fixtureId);
+          }
+        }
+
+        for (const fixtureId of candidateIds) {
+          if (byId.has(fixtureId)) continue;
+          try {
+            const fresh = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+            if (!isTerminalFixture(fresh)) continue;
+
+            const completedFixture = normalize(fresh, 'COMPLETED');
+            byId.set(fixtureId, completedFixture);
+
+            await this.realtime.db.collection('completedMatches').doc(String(fixtureId)).set({
+              ...completedFixture,
+              applicationState: 'COMPLETED',
+              active: false,
+              completedAt: new Date(),
+              updatedAt: new Date(),
+            }, { merge: true });
+          } catch (error) {
+            console.warn(
+              'Completed-match candidate verification failed fixture=' + fixtureId + ':',
+              error instanceof Error ? error.message : String(error),
+            );
+          }
+        }
+      } catch (error) {
+        console.warn(
+          'Completed-match realtime candidate read skipped:',
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+
+    const data = [...byId.values()]
+      .filter((fixture: any) =>
+        isTerminalFixture(fixture) ||
+        String(fixture?.applicationState ?? '').toUpperCase() === 'COMPLETED',
+      )
+      .sort((a, b) => new Date(b.starting_at).getTime() - new Date(a.starting_at).getTime());
+
+    return {
+      data,
+      meta: {
+        pagination: {
+          total: data.length,
+          count: data.length,
+          per_page: data.length,
+          current_page: 1,
+          total_pages: 1,
+        },
+      },
+    };
+  }
   async getDetail(fixtureId: number) {
     const fixture = normalize(await this.sportmonks.getFixture(fixtureId, { forceLive: false }));
     const fallOfWickets = fallOfWicketsFromFixture(fixture);
