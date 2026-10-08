@@ -32,8 +32,8 @@ function inningsNumber(value: any) {
   return match ? Number(match[1]) : null;
 }
 
-function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls, scoreboards, persistedWickets }: {
-  fixture: any; runs: any[]; batting: any[]; bowling: any[]; lineup: any[]; balls: any[]; scoreboards: any[]; persistedWickets: any[];
+function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls, scoreboards, persistedWickets, selectedTeamId }: {
+  fixture: any; runs: any[]; batting: any[]; bowling: any[]; lineup: any[]; balls: any[]; scoreboards: any[]; persistedWickets: any[]; selectedTeamId: number;
 }) {
   const labels = ['1st Innings', '2nd Innings', '3rd Innings', '4th Innings'];
   const orderedRuns = [...runs].sort((a: any, b: any) => Number(a?.inning ?? 0) - Number(b?.inning ?? 0));
@@ -92,7 +92,9 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
 
     {orderedTeamGroups.length === 0
       ? <div className="card"><p className="section-subtitle">Innings data is not available from the cricket feed yet.</p></div>
-      : orderedTeamGroups.map(({ teamId, team, innings: teamInnings }: any) => <div className="card" key={`team-group-${teamId}`} style={{ padding: 14 }}>
+      : orderedTeamGroups
+          .filter(({ teamId }: any) => Number(teamId) === Number(selectedTeamId))
+          .map(({ teamId, team, innings: teamInnings }: any) => <div className="card" key={`team-group-${teamId}`} style={{ padding: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 6px 14px' }}>
             <TeamBadge team={team} />
             <div>
@@ -282,7 +284,7 @@ function MatchDetailContent() {
       </div>
     </div>
 
-    {isMultiInningsFormat ? <MultiInningsScorecard fixture={fixture} runs={runs} batting={batting} bowling={bowling} lineup={lineup} balls={balls} scoreboards={scoreboards} persistedWickets={persistedWickets} /> : <>
+    {isMultiInningsFormat ? <MultiInningsScorecard fixture={fixture} runs={runs} batting={batting} bowling={bowling} lineup={lineup} balls={balls} scoreboards={scoreboards} persistedWickets={persistedWickets} selectedTeamId={activeTeamId} /> : <>
 
     <div className="card" style={{ padding: 18, marginBottom: 14, background: 'linear-gradient(135deg,rgba(155,255,71,.08),rgba(18,23,34,.94))' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 14, flexWrap: 'wrap' }}>
