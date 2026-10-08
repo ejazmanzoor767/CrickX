@@ -80,6 +80,10 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
     if (!orderedTeamGroups.some((item) => item.teamId === group.teamId)) orderedTeamGroups.push(group);
   }
 
+  for (const group of orderedTeamGroups) {
+    group.innings = [group.innings[0] ?? null, group.innings[1] ?? null];
+  }
+
   return <div style={{ display: 'grid', gap: 16 }}>
     <div className="card" style={{ padding: 18, background: 'linear-gradient(135deg,rgba(155,255,71,.08),rgba(18,23,34,.94))' }}>
       <p className="eyebrow">TEST / 4-DAY SCORECARD</p>
@@ -97,19 +101,28 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
             </div>
           </div>
           <div style={{ display: 'grid', gap: 14 }}>
-            {teamInnings.map(({ run, inning, inningBatting, inningBowling, inningBalls, inningWickets, extras }: any) => {
+            {teamInnings.map((inningData: any, teamInningIndex: number) => {
+          const { run, inning, inningBatting, inningBowling, inningBalls, inningWickets, extras } = inningData ?? {};
           const team = Number(teamId) === Number(fixture?.localteam_id) ? fixture?.localteam : fixture?.visitorteam;
+          const teamLabel = teamInningIndex === 0 ? '1st Innings' : '2nd Innings';
+          if (!run) {
+            return <div className="card" key={`team-${teamId}-missing-${teamInningIndex}`} style={{ padding: 18, background: 'rgba(255,255,255,.018)' }}>
+              <p className="eyebrow">{teamLabel}</p>
+              <h3 style={{ margin: '4px 0 0', fontFamily: 'Barlow Condensed', fontSize: 24 }}>{team?.name ?? 'Team'}</h3>
+              <p className="section-subtitle" style={{ margin: '8px 0 0' }}>This innings has not started yet.</p>
+            </div>;
+          }
           const score = Number(run?.score ?? 0);
           const wickets = Number(run?.wickets ?? 0);
           const overs = run?.overs ?? 0;
           const legalBalls = ballsFromOvers(overs);
           const rate = legalBalls > 0 ? (score / legalBalls) * 6 : null;
-          return <div className="card" key={`multi-innings-${inning}-${teamId}`} style={{ padding: 0, overflow: 'hidden' }}>
+          return <div className="card" key={`team-${teamId}-innings-${teamInningIndex}`} style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <TeamBadge team={team} />
-                  <div><p className="eyebrow" style={{ marginBottom: 3 }}>{labels[inning - 1] ?? `Innings ${inning}`}</p><h2 style={{ margin: 0, fontFamily: 'Barlow Condensed', fontSize: 26, textTransform: 'uppercase' }}>{team?.name ?? 'Team'}</h2></div>
+                  <div><p className="eyebrow" style={{ marginBottom: 3 }}>{teamLabel}</p><h2 style={{ margin: 0, fontFamily: 'Barlow Condensed', fontSize: 26, textTransform: 'uppercase' }}>{team?.name ?? 'Team'}</h2></div>
                 </div>
                 <div style={{ textAlign: 'right' }}><div style={{ fontFamily: 'Barlow Condensed', fontSize: 42, lineHeight: .95, fontWeight: 900 }}>{score}/{wickets}</div><div style={{ color: '#98a0b3', fontSize: 13, marginTop: 5 }}>{overs} overs · RR {rate === null ? '—' : rate.toFixed(2)}</div></div>
               </div>
@@ -122,11 +135,11 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
               <div className="table-row"><span>Runs from bat</span><strong>{Math.max(score - extras, 0)}</strong></div>
             </div>
 
-            <ScoreTable title={`BATTING · ${team?.name ?? 'Team'} · ${labels[inning - 1] ?? `Innings ${inning}`}`} data={inningBatting} empty="Detailed batting figures for this innings are not available yet.">
+            <ScoreTable title={`BATTING · ${team?.name ?? 'Team'} · ${teamLabel}`} data={inningBatting} empty="Detailed batting figures for this innings are not available yet.">
               {items => <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}><thead><tr>{['Batter','R','B','4s','6s','SR','Status'].map(h => <th key={h} style={{ textAlign: h === 'Batter' ? 'left' : 'right', padding: '11px 10px', color: '#98a0b3', fontSize: 11, letterSpacing: '.08em' }}>{h}</th>)}</tr></thead><tbody>{items.map((b: any, i: number) => { const dismissed = inningWickets.some((w: any) => Number(w?.playerId ?? w?.player_id) === Number(b?.player_id)); return <tr key={`bat-${inning}-${b?.player_id ?? i}`} style={{ borderTop: '1px solid rgba(255,255,255,.06)' }}><td style={{ padding: '12px 10px', fontWeight: 800 }}>{playerName(b, lineup)}</td><td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 900 }}>{b.score ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.ball ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.four_x ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.six_x ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{num(b.rate) === null ? '—' : Number(b.rate).toFixed(1)}</td><td style={{ padding: '12px 10px', textAlign: 'right', color: dismissed ? '#98a0b3' : '#7dff9a', fontWeight: 900 }}>{dismissed ? 'OUT' : 'NOT OUT'}</td></tr>; })}</tbody></table>}
             </ScoreTable>
 
-            <ScoreTable title={`BOWLING · ${labels[inning - 1] ?? `Innings ${inning}`}`} data={inningBowling} empty="Detailed bowling figures for this innings are not available yet.">
+            <ScoreTable title={`BOWLING · ${teamLabel}`} data={inningBowling} empty="Detailed bowling figures for this innings are not available yet.">
               {items => <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}><thead><tr>{['Bowler','O','M','R','W','Econ'].map(h => <th key={h} style={{ textAlign: h === 'Bowler' ? 'left' : 'right', padding: '11px 10px', color: '#98a0b3', fontSize: 11, letterSpacing: '.08em' }}>{h}</th>)}</tr></thead><tbody>{items.map((b: any, i: number) => { const o = Number(b?.overs), r = Number(b?.runs ?? 0); const whole = Number.isFinite(o) ? Math.floor(o) : 0; const part = Number.isFinite(o) ? Math.round((o - whole) * 10) : 0; const bowlBalls = whole * 6 + Math.min(Math.max(part, 0), 5); const econ = bowlBalls > 0 ? (r / bowlBalls) * 6 : null; return <tr key={`bowl-${inning}-${b?.player_id ?? i}`} style={{ borderTop: '1px solid rgba(255,255,255,.06)' }}><td style={{ padding: '12px 10px', fontWeight: 800 }}>{playerName(b, lineup)}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.overs ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.medians ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.runs ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 900 }}>{b.wickets ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{econ === null ? '—' : econ.toFixed(2)}</td></tr>; })}</tbody></table>}
             </ScoreTable>
 
