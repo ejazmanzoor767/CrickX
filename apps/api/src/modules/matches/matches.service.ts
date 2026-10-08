@@ -6,6 +6,8 @@ import { SportmonksFixture } from '../sportmonks/sportmonks.types';
 
 function sportmonksDate(value: Date) { return value.toISOString().slice(0, 10); }
 const STALE_NOT_STARTED_MS = 6 * 60 * 60 * 1000;
+const COMPLETION_RECONCILE_LOOKBACK_MS = 48 * 60 * 60 * 1000;
+const COMPLETION_RECONCILE_MAX_CANDIDATES = 60;
 export function isTerminalFixture(fixture: Partial<SportmonksFixture>): boolean {
   const status = String(fixture.status ?? '').trim().toLowerCase();
   return [
@@ -313,6 +315,88 @@ export class MatchesService {
     return { data, meta: { pagination: { total:data.length,count:data.length,per_page:data.length,current_page:1,total_pages:1 } } };
   }
 
+  /**
+   * Re-check recently observed matches on a fixed cadence. Sportmonks can
+   * remove a finished match from /livescores while the schedule endpoint
+   * temporarily lags. Persisting a fresh terminal snapshot makes the
+   * Completed tab and downstream settlement deterministic.
+   */
+  async reconcileRecentlyCompleted() {
+    const now = Date.now();
+    const cutoff = now - COMPLETION_RECONCILE_LOOKBACK_MS;
+    const candidates = new Map<number, any>();
+
+    if (this.realtime.isEnabled()) {
+      try {
+        const snapshot = await this.realtime.db.collection('liveMatches').limit(COMPLETION_RECONCILE_MAX_CANDIDATES).get();
+        for (const doc of snapshot.docs) {
+          const row = doc.data() as any;
+          const fixtureId = Number(row?.fixtureId ?? row?.id ?? doc.id);
+          const startingAt = new Date(row?.starting_at ?? '').getTime();
+          const updatedAt = new Date(row?.updatedAt ?? '').getTime();
+          if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
+          if (Number.isFinite(startingAt) && startingAt > now) continue;
+          if (Number.isFinite(startingAt) && startingAt < cutoff && (!Number.isFinite(updatedAt) || updatedAt < cutoff)) continue;
+          candidates.set(fixtureId, row);
+        }
+      } catch (error) {
+        console.warn('Recent live-match reconciliation read skipped:', error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    // Schedule-feed coverage catches matches missed by realtime projection.
+    try {
+      const start = new Date(cutoff);
+      const end = new Date(now + 24 * 60 * 60 * 1000);
+      const recent = await this.sportmonks.listFixturesPaginated({
+        startsBetween: { start: sportmonksDate(start), end: sportmonksDate(end) },
+        include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon',
+      });
+      for (const fixture of Array.isArray(recent.data) ? recent.data : []) {
+        const fixtureId = Number(fixture?.id);
+        const startingAt = new Date(fixture?.starting_at ?? '').getTime();
+        if (!Number.isFinite(fixtureId) || fixtureId <= 0 || !Number.isFinite(startingAt)) continue;
+        if (startingAt > now || startingAt < cutoff) continue;
+        candidates.set(fixtureId, fixture);
+      }
+    } catch (error) {
+      console.warn('Recent fixture completion reconciliation source failed:', error instanceof Error ? error.message : String(error));
+    }
+
+    let checked = 0;
+    let completed = 0;
+    for (const [fixtureId] of candidates) {
+      try {
+        const fresh = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+        checked += 1;
+        if (!isTerminalFixture(fresh)) continue;
+
+        const normalized = normalize(fresh, 'COMPLETED');
+        if (this.realtime.isEnabled()) {
+          await this.realtime.db.collection('completedMatches').doc(String(fixtureId)).set({
+            ...normalized,
+            applicationState: 'COMPLETED',
+            active: false,
+            completedAt: new Date(),
+            updatedAt: new Date(),
+          }, { merge: true });
+          await this.realtime.db.collection('liveMatches').doc(String(fixtureId)).set({
+            applicationState: 'COMPLETED',
+            active: false,
+            status: fresh.status ?? null,
+            completedAt: new Date(),
+            updatedAt: new Date(),
+          }, { merge: true });
+        }
+        completed += 1;
+      } catch (error) {
+        console.warn('Completion reconciliation failed fixture=' + fixtureId + ':', error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    return { checked, completed, candidates: candidates.size };
+  }
+
   async listCompleted(daysBack = 14) {
     const now = new Date();
     const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
@@ -323,7 +407,30 @@ export class MatchesService {
       fixtures.push(...(Array.isArray(envelope.data) ? envelope.data : []));
       totalPages = Math.max(1, Number(envelope.meta?.pagination?.total_pages ?? page)); page += 1;
     } while (page <= totalPages);
-    const data = fixtures.filter((f) => applicationState(f) === 'COMPLETED').sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime()).map((fixture) => normalize(fixture));
+    const providerData = fixtures.filter((f) => applicationState(f) === 'COMPLETED').sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime()).map((fixture) => normalize(fixture));
+
+    let projectedData: any[] = [];
+    if (this.realtime.isEnabled()) {
+      try {
+        const snapshot = await this.realtime.db.collection('completedMatches').limit(200).get();
+        projectedData = snapshot.docs
+          .map((doc) => doc.data() as any)
+          .filter((fixture: any) => {
+            const started = new Date(fixture?.starting_at ?? '').getTime();
+            return Number.isFinite(started) && started >= start.getTime() && started <= now.getTime() && isTerminalFixture(fixture);
+          })
+          .map((fixture: any) => normalize(fixture, 'COMPLETED'));
+      } catch (error) {
+        console.warn('Completed-match projection read skipped:', error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    const byId = new Map<number, any>();
+    for (const fixture of [...providerData, ...projectedData]) {
+      const id = Number(fixture?.id);
+      if (Number.isFinite(id) && id > 0) byId.set(id, fixture);
+    }
+    const data = [...byId.values()].sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime());
     return { data, meta: { pagination: { total:data.length,count:data.length,per_page:data.length,current_page:1,total_pages:1 } } };
   }
 
