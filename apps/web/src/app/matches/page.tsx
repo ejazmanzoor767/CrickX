@@ -112,7 +112,23 @@ export default function MatchesPage() {
       const liveRows = rows
         .filter((row: any) => row?.active !== false && String(row?.applicationState ?? 'LIVE').toUpperCase() === 'LIVE')
         .sort((a: any, b: any) => new Date(a.starting_at ?? 0).getTime() - new Date(b.starting_at ?? 0).getTime());
-      setLive(liveRows);
+      setLive((current) => {
+        // Realtime is an accelerator, not the authority for the complete list.
+        // Keep API-discovered live fixtures when the Firestore projection is
+        // temporarily behind, and let the 15s API refresh remove completed ones.
+        const merged = new Map<number, any>();
+        for (const fixture of current) {
+          const id = Number(fixture?.id);
+          if (Number.isFinite(id)) merged.set(id, fixture);
+        }
+        for (const fixture of liveRows) {
+          const id = Number(fixture?.id);
+          if (Number.isFinite(id)) merged.set(id, fixture);
+        }
+        return [...merged.values()]
+          .filter((fixture: any) => !isVoidFixture(fixture) && !isCompletedFixture(fixture))
+          .sort((a: any, b: any) => new Date(a.starting_at ?? 0).getTime() - new Date(b.starting_at ?? 0).getTime());
+      });
     }, () => undefined);
     const timer = window.setInterval(() => void refreshAll(false), 15000);
     return () => {
