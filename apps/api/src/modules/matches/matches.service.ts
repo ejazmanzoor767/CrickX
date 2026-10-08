@@ -232,12 +232,75 @@ export class MatchesService {
     const stale = await this.realtime.db.collection('liveMatches').where('active', '==', true).get();
     const batch = this.realtime.db.batch();
     let changed = false;
+
     for (const doc of stale.docs) {
-      if (activeIds.has(Number(doc.id))) continue;
-      batch.set(doc.ref, { active: false, applicationState: 'COMPLETED', updatedAt: now }, { merge: true });
+      const fixtureId = Number(doc.id);
+      if (!Number.isFinite(fixtureId) || activeIds.has(fixtureId)) continue;
+
+      // /livescores can remove a fixture before the schedule feed catches up.
+      // Verify the fixture directly with Sportmonks before deciding what the
+      // UI should show. This keeps a just-finished match from falling into a
+      // multi-hour gap between Live and Completed.
+      try {
+        const latest = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+        const state = applicationState(latest);
+
+        if (state === 'COMPLETED') {
+          const completed = normalize(latest, 'COMPLETED');
+          await this.realtime.db.collection('completedMatches').doc(String(fixtureId)).set({
+            ...completed,
+            id: fixtureId,
+            fixtureId,
+            applicationState: 'COMPLETED',
+            completedAt: now,
+            updatedAt: now,
+          }, { merge: true });
+
+          batch.set(doc.ref, { active: false, applicationState: 'COMPLETED', updatedAt: now }, { merge: true });
+          changed = true;
+          continue;
+        }
+
+        // If Sportmonks temporarily omits a still-live fixture from
+        // /livescores, keep it visible in Live rather than creating a gap.
+        if (state === 'LIVE') {
+          await this.realtime.db.collection('liveMatches').doc(String(fixtureId)).set({
+            ...latest,
+            id: fixtureId,
+            fixtureId,
+            applicationState: 'LIVE',
+            active: true,
+            updatedAt: now,
+          }, { merge: true });
+          continue;
+        }
+      } catch (error) {
+        console.warn(
+          `Unable to verify fixture ${fixtureId} after it left the live feed:`,
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+
+      // Do not label an unverified fixture as completed. This prevents a
+      // transient provider omission from moving a match out of both Live and
+      // Completed until Sportmonks exposes its terminal state.
+      batch.set(doc.ref, { active: false, applicationState: 'UPCOMING', updatedAt: now }, { merge: true });
       changed = true;
     }
+
     if (changed) await batch.commit();
+  }
+
+  private async listProjectedCompleted(start: Date) {
+    if (!this.realtime.isEnabled()) return [] as any[];
+    const snapshot = await this.realtime.db.collection('completedMatches').get();
+    return snapshot.docs
+      .map((doc) => doc.data() as any)
+      .filter((row) => {
+        const timestamp = new Date(row?.starting_at ?? '').getTime();
+        return Number.isFinite(timestamp) && timestamp >= start.getTime();
+      })
+      .map((row) => normalize(row, 'COMPLETED'));
   }
 
   async listLive() {
@@ -323,7 +386,18 @@ export class MatchesService {
       fixtures.push(...(Array.isArray(envelope.data) ? envelope.data : []));
       totalPages = Math.max(1, Number(envelope.meta?.pagination?.total_pages ?? page)); page += 1;
     } while (page <= totalPages);
-    const data = fixtures.filter((f) => applicationState(f) === 'COMPLETED').sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime()).map((fixture) => normalize(fixture));
+    const providerData = fixtures
+      .filter((f) => applicationState(f) === 'COMPLETED')
+      .map((fixture) => normalize(fixture, 'COMPLETED'));
+    const projectedData = await this.listProjectedCompleted(start);
+
+    const byId = new Map<number, any>();
+    for (const fixture of projectedData) byId.set(Number(fixture.id), fixture);
+    for (const fixture of providerData) byId.set(Number(fixture.id), fixture);
+
+    const data = [...byId.values()]
+      .filter((fixture) => Number.isFinite(Number(fixture?.id)))
+      .sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime());
     return { data, meta: { pagination: { total:data.length,count:data.length,per_page:data.length,current_page:1,total_pages:1 } } };
   }
 
