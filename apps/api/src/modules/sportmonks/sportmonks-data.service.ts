@@ -75,85 +75,79 @@ function normalizeFixture(fixture: SportmonksFixture): SportmonksFixture {
 
 @Injectable()
 export class SportmonksDataService {
-  private readonly allowedFixtureIds: Set<number> | null;
+  private readonly allowedLeagueIds: Set<number> | null;
 
   constructor(
     private readonly client: SportmonksClientService,
     private readonly prisma: FirestoreService,
     private readonly config: ConfigService,
   ) {
-    const raw = this.config.get<string>('ALLOWED_SPORTMONKS_FIXTURE_IDS', '');
+    const raw = this.config.get<string>('ALLOWED_SPORTMONKS_LEAGUE_IDS', '');
     const ids = raw
       .split(',')
       .map((value) => Number(value.trim()))
       .filter((value) => Number.isFinite(value) && value > 0);
 
-    this.allowedFixtureIds = ids.length > 0 ? new Set(ids) : null;
+    this.allowedLeagueIds = ids.length > 0 ? new Set(ids) : null;
   }
 
   /**
-   * When ALLOWED_SPORTMONKS_FIXTURE_IDS is configured, only those exact
-   * Sportmonks fixture IDs are allowed into any CrickX match/fantasy feed.
-   * An unset/blank variable preserves the existing provider feed behavior.
+   * CrickX exposes only fixtures belonging to the configured league allowlist.
+   * A blank variable preserves provider-feed behavior; a configured value
+   * means only those league IDs are eligible.
    */
-  isFixtureAllowed(fixtureId: number): boolean {
-    if (!this.allowedFixtureIds) return true;
-    return this.allowedFixtureIds.has(Number(fixtureId));
+  isLeagueAllowed(leagueId: number): boolean {
+    if (!this.allowedLeagueIds) return true;
+    return this.allowedLeagueIds.has(Number(leagueId));
   }
 
   /**
-   * CrickX is limited to white-ball cricket. Sportmonks identifies the match
-   * format on fixture.type. Reject Test / First Class / 4-day / 5-day formats
-   * at the provider boundary so they cannot enter any match or fantasy feed,
-   * even when a fixture ID is accidentally allowlisted.
+   * Block red-ball / multi-day formats at the provider boundary.
    */
   isFixtureFormatAllowed(fixture: Pick<SportmonksFixture, 'type'>): boolean {
-    const type = String(fixture?.type ?? '').trim().toLowerCase().replace(/_/g, ' ');
+    const type = String(fixture?.type ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/[_/]+/g, ' ')
+      .replace(/\s+/g, ' ');
+
     if (!type) return true;
-
-    const blockedFormats = [
-      'test',
-      'test match',
-      'first class',
-      'first-class',
-      '4 day',
-      '4-day',
-      'four day',
-      'four-day',
-      '5 day',
-      '5-day',
-      'five day',
-      'five-day',
-    ];
-
-    return !blockedFormats.some((value) => type === value || type.includes(value));
+    if (/\btest(?:\s+match|\s+cricket)?\b/.test(type)) return false;
+    if (/\bfirst\s*[- ]?\s*class\b/.test(type)) return false;
+    if (/\b(?:4|four|5|five)\s*[- ]?\s*day(?:s)?\b/.test(type)) return false;
+    return true;
   }
 
-  private assertFixtureFormatAllowed(fixture: Pick<SportmonksFixture, 'type'>, fixtureId: number) {
+  private assertFixtureAllowed(
+    fixture: Pick<SportmonksFixture, 'league_id' | 'type'>,
+    fixtureId: number,
+  ) {
+    if (!this.isLeagueAllowed(Number(fixture?.league_id))) {
+      throw new NotFoundException(
+        'Fixture ' + fixtureId + ' is not in an enabled CrickX league.',
+      );
+    }
+
     if (!this.isFixtureFormatAllowed(fixture)) {
-      throw new NotFoundException(`Fixture ${fixtureId} uses a red-ball format that is not enabled for CrickX.`);
+      throw new NotFoundException(
+        'Fixture ' + fixtureId + ' uses a Test/First Class multi-day format that is not enabled for CrickX.',
+      );
     }
   }
 
   private filterFixtures<T extends SportmonksFixture>(fixtures: T[]): T[] {
     return fixtures.filter((fixture) =>
-      this.isFixtureAllowed(Number(fixture?.id)) &&
+      this.isLeagueAllowed(Number(fixture?.league_id)) &&
       this.isFixtureFormatAllowed(fixture),
     );
   }
 
   private filterFixtureEnvelope(envelope: any) {
-    if (!this.allowedFixtureIds || !Array.isArray(envelope?.data)) return envelope;
+    if (!Array.isArray(envelope?.data)) return envelope;
     return {
       ...envelope,
       data: this.filterFixtures(envelope.data as SportmonksFixture[]),
     };
-  }
-
-  private assertFixtureAllowed(fixtureId: number) {
-    if (!this.isFixtureAllowed(fixtureId)) {
-      throw new NotFoundException(`Fixture ${fixtureId} is not enabled for CrickX.`);
-    }
   }
 
   async listLeagues() {
@@ -225,7 +219,7 @@ export class SportmonksDataService {
       { include: includes },
     );
     const incoming = normalizeFixture(envelope.data);
-    this.assertFixtureFormatAllowed(incoming, fixtureId);
+    this.assertFixtureAllowed(incoming, fixtureId);
 
     // Only persist non-live snapshots. High-frequency live/terminal refreshes
     // return the provider response directly and do not write the huge ball list
@@ -280,8 +274,6 @@ export class SportmonksDataService {
   }
 
   async getFixtureSquads(fixtureId: number) {
-    this.assertFixtureAllowed(fixtureId);
-
     // Cricket API v2.0 exposes a team's squad through the Teams endpoint:
     // /teams/{teamId}?include=squad&filter[season_id]={seasonId}.
     // The football v3-style /squads/seasons/... endpoint is not valid here.
@@ -290,6 +282,7 @@ export class SportmonksDataService {
       { include: 'localteam,visitorteam,season,lineup' },
     );
     const fixture = normalizeFixture(envelope.data);
+    this.assertFixtureAllowed(fixture, fixtureId);
 
     const localTeamId = Number(fixture.localteam_id ?? fixture.localteam?.id);
     const visitorTeamId = Number(fixture.visitorteam_id ?? fixture.visitorteam?.id);
