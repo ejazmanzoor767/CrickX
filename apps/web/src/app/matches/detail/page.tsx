@@ -57,6 +57,8 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
       (Number(row?.noball_runs) || 0) + (Number(row?.wide) || 0) + (Number(row?.wide_runs) || 0) +
       (Number(row?.penalty) || 0) + (Number(row?.penalty_runs) || 0), 0);
     return { run, inning, teamId, inningBatting, inningBowling, inningBalls, inningWickets, extras: ballExtras > 0 ? ballExtras : scoreboardExtras };
+  });
+
   const teamGroups = new Map<number, { teamId: number; team: any; innings: any[] }>();
   for (const item of innings) {
     if (!item.teamId) continue;
@@ -77,8 +79,6 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
   for (const group of teamGroups.values()) {
     if (!orderedTeamGroups.some((item) => item.teamId === group.teamId)) orderedTeamGroups.push(group);
   }
-
-  });
 
   return <div style={{ display: 'grid', gap: 16 }}>
     <div className="card" style={{ padding: 18, background: 'linear-gradient(135deg,rgba(155,255,71,.08),rgba(18,23,34,.94))' }}>
