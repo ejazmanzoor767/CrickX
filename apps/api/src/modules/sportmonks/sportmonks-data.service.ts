@@ -84,17 +84,16 @@ export class SportmonksDataService {
       .trim()
       .toLowerCase()
       .replace(/[_/]+/g, ' ')
-      .replace(/\\s+/g, ' ');
+      .replace(/\s+/g, ' ');
 
     // CrickX excludes red-ball Test and explicit 4/5-day formats everywhere:
     // upcoming, live, completed and all fantasy feeds.
-    if (/\\btest(?:\\s+match|\\s+cricket)?\\b/.test(type)) return false;
-    if (/\\b(?:4|four|5|five)\\s*[- ]?\\s*day(?:s)?\\b/.test(type)) return false;
-    if (/\\b(?:test\\s*\\d*\\s*day|\\d+\\s*day\\s*test)\\b/.test(type)) return false;
+    if (/\btest(?:\s+match|\s+cricket)?\b/.test(type)) return false;
+    if (/\b(?:4|four|5|five)\s*[- ]?\s*day(?:s)?\b/.test(type)) return false;
+    if (/\b(?:test\s*\d*\s*day|\d+\s*day\s*test)\b/.test(type)) return false;
 
     return true;
   }
-
   private filterFixtureEnvelope(envelope: any) {
     if (!Array.isArray(envelope?.data)) return envelope;
     return {
