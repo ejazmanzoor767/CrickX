@@ -247,7 +247,7 @@ export class MatchesService {
       // allowlisted or that use a blocked red-ball format.
       if (
         !this.sportmonks.isFixtureAllowed(fixtureId) ||
-        !this.sportmonks.isFixtureFormatAllowed({ type: String(doc.data()?.type ?? '') })
+        !this.sportmonks.isFixtureFormatAllowed({ type: String(doc.data?.()?.type ?? '') })
       ) {
         batch.set(doc.ref, { active: false, updatedAt: now }, { merge: true });
         changed = true;
