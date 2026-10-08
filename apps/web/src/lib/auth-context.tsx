@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut, updateProfile, type User } from 'firebase/auth';
+import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut, updateProfile, type User } from 'firebase/auth';
 import { getClientAuth } from './firebase';
 
 interface AuthContextValue {
@@ -38,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const auth = getClientAuth();
       const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
       if (displayName.trim()) await updateProfile(result.user, { displayName: displayName.trim() });
+      await sendEmailVerification(result.user);
       return result.user;
     },
     logout: () => signOut(getClientAuth()),
