@@ -321,6 +321,7 @@ export class MatchesService {
         const fixtureId = Number(row?.id ?? row?.fixtureId);
         const timestamp = new Date(row?.starting_at ?? '').getTime();
         return this.sportmonks.isFixtureAllowed(fixtureId) &&
+          this.sportmonks.isFixtureFormatAllowed({ type: String(row?.type ?? '') }) &&
           Number.isFinite(timestamp) &&
           timestamp >= start.getTime();
       })
