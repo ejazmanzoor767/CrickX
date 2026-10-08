@@ -425,8 +425,43 @@ export class MatchesService {
       }
     }
 
+    // Prediction matches persist the authoritative completed state for
+    // prediction-enabled fixtures. Include those records so a match whose
+    // provider schedule/projection is delayed still appears in Completed.
+    let predictionCompletedData: any[] = [];
+    try {
+      const snapshot = await this.firestore.db
+        .collection('predictionMatches')
+        .where('status', '==', 'COMPLETED')
+        .limit(200)
+        .get();
+
+      for (const doc of snapshot.docs) {
+        const row = doc.data() as any;
+        const fixtureId = Number(row?.sportmonksFixtureId ?? String(doc.id).replace(/^prediction_/, ''));
+        if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
+
+        try {
+          const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+          const started = new Date(fixture?.starting_at ?? '').getTime();
+          if (!Number.isFinite(started) || started < start.getTime() || started > now.getTime()) continue;
+          predictionCompletedData.push(normalize(fixture, 'COMPLETED'));
+        } catch (error) {
+          console.warn(
+            'Completed prediction-match fixture read failed fixture=' + fixtureId + ':',
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      }
+    } catch (error) {
+      console.warn(
+        'Completed prediction-match read skipped:',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
     const byId = new Map<number, any>();
-    for (const fixture of [...providerData, ...projectedData]) {
+    for (const fixture of [...providerData, ...projectedData, ...predictionCompletedData]) {
       const id = Number(fixture?.id);
       if (Number.isFinite(id) && id > 0) byId.set(id, fixture);
     }
