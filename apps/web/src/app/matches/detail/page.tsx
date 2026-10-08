@@ -84,31 +84,19 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
     group.innings = [group.innings[0] ?? null, group.innings[1] ?? null];
   }
 
-  return <div style={{ display: 'grid', gap: 16 }}>
-    <div className="card" style={{ padding: 18, background: 'linear-gradient(135deg,rgba(155,255,71,.08),rgba(18,23,34,.94))' }}>
-      <p className="eyebrow">TEST / 4-DAY SCORECARD</p>
-      <p className="section-subtitle" style={{ margin: '6px 0 0' }}>Separate innings cards for matches where each team can bat twice.</p>
-    </div>
-
+  return <div className="test-multi-innings-scorecard" style={{ display: 'grid', gap: 'clamp(10px, 2.5vw, 16px)', width: '100%', minWidth: 0 }}>
     {orderedTeamGroups.length === 0
       ? <div className="card"><p className="section-subtitle">Innings data is not available from the cricket feed yet.</p></div>
       : orderedTeamGroups
           .filter(({ teamId }: any) => Number(teamId) === Number(selectedTeamId))
-          .map(({ teamId, team, innings: teamInnings }: any) => <div className="card" key={`team-group-${teamId}`} style={{ padding: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 6px 14px' }}>
-            <TeamBadge team={team} />
-            <div>
-              <p className="eyebrow" style={{ marginBottom: 3 }}>TEAM SCORECARD</p>
-              <h2 style={{ margin: 0, fontFamily: 'Barlow Condensed', fontSize: 28, textTransform: 'uppercase' }}>{team?.name ?? 'Team'}</h2>
-            </div>
-          </div>
+          .map(({ teamId, team, innings: teamInnings }: any) => <div key={`team-group-${teamId}`} style={{ display: 'grid', gap: 'clamp(10px, 2.5vw, 14px)', width: '100%', minWidth: 0 }}>
           <div style={{ display: 'grid', gap: 14 }}>
             {teamInnings.map((inningData: any, teamInningIndex: number) => {
           const { run, inning, inningBatting, inningBowling, inningBalls, inningWickets, extras } = inningData ?? {};
           const team = Number(teamId) === Number(fixture?.localteam_id) ? fixture?.localteam : fixture?.visitorteam;
           const teamLabel = teamInningIndex === 0 ? '1st Innings' : '2nd Innings';
           if (!run) {
-            return <div className="card" key={`team-${teamId}-missing-${teamInningIndex}`} style={{ padding: 18, background: 'rgba(255,255,255,.018)' }}>
+            return <div className="card" key={`team-${teamId}-missing-${teamInningIndex}`} style={{ padding: 'clamp(12px, 3vw, 18px)', background: 'rgba(255,255,255,.018)' }}>
               <p className="eyebrow">{teamLabel}</p>
               <h3 style={{ margin: '4px 0 0', fontFamily: 'Barlow Condensed', fontSize: 24 }}>{team?.name ?? 'Team'}</h3>
               <p className="section-subtitle" style={{ margin: '8px 0 0' }}>This innings has not started yet.</p>
@@ -119,12 +107,12 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
           const overs = run?.overs ?? 0;
           const legalBalls = ballsFromOvers(overs);
           const rate = legalBalls > 0 ? (score / legalBalls) * 6 : null;
-          return <div className="card" key={`team-${teamId}-innings-${teamInningIndex}`} style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+          return <div className="card" key={`team-${teamId}-innings-${teamInningIndex}`} style={{ padding: 0, overflow: 'hidden', width: '100%', minWidth: 0 }}>
+            <div style={{ padding: 'clamp(12px, 3vw, 18px) clamp(12px, 4vw, 20px) 12px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <TeamBadge team={team} />
-                  <div><p className="eyebrow" style={{ marginBottom: 3 }}>{teamLabel}</p><h2 style={{ margin: 0, fontFamily: 'Barlow Condensed', fontSize: 26, textTransform: 'uppercase' }}>{team?.name ?? 'Team'}</h2></div>
+                  <div><p className="eyebrow" style={{ marginBottom: 3 }}>{teamLabel}</p><h2 style={{ margin: 0, fontFamily: 'Barlow Condensed', fontSize: 'clamp(20px, 5vw, 26px)', textTransform: 'uppercase' }}>{team?.name ?? 'Team'}</h2></div>
                 </div>
                 <div style={{ textAlign: 'right' }}><div style={{ fontFamily: 'Barlow Condensed', fontSize: 42, lineHeight: .95, fontWeight: 900 }}>{score}/{wickets}</div><div style={{ color: '#98a0b3', fontSize: 13, marginTop: 5 }}>{overs} overs · RR {rate === null ? '—' : rate.toFixed(2)}</div></div>
               </div>
