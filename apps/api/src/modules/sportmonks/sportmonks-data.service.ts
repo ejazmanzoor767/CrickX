@@ -101,9 +101,45 @@ export class SportmonksDataService {
     return this.allowedFixtureIds.has(Number(fixtureId));
   }
 
+  /**
+   * CrickX is limited to white-ball cricket. Sportmonks identifies the match
+   * format on fixture.type. Reject Test / First Class / 4-day / 5-day formats
+   * at the provider boundary so they cannot enter any match or fantasy feed,
+   * even when a fixture ID is accidentally allowlisted.
+   */
+  isFixtureFormatAllowed(fixture: Pick<SportmonksFixture, 'type'>): boolean {
+    const type = String(fixture?.type ?? '').trim().toLowerCase().replace(/_/g, ' ');
+    if (!type) return true;
+
+    const blockedFormats = [
+      'test',
+      'test match',
+      'first class',
+      'first-class',
+      '4 day',
+      '4-day',
+      'four day',
+      'four-day',
+      '5 day',
+      '5-day',
+      'five day',
+      'five-day',
+    ];
+
+    return !blockedFormats.some((value) => type === value || type.includes(value));
+  }
+
+  private assertFixtureFormatAllowed(fixture: Pick<SportmonksFixture, 'type'>, fixtureId: number) {
+    if (!this.isFixtureFormatAllowed(fixture)) {
+      throw new NotFoundException(`Fixture ${fixtureId} uses a red-ball format that is not enabled for CrickX.`);
+    }
+  }
+
   private filterFixtures<T extends SportmonksFixture>(fixtures: T[]): T[] {
-    if (!this.allowedFixtureIds) return fixtures;
-    return fixtures.filter((fixture) => this.isFixtureAllowed(Number(fixture?.id)));
+    return fixtures.filter((fixture) =>
+      this.isFixtureAllowed(Number(fixture?.id)) &&
+      this.isFixtureFormatAllowed(fixture),
+    );
   }
 
   private filterFixtureEnvelope(envelope: any) {
@@ -189,6 +225,7 @@ export class SportmonksDataService {
       { include: includes },
     );
     const incoming = normalizeFixture(envelope.data);
+    this.assertFixtureFormatAllowed(incoming, fixtureId);
 
     // Only persist non-live snapshots. High-frequency live/terminal refreshes
     // return the provider response directly and do not write the huge ball list
