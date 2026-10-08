@@ -138,10 +138,10 @@ export class SportmonksDataService {
   }
 
   async listLiveFixtures() {
-    // Sportmonks documents /livescores/now as the in-play endpoint.
-    // Use it as the authoritative Live source so newly started matches are
-    // not hidden by the broader current-day schedule snapshot.
-    const envelope = await this.client.get<SportmonksFixture[]>('/livescores/now', { include: LIVE_SCORECARD_INCLUDES });
+    // Cricket API 2.0's /livescores feed is the compatible live source for
+    // this Sportmonks account. It contains the current day's live/in-play
+    // fixtures and remains available around kickoff and shortly after finish.
+    const envelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
     return this.filterFixtureEnvelope(envelope);
   }
 
