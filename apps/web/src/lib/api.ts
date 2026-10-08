@@ -97,6 +97,8 @@ export const api = {
   contestsForFixture: (fixtureId: number) => apiFetch(`/fantasy/contests/fixture/${fixtureId}`),
   contestLeaderboard: (contestId: string) => apiFetch(`/fantasy/contests/${contestId}/leaderboard`),
   myFantasyTeams: () => apiFetch('/fantasy/teams'),
+  publicFantasyTeam: (userId: string, fixtureId: number) =>
+    apiFetch(`/fantasy/teams/public/${encodeURIComponent(userId)}/${fixtureId}`),
   createFantasyTeam: (payload: unknown) => apiFetch('/fantasy/teams', { method: 'POST', body: JSON.stringify(payload) }),
   editFantasyTeam: (teamId: string, payload: unknown) => apiFetch(`/fantasy/teams/${teamId}`, { method: 'PUT', body: JSON.stringify(payload) }),
   activeContest: (fixtureId: number) => apiFetch(`/fantasy/contests/fixture/${fixtureId}/active`),
