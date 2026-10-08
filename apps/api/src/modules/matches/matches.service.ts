@@ -38,11 +38,8 @@ export function applicationState(fixture: SportmonksFixture, options: { provider
 
   const notStartedStatus = ['ns', 'scheduled', 'not started', 'upcoming', 'postponed']
     .some((value) => status === value || status.includes(value));
-  const explicitlyPostponed = status.includes('postponed');
-  const liveStatus = [
-    'live', 'innings break', 'lunch', 'tea', 'stumps',
-    'innings', 'in progress', 'drinks', 'rain delay', 'delayed',
-  ].some((part) => status.includes(part));
+  const liveStatus = ['live', 'innings break', 'lunch', 'tea', 'stumps']
+    .some((part) => status.includes(part));
 
   // A fixture returned by Sportmonks' dedicated live feed is positive
   // evidence that the provider considers it part of the current live set.
@@ -51,16 +48,7 @@ export function applicationState(fixture: SportmonksFixture, options: { provider
   if (options.providerLiveFeed && started) return 'LIVE';
   if (liveStatus) return 'LIVE';
   if (fixture.live === 1) return 'LIVE';
-
-  // Sportmonks can briefly leave a fixture in NS/scheduled immediately after
-  // its scheduled start while the live feed catches up. Once the start time
-  // has actually passed, expose it as LIVE unless the provider explicitly
-  // marks it postponed. This prevents a started match from disappearing into
-  // Upcoming for the first polling cycles.
-  if (notStartedStatus) {
-    if (explicitlyPostponed) return 'UPCOMING';
-    return started ? 'LIVE' : 'UPCOMING';
-  }
+  if (notStartedStatus) return 'UPCOMING';
 
   return 'UPCOMING';
 }
@@ -177,12 +165,7 @@ export class MatchesService {
 
   async listUpcomingAndRecent(page = 1) {
     const result = await this.sportmonks.listFixtures({ page, include: 'localteam,visitorteam,venue,league,season,stage,tosswon' });
-    return {
-      ...result,
-      data: Array.isArray(result.data)
-        ? result.data.map((fixture: SportmonksFixture) => normalize(fixture))
-        : [],
-    };
+    return { ...result, data: Array.isArray(result.data) ? result.data.map((fixture) => normalize(fixture)) : [] };
   }
   async listLeagues() { return this.sportmonks.listLeagues(); }
   async listToday() {
@@ -220,242 +203,46 @@ export class MatchesService {
 
     return { data, meta: { pagination: { total: data.length, count: data.length, per_page: data.length, current_page: 1, total_pages: 1 } } };
   }
-  private async projectLiveMatches(fixtures: any[]): Promise<Set<number>> {
-    if (!this.realtime.isEnabled()) return new Set<number>();
-
+  private async projectLiveMatches(fixtures: any[]) {
+    if (!this.realtime.isEnabled()) return;
     const activeIds = new Set<number>();
-    const completedIds = new Set<number>();
     const now = new Date();
-    const batch = this.realtime.db.batch();
-    let changed = false;
 
-    // Sportmonks' livescore feed can continue to expose a finished fixture
-    // after the match has ended. Verify every currently-live fixture directly
-    // against /fixtures/{id}; the fixture status is the authoritative
-    // completion signal and lets us move the card to Completed immediately.
-    const verified = await Promise.all(fixtures.map(async (fixture: any) => {
+    for (const fixture of fixtures) {
       const fixtureId = Number(fixture?.id);
-      if (!Number.isFinite(fixtureId) || fixtureId <= 0) {
-        return { fixture, fixtureId, latest: fixture, verified: false };
-      }
-
-      try {
-        const latest = await this.sportmonks.getFixture(fixtureId, {
-          forceLive: true,
-          allowUnlistedLeague: true,
-        });
-        return { fixture, fixtureId, latest, verified: true };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.warn(`Unable to verify active fixture ${fixtureId} directly:`, message);
-        return { fixture, fixtureId, latest: fixture, verified: false };
-      }
-    }));
-
-    for (const item of verified) {
-      const { fixture, fixtureId, latest, verified: directVerified } = item;
       if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
-
-      const state = directVerified
-        ? applicationState(latest)
-        : applicationState(fixture, { providerLiveFeed: true });
-
-      if (state === 'COMPLETED') {
-        const completed = normalize(latest, 'COMPLETED');
-        await this.realtime.db.collection('completedMatches').doc(String(fixtureId)).set({
-          ...completed,
-          id: fixtureId,
-          fixtureId,
-          applicationState: 'COMPLETED',
-          active: true,
-          completionSource: 'sportmonks-fixture-status',
-          completedAt: now,
-          updatedAt: now,
-        }, { merge: true });
-
-        batch.set(this.realtime.db.collection('liveMatches').doc(String(fixtureId)), {
-          active: false,
-          applicationState: 'COMPLETED',
-          updatedAt: now,
-        }, { merge: true });
-
-        completedIds.add(fixtureId);
-        changed = true;
-        continue;
-      }
-
       activeIds.add(fixtureId);
-      const live = normalize(
-        directVerified && state === 'LIVE' ? latest : fixture,
-        'LIVE',
-      );
-
-      batch.set(this.realtime.db.collection('liveMatches').doc(String(fixtureId)), {
-        ...live,
+      await this.realtime.db.collection('liveMatches').doc(String(fixtureId)).set({
         id: fixtureId,
         fixtureId,
         applicationState: 'LIVE',
         active: true,
-        league_id: live?.league_id ?? null,
-        type: live?.type ?? null,
-        status: live?.status ?? null,
-        live: Number(live?.live) === 1 ? 1 : 0,
-        starting_at: live?.starting_at ?? null,
-        localteam: live?.localteam ?? null,
-        visitorteam: live?.visitorteam ?? null,
-        league: (live as any)?.league ?? (fixture as any)?.league ?? null,
-        runs: Array.isArray(live?.runs) ? live.runs : [],
-        scoreboards: Array.isArray(live?.scoreboards) ? live.scoreboards : [],
-        updatedAt: now,
-      }, { merge: true });
-
-      // A previously-projected false completion must not survive once the
-      // provider says the fixture is live again.
-      batch.set(this.realtime.db.collection('completedMatches').doc(String(fixtureId)), {
-        active: false,
+        status: fixture?.status ?? null,
+        live: Number(fixture?.live) === 1 ? 1 : 0,
+        starting_at: fixture?.starting_at ?? null,
+        localteam: fixture?.localteam ?? null,
+        visitorteam: fixture?.visitorteam ?? null,
+        league: fixture?.league ?? null,
+        runs: Array.isArray(fixture?.runs) ? fixture.runs : [],
+        scoreboards: Array.isArray(fixture?.scoreboards) ? fixture.scoreboards : [],
         updatedAt: now,
       }, { merge: true });
     }
 
-    // Reconcile persisted live fixtures that are no longer present in the
-    // current livescore response. Verify them directly so a disappearing
-    // livescore does not create a Live -> Completed gap.
     const stale = await this.realtime.db.collection('liveMatches').where('active', '==', true).get();
-
+    const batch = this.realtime.db.batch();
+    let changed = false;
     for (const doc of stale.docs) {
-      const fixtureId = Number(doc.id);
-      if (!Number.isFinite(fixtureId)) continue;
-      if (activeIds.has(fixtureId) || completedIds.has(fixtureId)) continue;
-
-      // Disable stale realtime documents that carry a blocked format.
-      if (!this.sportmonks.isFixtureFormatAllowed({
-        league_id: Number(doc.data?.()?.league_id),
-        type: String(doc.data?.()?.type ?? ''),
-      })) {
-        batch.set(doc.ref, { active: false, updatedAt: now }, { merge: true });
-        changed = true;
-        continue;
-      }
-
-      try {
-        const latest = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
-        const state = applicationState(latest);
-
-        if (state === 'COMPLETED') {
-          const completed = normalize(latest, 'COMPLETED');
-          await this.realtime.db.collection('completedMatches').doc(String(fixtureId)).set({
-            ...completed,
-            id: fixtureId,
-            fixtureId,
-            applicationState: 'COMPLETED',
-            active: true,
-            completionSource: 'sportmonks-fixture-status-after-live-drop',
-            completedAt: now,
-            updatedAt: now,
-          }, { merge: true });
-
-          batch.set(doc.ref, {
-            active: false,
-            applicationState: 'COMPLETED',
-            updatedAt: now,
-          }, { merge: true });
-
-          completedIds.add(fixtureId);
-          changed = true;
-          continue;
-        }
-
-        // If Sportmonks temporarily omits a still-live fixture from
-        // /livescores, keep it visible in Live rather than creating a gap.
-        if (state === 'LIVE') {
-          batch.set(doc.ref, {
-            ...latest,
-            id: fixtureId,
-            fixtureId,
-            applicationState: 'LIVE',
-            active: true,
-            updatedAt: now,
-          }, { merge: true });
-          activeIds.add(fixtureId);
-          continue;
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (
-          message.includes('not in an enabled CrickX league') ||
-          message.includes('Test/First Class multi-day format')
-        ) {
-          batch.set(doc.ref, { active: false, updatedAt: now }, { merge: true });
-          changed = true;
-          continue;
-        }
-
-        console.warn(
-          `Unable to verify fixture ${fixtureId} after it left the live feed:`,
-          message,
-        );
-      }
-
-      // A transient provider omission must not create a gap between Live and
-      // Completed. Keep the existing projection active and let the next poll
-      // re-check the fixture directly with Sportmonks.
-      batch.set(doc.ref, { active: true, applicationState: 'LIVE', updatedAt: now }, { merge: true });
+      if (activeIds.has(Number(doc.id))) continue;
+      batch.set(doc.ref, { active: false, applicationState: 'COMPLETED', updatedAt: now }, { merge: true });
       changed = true;
     }
-
     if (changed) await batch.commit();
-    else {
-      // Active fixtures are written to the batch even when nothing was marked
-      // stale, so commit the live snapshot changes as well.
-      await batch.commit();
-    }
-
-    return completedIds;
-  }
-
-  async syncLiveProjection() {
-    if (!this.realtime.isEnabled()) return [] as number[];
-    const liveResult = await this.sportmonks.listLiveFixturesRaw();
-    const liveRows = Array.isArray(liveResult.data)
-      ? liveResult.data.filter((fixture: SportmonksFixture) =>
-          this.sportmonks.isFixtureFormatAllowed(fixture),
-        )
-      : [];
-    const completed = await this.projectLiveMatches(liveRows);
-    return Array.from(completed);
-  }
-
-  private async listProjectedCompleted(start: Date) {
-    if (!this.realtime.isEnabled()) return [] as any[];
-    const snapshot = await this.realtime.db.collection('completedMatches').get();
-    return snapshot.docs
-      .map((doc) => doc.data() as any)
-      .filter((row) => {
-        const fixtureId = Number(row?.id ?? row?.fixtureId);
-        const timestamp = new Date(row?.starting_at ?? '').getTime();
-        const leagueId = Number(row?.league_id);
-        const type = String(row?.type ?? '').trim();
-        return row?.active !== false &&
-          type.length > 0 &&
-          Number.isFinite(leagueId) &&
-          this.sportmonks.isLeagueAllowed(leagueId) &&
-          this.sportmonks.isFixtureFormatAllowed({ league_id: leagueId, type }) &&
-          Number.isFinite(timestamp) &&
-          timestamp >= start.getTime();
-      })
-      .map((row) => normalize(row, 'COMPLETED'));
   }
 
   async listLive() {
-    // The standard provider method applies the configured league allowlist.
-    // Live/current-day matches must also be allowed to appear when a newly
-    // started short-format competition is not yet present in that env list.
-    const liveResult = await this.sportmonks.listLiveFixturesRaw();
-    const liveRows = Array.isArray(liveResult.data)
-      ? liveResult.data.filter((fixture: SportmonksFixture) =>
-          this.sportmonks.isFixtureFormatAllowed(fixture),
-        )
-      : [];
+    const liveResult = await this.sportmonks.listLiveFixtures();
+    const liveRows = Array.isArray(liveResult.data) ? liveResult.data : [];
 
     // /livescores is the primary source for Live Matches. During kickoff,
     // Sportmonks can briefly return an NS/live=0 snapshot even though the
@@ -476,18 +263,14 @@ export class MatchesService {
     const endOfDay = new Date(startOfDay);
     endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
 
-    const scheduledResult = await this.sportmonks.listFixturesPaginatedRaw({
+    const scheduledResult = await this.sportmonks.listFixturesPaginated({
       startsBetween: {
         start: sportmonksDate(startOfDay),
         end: sportmonksDate(endOfDay),
       },
       include: 'localteam,visitorteam,league,season,stage,runs,scoreboards',
     });
-    const scheduledRows = Array.isArray(scheduledResult.data)
-      ? scheduledResult.data.filter((fixture: SportmonksFixture) =>
-          this.sportmonks.isFixtureFormatAllowed(fixture),
-        )
-      : [];
+    const scheduledRows = Array.isArray(scheduledResult.data) ? scheduledResult.data : [];
 
     const liveData = [...liveById.values()]
       .filter((fixture) => applicationState(fixture, { providerLiveFeed: true }) === 'LIVE')
@@ -505,18 +288,13 @@ export class MatchesService {
     }
 
     const data = [...byId.values()];
-    let completedIds = new Set<number>();
-    try {
-      completedIds = await this.projectLiveMatches(data);
-    } catch (error) {
+    await this.projectLiveMatches(data).catch((error) => {
       console.warn('Live-match Firestore projection skipped:', error instanceof Error ? error.message : String(error));
-    }
-
-    const visibleLiveData = data.filter((fixture: any) => !completedIds.has(Number(fixture?.id)));
+    });
 
     return {
       ...liveResult,
-      data: visibleLiveData,
+      data,
       meta: liveResult.meta ?? scheduledResult.meta,
     };
   }
@@ -538,48 +316,14 @@ export class MatchesService {
   async listCompleted(daysBack = 14) {
     const now = new Date();
     const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
-    const recentStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const fixtures: SportmonksFixture[] = [];
     let page = 1; let totalPages = 1;
     do {
-      const envelope = await this.sportmonks.listFixtures({
-        startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) },
-        page,
-        include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon',
-      });
+      const envelope = await this.sportmonks.listFixtures({ startsBetween: { start: sportmonksDate(start), end: sportmonksDate(now) }, page, include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon' });
       fixtures.push(...(Array.isArray(envelope.data) ? envelope.data : []));
       totalPages = Math.max(1, Number(envelope.meta?.pagination?.total_pages ?? page)); page += 1;
     } while (page <= totalPages);
-
-    // Normal completed history remains governed by the configured league
-    // allowlist. For the most recent 24h, also inspect the raw provider feed so
-    // newly completed competitions are not missing simply because their league
-    // ID has not yet been added to the deployment environment.
-    const recentEnvelope = await this.sportmonks.listFixturesPaginatedRaw({
-      startsBetween: { start: sportmonksDate(recentStart), end: sportmonksDate(now) },
-      include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon',
-    });
-    const recentProviderRows = Array.isArray(recentEnvelope.data)
-      ? recentEnvelope.data.filter((fixture: SportmonksFixture) =>
-          this.sportmonks.isFixtureFormatAllowed(fixture),
-        )
-      : [];
-
-    const providerData = [...fixtures, ...recentProviderRows]
-      .filter((fixture, index, all) =>
-        all.findIndex((candidate) => Number(candidate?.id) === Number(fixture?.id)) === index,
-      )
-      .filter((f) => applicationState(f) === 'COMPLETED')
-      .map((fixture) => normalize(fixture, 'COMPLETED'));
-    const projectedData = await this.listProjectedCompleted(start);
-
-    const byId = new Map<number, any>();
-    for (const fixture of projectedData) byId.set(Number(fixture.id), fixture);
-    for (const fixture of providerData) byId.set(Number(fixture.id), fixture);
-
-    const data = [...byId.values()]
-      .filter((fixture) => Number.isFinite(Number(fixture?.id)))
-      .sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime());
+    const data = fixtures.filter((f) => applicationState(f) === 'COMPLETED').sort((a,b)=>new Date(b.starting_at).getTime()-new Date(a.starting_at).getTime()).map((fixture) => normalize(fixture));
     return { data, meta: { pagination: { total:data.length,count:data.length,per_page:data.length,current_page:1,total_pages:1 } } };
   }
 

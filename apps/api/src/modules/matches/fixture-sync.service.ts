@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { MatchesService } from './matches.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
-import { SportmonksFixture } from '../sportmonks/sportmonks.types';
 
 /**
  * Pre-warms the Sportmonks fixture cache for upcoming matches so the
@@ -20,29 +19,11 @@ export class FixtureSyncService {
     private readonly sportmonks: SportmonksDataService,
   ) {}
 
-
-  /**
-   * Re-check active live fixtures directly against Sportmonks every 30 seconds.
-   * This keeps the Live -> Completed transition working even when no browser
-   * is currently polling the match-centre page.
-   */
-  @Cron(CronExpression.EVERY_30_SECONDS)
-  async syncLiveCompletion() {
-    try {
-      const completed = await this.matches.syncLiveProjection();
-      if (completed.length > 0) {
-        this.logger.log(`Projected ${completed.length} newly completed fixture(s): ${completed.join(', ')}`);
-      }
-    } catch (err) {
-      this.logger.error('Live completion sync failed', err instanceof Error ? err.stack : String(err));
-    }
-  }
-
   @Cron(CronExpression.EVERY_5_MINUTES)
   async syncUpcoming() {
     try {
       const { data: fixtures } = await this.matches.listUpcomingAndRecent(1);
-      const soon = fixtures.filter((f: SportmonksFixture) => {
+      const soon = fixtures.filter((f) => {
         const startsInMs = new Date(f.starting_at).getTime() - Date.now();
         return startsInMs > 0 && startsInMs < 24 * 60 * 60 * 1000; // within next 24h
       });

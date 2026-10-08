@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksClientService } from './sportmonks-client.service';
 import {
   SportmonksFixture,
@@ -10,15 +10,31 @@ import {
 
 // The live scorecard needs the complete ball record plus the ball outcome and
 // player relationships. Sportmonks supports nested includes for ball data.
-// Sportmonks allows up to 10 nested includes. Live cricket data must come
-// from the livescores endpoint; fixture-by-id is not the live source.
-const FIXTURE_INCLUDES = 'localteam,visitorteam,scoreboards,runs,batting,bowling,lineup.player,balls,balls.score';
+const FIXTURE_INCLUDES = 'localteam,visitorteam,scoreboards,runs,batting,bowling,lineup,balls,balls.score,balls.batsman,balls.bowler,venue';
 const LIVE_FIXTURE_INCLUDES = FIXTURE_INCLUDES;
-const LIVE_SCORECARD_INCLUDES = 'localteam,visitorteam,league,scoreboards,runs,batting,bowling,lineup.player,balls,balls.score';
+const LIVE_SCORECARD_INCLUDES = 'localteam,visitorteam,scoreboards,runs';
 
-const MAX_FIXTURE_PAGES = 50;
+const TTL_LIVE_MS = 15 * 1000;
+const TTL_UPCOMING_MS = 5 * 60 * 1000;
+const TTL_PLAYER_MS = 60 * 60 * 1000;
+const MAX_FIXTURE_PAGES = 5;
 
 const asRows = (value: any): any[] => Array.isArray(value) ? value : Array.isArray(value?.data) ? value.data : [];
+
+function mergeBallHistory(previous: any[], current: any[]) {
+  const map = new Map<string, any>();
+  for (const ball of [...previous, ...current]) {
+    const inning = ball?.inning ?? ball?.score_id ?? '?';
+    const number = ball?.ball ?? ball?.id ?? `${map.size}`;
+    map.set(`${inning}-${number}`, ball);
+  }
+  return [...map.values()].sort((a, b) => {
+    const ai = Number(a?.inning ?? a?.score_id ?? 0);
+    const bi = Number(b?.inning ?? b?.score_id ?? 0);
+    if (ai !== bi) return ai - bi;
+    return Number(a?.ball ?? 0) - Number(b?.ball ?? 0);
+  });
+}
 
 function normalizeLineupPlayer(entry: any): SportmonksLineupPlayer {
   const meta = entry?.lineup ?? {};
@@ -58,107 +74,16 @@ function normalizeFixture(fixture: SportmonksFixture): SportmonksFixture {
 
 @Injectable()
 export class SportmonksDataService {
-  private readonly allowedLeagueIds: Set<number> | null;
-
   constructor(
     private readonly client: SportmonksClientService,
-    private readonly config: ConfigService,
-  ) {
-    const raw = this.config.get<string>('ALLOWED_SPORTMONKS_LEAGUE_IDS', '');
-    const ids = raw
-      .split(',')
-      .map((value) => Number(value.trim()))
-      .filter((value) => Number.isFinite(value) && value > 0);
-
-    this.allowedLeagueIds = ids.length > 0 ? new Set(ids) : null;
-  }
-
-  /**
-   * CrickX exposes only fixtures belonging to the configured league allowlist.
-   * A blank variable preserves provider-feed behavior; a configured value
-   * means only those league IDs are eligible.
-   */
-  isLeagueAllowed(leagueId: number): boolean {
-    if (!this.allowedLeagueIds) return true;
-    return this.allowedLeagueIds.has(Number(leagueId));
-  }
-
-  /**
-   * Block red-ball / multi-day formats at the provider boundary.
-   */
-  isFixtureFormatAllowed(fixture: Pick<SportmonksFixture, 'type' | 'league_id'>): boolean {
-    const type = String(fixture?.type ?? '')
-      .trim()
-      .toLowerCase()
-      .replace(/[_/]+/g, ' ')
-      .replace(/\s+/g, ' ');
-
-    if (!type) return true;
-
-    // Test and explicit 4/5-day formats are always excluded.
-    // The league allowlist must not override these product rules.
-    if (/\btest(?:\s+match|\s+cricket)?\b/.test(type)) return false;
-    if (/\b(?:4|four|5|five)\s*[- ]?\s*day(?:s)?\b/.test(type)) return false;
-
-    // Generic First Class fixtures are allowed only when their league is
-    // explicitly allowlisted.
-    if (/\bfirst\s*[- ]?\s*class\b/.test(type)) {
-      const leagueId = Number((fixture as any)?.league_id);
-      return this.allowedLeagueIds?.has(leagueId) ?? false;
-    }
-
-    return true;
-  }
-  private assertFixtureAllowed(
-    fixture: Pick<SportmonksFixture, 'league_id' | 'type'>,
-    fixtureId: number,
-    options: { allowUnlistedLeague?: boolean } = {},
-  ) {
-    if (!options.allowUnlistedLeague && !this.isLeagueAllowed(Number(fixture?.league_id))) {
-      throw new NotFoundException(
-        'Fixture ' + fixtureId + ' is not in an enabled CrickX league.',
-      );
-    }
-
-    if (!this.isFixtureFormatAllowed(fixture)) {
-      throw new NotFoundException(
-        'Fixture ' + fixtureId + ' uses a Test/First Class multi-day format that is not enabled for CrickX.',
-      );
-    }
-  }
-
-  private filterFixtures<T extends SportmonksFixture>(fixtures: T[]): T[] {
-    return fixtures.filter((fixture) =>
-      this.isLeagueAllowed(Number(fixture?.league_id)) &&
-      this.isFixtureFormatAllowed(fixture),
-    );
-  }
-
-  private filterFixtureEnvelope(envelope: any) {
-    if (!Array.isArray(envelope?.data)) return envelope;
-    return {
-      ...envelope,
-      data: this.filterFixtures(envelope.data as SportmonksFixture[]),
-    };
-  }
+    private readonly prisma: FirestoreService,
+  ) {}
 
   async listLeagues() {
     return this.client.get<any[]>('/leagues', { include: 'season,country' });
   }
 
   async listFixtures(params: { leagueId?: number; page?: number; status?: string; startsBetween?: { start: string; end: string }; include?: string; sort?: string }) {
-    const filter: Record<string, string> = {};
-    if (params.leagueId) filter['filter[league_id]'] = String(params.leagueId);
-    if (params.status) filter['filter[status]'] = params.status;
-    if (params.startsBetween) filter['filter[starts_between]'] = `${params.startsBetween.start},${params.startsBetween.end}`;
-    const requestParams: Record<string, string | number> = { include: params.include ?? 'localteam,visitorteam,venue', ...filter };
-    if (params.page !== undefined) requestParams.page = params.page;
-    if (params.sort) requestParams.sort = params.sort;
-    const envelope = await this.client.get<SportmonksFixture[]>('/fixtures', requestParams);
-    return this.filterFixtureEnvelope(envelope);
-  }
-
-  async listFixturesRaw(params: { leagueId?: number; page?: number; status?: string; startsBetween?: { start: string; end: string }; include?: string; sort?: string }) {
     const filter: Record<string, string> = {};
     if (params.leagueId) filter['filter[league_id]'] = String(params.leagueId);
     if (params.status) filter['filter[status]'] = params.status;
@@ -177,90 +102,85 @@ export class SportmonksDataService {
       lastEnvelope = envelope;
       rows.push(...(envelope.data ?? []));
       const pagination = envelope.meta?.pagination;
-      // Do not stop merely because this page became empty after applying the
-      // CrickX fixture allowlist. An allowed fixture can be present on a later
-      // Sportmonks page.
-      if (!pagination) {
-        if ((envelope.data ?? []).length === 0) break;
-      } else if (pagination.current_page >= pagination.total_pages) {
-        break;
-      }
-    }
-    if (!lastEnvelope) return { data: [] as SportmonksFixture[] };
-    return { ...lastEnvelope, data: rows };
-  }
-
-  async listFixturesPaginatedRaw(params: { leagueId?: number; startsBetween?: { start: string; end: string }; status?: string; include?: string; sort?: string }, maxPages = MAX_FIXTURE_PAGES) {
-    const rows: SportmonksFixture[] = [];
-    let lastEnvelope: any = null;
-    for (let page = 1; page <= maxPages; page += 1) {
-      const envelope = await this.listFixturesRaw({ ...params, page });
-      lastEnvelope = envelope;
-      rows.push(...(envelope.data ?? []));
-      const pagination = envelope.meta?.pagination;
-      if (!pagination || pagination.current_page >= pagination.total_pages) break;
+      if (!pagination || pagination.current_page >= pagination.total_pages || (envelope.data ?? []).length === 0) break;
     }
     if (!lastEnvelope) return { data: [] as SportmonksFixture[] };
     return { ...lastEnvelope, data: rows };
   }
 
   async listTodayFixtures() {
-    const envelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
-    return this.filterFixtureEnvelope(envelope);
+    return this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
   }
 
   async listLiveFixtures() {
-    const envelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
-    return this.filterFixtureEnvelope(envelope);
+    return this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
   }
 
-  async listLiveFixturesRaw() {
-    return this.client.get<SportmonksFixture[]>('/livescores/now', { include: LIVE_SCORECARD_INCLUDES });
-  }
-
-  /**
-   * Fetch one live fixture from Sportmonks' live endpoint.
-   */
-  async getLiveFixture(fixtureId: number): Promise<SportmonksFixture> {
-    const params = {
-      fixtures: String(fixtureId),
-      include: LIVE_SCORECARD_INCLUDES,
-    };
-    try {
-      const liveEnvelope = await this.client.get<SportmonksFixture[]>('/livescores/now', params);
-      const found = (liveEnvelope.data ?? []).find((row: any) => Number(row?.id) === Number(fixtureId));
-      if (found) return normalizeFixture(found);
-    } catch {
-      // Fall back to the current-day livescores endpoint below.
+  async getFixture(fixtureId: number, opts: { forceLive?: boolean } = {}): Promise<SportmonksFixture> {
+    // Live/terminal scoring must not perform a Firestore read/write on every poll.
+    // The previous implementation cached the full ball-by-ball payload in
+    // Firestore, multiplying reads/writes and repeatedly serializing a large
+    // object. Use the persistent cache only for normal/non-live lookups.
+    if (!opts.forceLive) {
+      const cached = await this.prisma.cachedFixture.findUnique({
+        where: { sportmonksFixtureId: fixtureId },
+      });
+      if (cached && cached.expiresAt > new Date()) {
+        return normalizeFixture(cached.payload as unknown as SportmonksFixture);
+      }
     }
 
-    const dayEnvelope = await this.client.get<SportmonksFixture[]>('/livescores', params);
-    const found = (dayEnvelope.data ?? []).find((row: any) => Number(row?.id) === Number(fixtureId));
-    if (found) return normalizeFixture(found);
-
-    throw new NotFoundException('Live fixture ' + fixtureId + ' was not returned by Sportmonks livescores.');
-  }
-
-  async getFixture(fixtureId: number, opts: { forceLive?: boolean; allowUnlistedLeague?: boolean } = {}): Promise<SportmonksFixture> {
     const includes = opts.forceLive ? LIVE_FIXTURE_INCLUDES : FIXTURE_INCLUDES;
     const envelope = await this.client.get<SportmonksFixture>(
       `/fixtures/${fixtureId}`,
       { include: includes },
     );
     const incoming = normalizeFixture(envelope.data);
-    this.assertFixtureAllowed(incoming, fixtureId, {
-      allowUnlistedLeague: opts.allowUnlistedLeague,
-    });
+
+    // Only persist non-live snapshots. High-frequency live/terminal refreshes
+    // return the provider response directly and do not write the huge ball list
+    // back to Firestore.
+    if (!opts.forceLive) {
+      const ttlMs = incoming.live === 1 ? TTL_LIVE_MS : TTL_UPCOMING_MS;
+      await this.prisma.cachedFixture.upsert({
+        where: { sportmonksFixtureId: fixtureId },
+        create: {
+          sportmonksFixtureId: fixtureId,
+          payload: incoming as unknown as object,
+          expiresAt: new Date(Date.now() + ttlMs),
+        },
+        update: {
+          payload: incoming as unknown as object,
+          expiresAt: new Date(Date.now() + ttlMs),
+        },
+      });
+    }
 
     return incoming;
   }
 
   async getLiveDetail(fixtureId: number): Promise<SportmonksFixture> {
-    return this.getLiveFixture(fixtureId);
+    try {
+      const liveEnvelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
+      const liveFixture = (liveEnvelope.data ?? []).find((fixture) => Number(fixture.id) === Number(fixtureId));
+      if (liveFixture) return this.getFixture(fixtureId, { forceLive: true });
+    } catch {
+      const bareEnvelope = await this.client.get<SportmonksFixture[]>('/livescores');
+      const bareFixture = (bareEnvelope.data ?? []).find((fixture) => Number(fixture.id) === Number(fixtureId));
+      if (bareFixture) return this.getFixture(fixtureId, { forceLive: true });
+    }
+    throw new NotFoundException(`Live fixture ${fixtureId} was not returned by Sportmonks /livescores.`);
   }
 
   async getPlayer(playerId: number): Promise<SportmonksPlayer> {
+    const cached = await this.prisma.cachedPlayer.findUnique({ where: { sportmonksPlayerId: playerId } });
+    if (cached && cached.expiresAt > new Date()) return cached.payload as unknown as SportmonksPlayer;
     const envelope = await this.client.get<SportmonksPlayer>(`/players/${playerId}`);
+    await this.prisma.cachedPlayer.upsert({
+      where: { sportmonksPlayerId: playerId },
+      create: { sportmonksPlayerId: playerId, payload: envelope.data as unknown as object, expiresAt: new Date(Date.now() + TTL_PLAYER_MS) },
+      update: { payload: envelope.data as unknown as object, expiresAt: new Date(Date.now() + TTL_PLAYER_MS) },
+    });
     return envelope.data;
   }
 
@@ -278,7 +198,6 @@ export class SportmonksDataService {
       { include: 'localteam,visitorteam,season,lineup' },
     );
     const fixture = normalizeFixture(envelope.data);
-    this.assertFixtureAllowed(fixture, fixtureId);
 
     const localTeamId = Number(fixture.localteam_id ?? fixture.localteam?.id);
     const visitorTeamId = Number(fixture.visitorteam_id ?? fixture.visitorteam?.id);

@@ -66,7 +66,7 @@ for (const workspace of workspaces) {
 const audit = spawnSync(
   'npm',
   ['audit', '--omit=dev', '--json', '--audit-level=moderate'],
-  { encoding: 'utf8' },
+  { encoding: 'utf8' }
 );
 
 let report;
@@ -85,10 +85,6 @@ const relevant = Object.entries(vulnerabilities).filter(([name]) =>
 );
 
 for (const [name, vulnerability] of Object.entries(vulnerabilities)) {
-  if (!productionPackages.has(name)) {
-    continue;
-  }
-
   const severity = vulnerability.severity || 'unknown';
   const via = Array.isArray(vulnerability.via)
     ? vulnerability.via
@@ -97,14 +93,16 @@ for (const [name, vulnerability] of Object.entries(vulnerabilities)) {
         .filter(Boolean)
     : [];
 
-  console.error(
-    `[audit] Production vulnerability in audited closure: ${name} (${severity})${via.length ? ` - ${via.join(', ')}` : ''}`
-  );
+  if (!productionPackages.has(name)) {
+    console.warn(
+      `[audit] Ignored vulnerability outside API/web production closure: ${name} (${severity})${via.length ? ` - ${via.join(', ')}` : ''}`
+    );
+  }
 }
 
 if (relevant.length > 0) {
   console.error('');
-  console.error('Production dependency vulnerabilities found in the audited API/web closure:');
+  console.error('Production dependency vulnerabilities found in the audited workspace closure:');
   for (const [name, vulnerability] of relevant) {
     console.error(`- ${name}: ${vulnerability.severity || 'unknown'} severity`);
   }

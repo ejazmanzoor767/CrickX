@@ -8,6 +8,8 @@ import { SubmitPredictionDto } from './prediction.dto';
 
 const FIVE=5, PER_PREDICTION=5, TOTAL=25, WINDOW=300, PREDICTION_HORIZON_MS=7*24*60*60*1000;
 const SHARES:Record<number,number>={5:50,4:30,3:20};
+const BATTERS=['babar azam','mohammad rizwan','virat kohli','rohit sharma','shubman gill','yashasvi jaiswal','kl rahul','suryakumar yadav','jos buttler','travis head','steve smith','kane williamson','rachin ravindra','david warner','glenn maxwell','phil salt','harry brook','joe root','quinton de kock','heinrich klaasen','aiden markram','fakhar zaman','imam-ul-haq','saim ayub','shai hope','litton das','pathum nissanka','kusal mendis','devon conway','marnus labuschagne'];
+const BOWLERS=['shaheen afridi','jasprit bumrah','mohammed siraj','mitchell starc','pat cummins','josh hazlewood','trent boult','tim southee','rashid khan','kagiso rabada','anrich nortje','keshav maharaj','mustafizur rahman','taskin ahmed','wanindu hasaranga','mark wood','jofra archer','adil rashid','haris rauf','naseem shah','shaheen','bumrah','starc','rabada'];
 type Q={id:string;kind:string;title:string;prompt:string;options:{value:string;label:string}[];featuredPlayer?:any;teamId?:number;correctAnswer?:string};
 const arr=(v:any)=>Array.isArray(v)?v:Array.isArray(v?.data)?v.data:[];
 const pname=(p:any)=>String(p?.fullname??p?.player?.fullname??`${p?.firstname??p?.player?.firstname??''} ${p?.lastname??p?.player?.lastname??''}`).trim()||`Player ${Number(p?.player_id??p?.id??0)}`;
@@ -56,15 +58,8 @@ export class PredictionService implements OnModuleInit,OnModuleDestroy{
  private async read(id:string){const s=await this.mref(id).get();return s.exists?({id:s.id,...s.data()} as any):null;}
  private async sub(uid:string){const s=await this.subscriptions.status(uid);if(!s.active)throw new ForbiddenException('An active CrickX weekly subscription is required to participate in predictions. Subscribe for $0.18 for 7 days.');}
  private signText(mid:string,uid:string,ts:number){return['CrickX Prediction Entry','Prediction: '+mid,'User: '+uid,'Timestamp: '+ts,'By signing, I confirm this wallet belongs to me and should receive any CRX prize earned by these predictions.'].join('\n');}
- private score(p:any,role:'bat'|'bowl'){
-   const pos=String(p?.position_name??p?.position?.name??'').toLowerCase();
-   let score=0;
-   if(p?.isPlayingXI) score+=1000;
-   if(role==='bat'&&(pos.includes('bat')||pos.includes('wicket'))) score+=300;
-   if(role==='bowl'&&(pos.includes('bowl')||pos.includes('all'))) score+=300;
-   return score;
- }
- private pick(all:any[],role:'bat'|'bowl',exclude?:number){const map=new Map<number,any>();for(const p of all){const id=Number(p?.player_id??p?.id);if(Number.isFinite(id)&&id>0&&id!==exclude)map.set(id,{...p,player_id:id});}const c=[...map.values()].sort((a,b)=>this.score(b,role)-this.score(a,role)||pname(a).localeCompare(pname(b)));return c[0]||null;}
+ private score(p:any,role:'bat'|'bowl'){const n=pname(p).toLowerCase(),list=role==='bat'?BATTERS:BOWLERS,i=list.findIndex(x=>n===x||n.includes(x)||x.includes(n));let s=i>=0?2000-i*5:0;const pos=String(p?.position_name??p?.position?.name??'').toLowerCase();if(p?.isPlayingXI)s+=500;if(role==='bat'&&(pos.includes('bat')||pos.includes('wicket')))s+=200;if(role==='bowl'&&(pos.includes('bowl')||pos.includes('all')))s+=200;return s;}
+ private pick(all:any[],role:'bat'|'bowl',exclude?:number){const map=new Map<number,any>();for(const p of all){const id=Number(p?.player_id??p?.id);if(Number.isFinite(id)&&id>0&&id!==exclude)map.set(id,{...p,player_id:id});}const c=[...map.values()].sort((a,b)=>this.score(b,role)-this.score(a,role));return c.find(p=>this.score(p,role)>=1950)||c[0]||null;}
  private questions(f:any,s:any):Q[]{const teams=arr(s?.teams),a=f.localteam??teams[0]??{id:f.localteam_id,name:'Home Team'},b=f.visitorteam??teams[1]??{id:f.visitorteam_id,name:'Away Team'};const ps=[...(teams[0]?.players??[]),...(teams[1]?.players??[]),...(f.lineup??[])].map((p:any)=>({...p,player_id:Number(p?.player_id??p?.id),team_id:Number(p?.team_id??p?.teamId??p?.team?.id),teamName:p?.teamName??p?.team?.name})).filter((p:any)=>Number.isFinite(p.player_id));const bat=this.pick(ps,'bat'),bowl=this.pick(ps,'bowl',bat?.player_id);const feat=(p:any)=>p?{id:Number(p.player_id),name:pname(p),teamId:Number(p.team_id),teamName:p.teamName??(Number(p.team_id)===Number(a.id??f.localteam_id)?a.name:b.name)}:null;return[
 {id:'match-winner',kind:'MATCH_WINNER',title:'Match Winner',prompt:'Who will win this match?',options:[{value:'LOCAL',label:String(a.name??'Home Team')},{value:'VISITOR',label:String(b.name??'Away Team')},{value:'DRAW',label:'Tie / No Result'}]},
 {id:'featured-bowler',kind:'BOWLER_WICKETS',title:(feat(bowl)?.name??'Featured bowler')+"'s Bowling Performance",prompt:'Will '+(feat(bowl)?.name??'this bowler')+' take 3 or more wickets in this match?',options:[{value:'YES',label:'YES'},{value:'NO',label:'NO'}],featuredPlayer:feat(bowl)},

@@ -10,7 +10,7 @@ const asList = (result: any) => Array.isArray(result) ? result : (result?.data ?
 const formatTime = (value: string) => new Date(value).toLocaleString('en-PK', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const hasStarted = (fixture: any) => { const start = new Date(fixture?.starting_at ?? '').getTime(); return Number.isFinite(start) && start <= Date.now(); };
 const statusText = (fixture: any, live = false) => live ? 'LIVE' : (fixture.applicationState ?? fixture.status ?? 'UPCOMING');
-const scoreText = (r: any) => `${r?.score ?? r?.total ?? 0}/${r?.wickets ?? 0} (${r?.overs ?? 0} ov)`;
+const scoreText = (r: any) => `${r?.score ?? 0}/${r?.wickets ?? 0} (${r?.overs ?? 0} ov)`;
 const isVoidFixture = (fixture: any) => fixture?.draw_noresult === true || ['abandoned', 'cancelled', 'canceled', 'no result', 'no-result', 'washout'].some((part) => String(fixture?.status ?? '').toLowerCase().includes(part));
 const isStaleNotStarted = (fixture: any) => { const start = new Date(fixture?.starting_at ?? '').getTime(); const status = String(fixture?.status ?? '').toLowerCase(); const ageExpired = Number.isFinite(start) && Date.now() - start >= 6 * 60 * 60 * 1000; const scheduledBeforeToday = Number.isFinite(start) && new Date(start).toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10); return (ageExpired || scheduledBeforeToday) && ['ns','scheduled','not started','upcoming'].some((value) => status === value || status.includes(value)); };
 const isCompletedFixture = (fixture: any) => String(fixture?.applicationState ?? '').toUpperCase() === 'COMPLETED' || isVoidFixture(fixture) || isStaleNotStarted(fixture);
@@ -28,12 +28,7 @@ const isLiveFixture = (fixture: any) => {
 };
 
 function MatchCard({ fixture, live, completed, teamSaved }: { fixture: any; live?: boolean; completed?: boolean; teamSaved?: boolean }) {
-  const runs =
-    Array.isArray(fixture.runs) && fixture.runs.length > 0
-      ? fixture.runs
-      : Array.isArray(fixture.scoreboards)
-        ? fixture.scoreboards
-        : [];
+  const runs = fixture.runs ?? fixture.scoreboards ?? [];
   const viewTeamHref = `/fantasy/view?fixtureId=${fixture.id}`;
   const hasSavedTeam = Boolean(teamSaved);
 
@@ -74,16 +69,8 @@ export default function MatchesPage() {
   async function refreshAll(spinner = false) {
     if (spinner) setLoading(true);
     try {
-      // Reconcile Live first. The backend checks live fixtures directly against
-      // Sportmonks' fixture status and projects newly finished matches into
-      // completedMatches, so the Completed tab sees the transition in the same
-      // refresh instead of waiting for a later poll/provider page update.
-      const liveResult = await api.liveMatches();
-      const [todayResult, upcomingResult, completedResult, teamsResult] = await Promise.all([
-        api.todayMatches(),
-        api.upcomingMatches(4),
-        api.completedMatches(14),
-        user ? api.myFantasyTeams().catch(() => []) : Promise.resolve([]),
+      const [liveResult, todayResult, upcomingResult, completedResult, teamsResult] = await Promise.all([
+        api.liveMatches(), api.todayMatches(), api.upcomingMatches(4), api.completedMatches(14), user ? api.myFantasyTeams().catch(() => []) : Promise.resolve([]),
       ]);
       const liveFeed = asList(liveResult);
       const todayFeed = asList(todayResult);
@@ -117,23 +104,7 @@ export default function MatchesPage() {
       const liveRows = rows
         .filter((row: any) => row?.active !== false && String(row?.applicationState ?? 'LIVE').toUpperCase() === 'LIVE')
         .sort((a: any, b: any) => new Date(a.starting_at ?? 0).getTime() - new Date(b.starting_at ?? 0).getTime());
-      setLive((current) => {
-        // Realtime is an accelerator, not the authority for the complete list.
-        // Keep API-discovered live fixtures when the Firestore projection is
-        // temporarily behind, and let the 15s API refresh remove completed ones.
-        const merged = new Map<number, any>();
-        for (const fixture of current) {
-          const id = Number(fixture?.id);
-          if (Number.isFinite(id)) merged.set(id, fixture);
-        }
-        for (const fixture of liveRows) {
-          const id = Number(fixture?.id);
-          if (Number.isFinite(id)) merged.set(id, fixture);
-        }
-        return [...merged.values()]
-          .filter((fixture: any) => !isVoidFixture(fixture) && !isCompletedFixture(fixture))
-          .sort((a: any, b: any) => new Date(a.starting_at ?? 0).getTime() - new Date(b.starting_at ?? 0).getTime());
-      });
+      setLive(liveRows);
     }, () => undefined);
     const timer = window.setInterval(() => void refreshAll(false), 15000);
     return () => {

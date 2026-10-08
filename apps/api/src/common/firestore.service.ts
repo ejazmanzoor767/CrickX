@@ -45,6 +45,8 @@ const COLLECTIONS: Record<string, string> = {
   fantasyTeamEditHistory: 'fantasyTeamEditHistory',
   leaderboardSnapshot: 'leaderboardSnapshots',
   playerFixtureCredit: 'playerFixtureCredits',
+  cachedFixture: 'cachedFixtures',
+  cachedPlayer: 'cachedPlayers',
 };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -481,6 +483,8 @@ export class FirestoreService {
   readonly fantasyTeamEditHistory: Delegate;
   readonly leaderboardSnapshot: Delegate;
   readonly playerFixtureCredit: Delegate;
+  readonly cachedFixture: Delegate;
+  readonly cachedPlayer: Delegate;
 
   constructor(postgres: PostgresService) {
     this.postgres = postgres;
@@ -504,6 +508,8 @@ export class FirestoreService {
     this.fantasyTeamEditHistory = this.delegate('fantasyTeamEditHistory');
     this.leaderboardSnapshot = this.delegate('leaderboardSnapshot');
     this.playerFixtureCredit = this.delegate('playerFixtureCredit');
+    this.cachedFixture = this.delegate('cachedFixture');
+    this.cachedPlayer = this.delegate('cachedPlayer');
   }
 
   private primaryEnabled() {
@@ -566,6 +572,8 @@ export class FirestoreService {
     if (typeof where.id === 'string') return where.id;
     if (model === 'transaction' && where.idempotencyKey !== undefined) return this.stableKeyId(where.idempotencyKey);
     if (model === 'refreshToken' && where.tokenHash !== undefined) return this.stableKeyId(where.tokenHash);
+    if (model === 'cachedFixture' && where.sportmonksFixtureId !== undefined) return String(where.sportmonksFixtureId);
+    if (model === 'cachedPlayer' && where.sportmonksPlayerId !== undefined) return String(where.sportmonksPlayerId);
     if (model === 'wallet' && where.userId !== undefined) return String(where.userId);
     return null;
   }

@@ -70,7 +70,7 @@ const feed = (path: string, params?: Record<string, string | number>) => {
   const query = params
     ? `?${new URLSearchParams(Object.entries(params).map(([key, value]) => [key, String(value)]))}`
     : '';
-  return apiFetch(`/matches${path}${query}`, { cache: 'no-store' });
+  return apiFetch(`/matches${path}${query}`);
 };
 
 const leaderboard = (path: string, params?: Record<string, string | number>) => {
