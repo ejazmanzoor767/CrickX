@@ -281,10 +281,12 @@ export class MatchesService {
         );
       }
 
-      // Do not label an unverified fixture as completed. This prevents a
-      // transient provider omission from moving a match out of both Live and
-      // Completed until Sportmonks exposes its terminal state.
-      batch.set(doc.ref, { active: false, applicationState: 'UPCOMING', updatedAt: now }, { merge: true });
+      // A transient provider omission must not create a gap between Live and
+      // Completed. Keep the existing projection active and let the next poll
+      // re-check the fixture directly with Sportmonks until a terminal state
+      // is confirmed. This prevents a match from disappearing for hours when
+      // /livescores drops it slightly before the fixture endpoint says Finish.
+      batch.set(doc.ref, { active: true, applicationState: 'LIVE', updatedAt: now }, { merge: true });
       changed = true;
     }
 
