@@ -244,8 +244,11 @@ export class MatchesService {
       if (!Number.isFinite(fixtureId)) continue;
 
       // Disable stale realtime documents for fixtures that are no longer
-      // allowlisted. They must not survive in the Live Firestore feed.
-      if (!this.sportmonks.isFixtureAllowed(fixtureId)) {
+      // allowlisted or that use a blocked red-ball format.
+      if (
+        !this.sportmonks.isFixtureAllowed(fixtureId) ||
+        !this.sportmonks.isFixtureFormatAllowed({ type: String(doc.data()?.type ?? '') })
+      ) {
         batch.set(doc.ref, { active: false, updatedAt: now }, { merge: true });
         changed = true;
         continue;
