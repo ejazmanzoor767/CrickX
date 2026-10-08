@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, Get, Post, Query, Req, UseGuards
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { WalletService } from './wallet.service';
-import { InitiateDepositDto, RequestWithdrawalDto, ConfirmCheckoutDepositDto, EarlyBuyCheckoutDto } from './dto';
+import { EarlyBuyCheckoutDto } from './dto';
 
 @Controller('wallet')
 @UseGuards(JwtAuthGuard)
@@ -25,18 +25,6 @@ export class WalletController {
     return this.wallet.listTransactions(this.uid(req), value);
   }
 
-  @Post('deposits')
-  deposit(@Req() req: Request, @Body() dto: InitiateDepositDto) {
-    return this.wallet.initiateDeposit(this.uid(req), dto.amount, dto.paymentGateway);
-  }
-
-  @Post('deposits/confirm')
-  confirmDeposit(@Req() req: Request, @Body() dto: ConfirmCheckoutDepositDto) {
-    return this.wallet.confirmDepositFromCheckout(
-      this.uid(req), dto.depositId, dto.razorpayPaymentId, dto.razorpayOrderId, dto.razorpaySignature,
-    );
-  }
-
   @Post('early-buy/checkout')
   earlyBuyCheckout(@Req() req: Request, @Body() dto: EarlyBuyCheckoutDto) {
     return this.wallet.earlyBuyCheckout(this.uid(req), dto.amountUsd, dto.walletAddress);
@@ -48,8 +36,5 @@ export class WalletController {
     return this.wallet.earlyBuyPaymentStatus(this.uid(req), order);
   }
 
-  @Post('withdrawals')
-  withdraw(@Req() req: Request, @Body() dto: RequestWithdrawalDto) {
-    return this.wallet.requestWithdrawal(this.uid(req), dto.amount, dto.bankAccountLast4);
-  }
+
 }
