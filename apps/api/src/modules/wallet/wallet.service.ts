@@ -15,6 +15,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { polygon } from 'viem/chains';
 import { FirestoreService, FirestoreDecimal } from '../../common/firestore.service';
+import { OxaPayService } from '../subscription/oxapay.service';
 
 export type BalanceBucket = 'DEPOSIT' | 'WINNINGS' | 'BONUS';
 
@@ -41,6 +42,7 @@ export class WalletService {
   constructor(
     private readonly prisma: FirestoreService,
     private readonly config: ConfigService,
+    private readonly oxapay: OxaPayService,
   ) {
     this.rpcUrl = this.config.get<string>('POLYGON_RPC_URL') || 'https://polygon-rpc.com';
     const token = this.config.get<string>('CRX_TOKEN_ADDRESS')?.trim();
