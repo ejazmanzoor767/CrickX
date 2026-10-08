@@ -99,7 +99,8 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
             return <div className="card" key={`team-${teamId}-missing-${teamInningIndex}`} style={{ padding: 'clamp(12px, 3vw, 18px)', background: 'rgba(255,255,255,.018)' }}>
               <p className="eyebrow">{teamLabel}</p>
               <h3 style={{ margin: '4px 0 0', fontFamily: 'Barlow Condensed', fontSize: 24 }}>{team?.name ?? 'Team'}</h3>
-              <p className="section-subtitle" style={{ margin: '8px 0 0' }}>This innings has not started yet.</p>
+              <strong style={{ display: 'block', marginTop: 8, fontFamily: 'Barlow Condensed', fontSize: 24, textTransform: 'uppercase' }}>Yet to bat</strong>
+              <p className="section-subtitle" style={{ margin: '4px 0 0' }}>This innings has not started yet.</p>
             </div>;
           }
           const score = Number(run?.score ?? 0);
