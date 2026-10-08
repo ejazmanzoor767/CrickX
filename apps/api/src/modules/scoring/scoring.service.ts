@@ -504,7 +504,8 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     }
   }
   async scoreFixture(fixtureId: number) {
-    const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+    // Live scoring must come from Sportmonks livescores, not /fixtures/{id}.
+    const fixture = await this.sportmonks.getLiveFixture(fixtureId);
     const batting = fixture.batting ?? [];
     const bowling = fixture.bowling ?? [];
     const balls = fixture.balls ?? [];
