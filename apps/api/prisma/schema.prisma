@@ -2,26 +2,10 @@
 // Fantasy Cricket — Application Database Schema
 //
 // SOURCE OF TRUTH RULE:
-//   This database owns USER data only: accounts, auth, fantasy teams,
-//   contests, entries, wallet, transactions, scoring config, leaderboards.
+//   The database owns application/user data and only stores Sportmonks IDs as
+//   references. Cricket fixture/player/score data is fetched live from
+//   Sportmonks and is never persisted as an application cache.
 //
-//   Cricket data (fixtures, teams, players, scores, stats, ball-by-ball)
-//   is NEVER duplicated here. We only store the Sportmonks numeric IDs
-//   (sportmonksFixtureId, sportmonksPlayerId, sportmonksTeamId, etc.) as
-//   foreign references, plus a thin, short-TTL cache table used purely to
-//   reduce API calls — never as a system of record. See CachedFixture /
-//   CachedPlayer below and apps/api/src/modules/sportmonks/README.md.
-// ============================================================================
-
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 // ---------------------------------------------------------------------------
 // Users & Auth
 // ---------------------------------------------------------------------------
@@ -493,24 +477,3 @@ model PlayerFixtureCredit {
   @@index([sportmonksFixtureId])
 }
 
-// ---------------------------------------------------------------------------
-// Thin Sportmonks cache (performance only — short TTL, never authoritative)
-// ---------------------------------------------------------------------------
-
-model CachedFixture {
-  sportmonksFixtureId Int      @id
-  payload             Json     // raw/trimmed Sportmonks fixture response incl. requested includes
-  fetchedAt            DateTime @updatedAt
-  expiresAt            DateTime
-
-  @@index([expiresAt])
-}
-
-model CachedPlayer {
-  sportmonksPlayerId Int      @id
-  payload            Json
-  fetchedAt          DateTime @updatedAt
-  expiresAt          DateTime
-
-  @@index([expiresAt])
-}
