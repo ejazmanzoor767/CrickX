@@ -1016,7 +1016,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         for (const fixtureId of fixtureIds) {
           if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
           try {
-            const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+            const fixture = await this.sportmonks.getLiveFixture(fixtureId);
             if (isFinished(fixture.status, fixture.live)) continue;
             // Funding is independent of Firestore-based player scoring.
             // Run it first so a Firestore quota incident cannot strand CRX.
@@ -1065,7 +1065,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       for (const fixtureId of fixtureIds) {
         if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
         try {
-          const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+          const fixture = await this.sportmonks.getLiveFixture(fixtureId);
           if (isFinished(fixture.status, fixture.live)) {
             continue;
           }
