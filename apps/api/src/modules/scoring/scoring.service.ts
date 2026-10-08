@@ -554,9 +554,9 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     const formatRules = rulesForFormat(fixture.type);
     const userFixtureScores = new Map<string, number>();
 
-    // Every saved fantasy team is a leaderboard participant, including before
-    // the first player-stat payload arrives. A zero score is a real placeholder
-    // until Sportmonks provides player statistics, rather than omitting the user.
+    // Every saved fantasy team remains visible on the leaderboard before the
+    // first player-stat payload arrives. Zero is the correct initial score until
+    // Sportmonks provides the corresponding player statistics.
     for (const team of fantasyTeams) {
       const scored = (batting.length || bowling.length || balls.length)
         ? this.calculateTeamScore(team, battingByPlayer, bowlingByPlayer, fieldingByPlayer, dotBallsByPlayer, formatRules, fixture.winner_team_id, fixture.man_of_match_id)
