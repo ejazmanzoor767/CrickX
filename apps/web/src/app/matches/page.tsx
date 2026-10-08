@@ -123,10 +123,9 @@ export default function MatchesPage() {
   const visible = tab === 'LIVE' ? live : tab === 'UPCOMING' ? nextFour : completedMine;
 
   return <section className="app-page match-centre-page">
-    <div className="page-intro match-centre-intro"><div><p className="eyebrow">CRICKX MATCHES</p><h1 className="section-title">Match centre</h1><p className="section-subtitle">Live scores, upcoming fixtures and your completed matches in one place.</p></div></div>
+    <div className="page-intro match-centre-intro"><div><p className="eyebrow">CRICKX MATCHES</p><h1 className="section-title">Match centre</h1><p className="section-subtitle">Live scores, upcoming fixtures and completed matches in one place.</p></div></div>
     <div className="card match-centre-tabs" style={{padding:8}}><div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>{(['LIVE','UPCOMING','COMPLETED'] as const).map((value) => <button key={value} className={tab===value?'primary-button':'secondary-button'} onClick={() => setTab(value)} style={{minHeight:46}}>{value}<span style={{marginLeft:6,opacity:.7}}>{value==='LIVE'?live.length:value==='UPCOMING'?nextFour.length:completed.length}</span></button>)}</div></div>
     {error && <div className="card"><p className="error-text">{error}</p></div>}
-    {tab === 'COMPLETED' && !user && <div className="card empty-state"><strong>Sign in to see completed matches and stats.</strong><Link className="primary-button" href="/login">Sign in</Link></div>}
     {loading ? <div className="card skeleton-card">Loading match centre…</div> : visible.length === 0 ? <div className="card empty-state"><strong>{tab==='LIVE'?'No matches are live right now.':tab==='UPCOMING'?'No upcoming fantasy matches found.':'No completed matches yet.'}</strong><span>{tab==='LIVE'?'Live cards will appear automatically when play begins.':tab==='UPCOMING'?'Upcoming matches are kept separate from live play.':'Completed matches show the final result, leaderboard and stats.'}</span>{tab==='UPCOMING' && <Link className="primary-button" href="/fantasy-home">Open Fantasy</Link>}</div> : <div className="match-list">{visible.map((fixture) => <MatchCard key={fixture.id} fixture={fixture} live={tab==='LIVE'} completed={tab==='COMPLETED'} teamSaved={savedTeamFixtureIds.has(Number(fixture.id))} />)}</div>}
   </section>;
 }
