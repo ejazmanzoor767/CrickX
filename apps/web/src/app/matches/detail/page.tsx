@@ -12,17 +12,7 @@ const oversText = (value: any) => num(value) === null ? '—' : String(value);
 const ballsFromOvers = (value: any) => { const o = num(value); if (o === null) return 0; const whole = Math.floor(o); const part = Math.round((o - whole) * 10); return whole * 6 + Math.min(Math.max(part, 0), 5); };
 const playerName = (row: any, lineup: any[]) => row?.batsman?.fullname ?? row?.bowler?.fullname ?? row?.player?.fullname ?? row?.fullname ?? lineup.find((p: any) => Number(p?.player_id ?? p?.id) === Number(row?.player_id ?? row?.batsman_id ?? row?.bowling_player_id))?.fullname ?? `Player ${row?.player_id ?? row?.batsman_id ?? row?.bowling_player_id ?? '—'}`;
 const teamName = (fixture: any, teamId: number) => Number(teamId) === Number(fixture.localteam_id) ? (fixture.localteam?.name ?? 'Home') : (fixture.visitorteam?.name ?? 'Away');
-const isLive = (fixture: any) => {
-  const state = String(fixture?.applicationState ?? '').toUpperCase();
-  if (state === 'LIVE') return true;
-  if (state === 'COMPLETED') return false;
-  const status = String(fixture?.status ?? '').toLowerCase();
-  if (Number(fixture?.live) === 1 || /live|innings break|lunch|tea|stumps|in progress/i.test(status)) return true;
-  const start = new Date(fixture?.starting_at ?? '').getTime();
-  const started = Number.isFinite(start) && start <= Date.now();
-  const postponed = /postponed|cancelled|canceled|abandoned|no result|washout/i.test(status);
-  return started && !postponed;
-};
+const isLive = (fixture: any) => Number(fixture?.live) === 1 || /live|innings break|lunch|tea|stumps/i.test(String(fixture?.status ?? ''));
 
 function ScoreTable({ title, data, empty, children }: { title: string; data: any[]; empty: string; children: (items: any[]) => ReactNode }) {
   return <div className="card" style={{ padding: 0, overflow: 'hidden' }}><div style={{ padding: '18px 20px 10px' }}><p className="eyebrow">{title}</p></div>{data.length ? <div style={{ overflowX: 'auto' }}>{children(data)}</div> : <p className="section-subtitle" style={{ padding: '0 20px 20px', margin: 0 }}>{empty}</p>}</div>;
@@ -68,32 +58,11 @@ function MatchDetailContent() {
 
   const local = fixture.localteam ?? {};
   const away = fixture.visitorteam ?? {};
-  const rawRuns = rows(fixture.runs);
-  const rawScoreboards = rows(fixture.scoreboards);
-  const scoreboardRuns = rawScoreboards
-    .filter((row: any) => {
-      const type = String(row?.type ?? '').toLowerCase();
-      const score = num(row?.score ?? row?.total);
-      return !['extra', 'extras'].includes(type) &&
-        Number.isFinite(Number(row?.team_id)) &&
-        (score !== null || num(row?.overs) !== null || num(row?.wickets) !== null);
-    })
-    .map((row: any) => ({
-      ...row,
-      inning: row?.inning ?? row?.score_id ?? row?.scoreboard,
-      score: num(row?.score) ?? num(row?.total) ?? 0,
-      wickets: num(row?.wickets) ?? 0,
-      overs: row?.overs ?? 0,
-    }));
-  // Sportmonks may expose the current live innings in scoreboards before the
-  // normalized runs collection is populated. Treat either source as a valid
-  // score source so the scorecard never gets stuck at 0/0 while live data exists.
-  const runs = (rawRuns.length ? rawRuns : scoreboardRuns)
-    .sort((a: any, b: any) => Number(a.inning ?? 0) - Number(b.inning ?? 0));
+  const runs = rows(fixture.runs).sort((a: any, b: any) => Number(a.inning ?? 0) - Number(b.inning ?? 0));
   const batting = rows(fixture.batting);
   const bowling = rows(fixture.bowling);
   const lineup = rows(fixture.lineup);
-  const scoreboards = rawScoreboards;
+  const scoreboards = rows(fixture.scoreboards);
   const balls = rows(fixture.balls);
   const live = isLive(fixture);
   const currentInning = runs.length ? runs[runs.length - 1] : null;

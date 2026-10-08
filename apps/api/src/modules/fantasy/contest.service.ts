@@ -12,16 +12,6 @@ import { PostgresContestError, PostgresService } from '../../common/postgres.ser
 
 const SIGNATURE_WINDOW_SECONDS = 300;
 
-function providerLiveState(fixture: any) {
-  const status = String(fixture?.status ?? '').toLowerCase();
-  const startingAtMs = new Date(fixture?.starting_at ?? '').getTime();
-  const started = !Number.isFinite(startingAtMs) || Date.now() >= startingAtMs;
-  const terminal = status.includes('finish') || status.includes('complete') || status.includes('abandon') || status.includes('cancel');
-  const explicitLive = ['live', 'in progress', 'innings break', 'lunch', 'tea', 'stumps']
-    .some((value) => status === value || status.includes(value));
-  return { started, terminal, explicitLive };
-}
-
 @Injectable()
 export class ContestService implements OnModuleInit {
   private readonly logger = new Logger(ContestService.name);
@@ -283,6 +273,7 @@ export class ContestService implements OnModuleInit {
 
     if (!contest) {
       if (!fixtureForClock) fixtureForClock = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+      fixtureForClock = await this.sportmonks.getFixture(fixtureId);
       const providerStatus = String(fixtureForClock.status ?? '').toLowerCase();
       const providerFinished = providerStatus.includes('finish') || providerStatus.includes('abandon') || providerStatus.includes('cancel');
       if (providerFinished) throw new ForbiddenException('This match has already finished or been cancelled, so entries cannot be opened.');
@@ -479,14 +470,6 @@ export class ContestService implements OnModuleInit {
     if (!contest) throw new NotFoundException('Contest not found.');
     if (contest.status === 'COMPLETED' || contest.status === 'CANCELLED') throw new ForbiddenException('Contest is already closed.');
 
-    // Never rely on the client calling /prepare first. Re-check the authoritative
-    // Sportmonks fixture immediately before accepting the signed entry.
-    const liveFixture = await this.sportmonks.getFixture(contest.sportmonksFixtureId, { forceLive: true });
-    const liveState = providerLiveState(liveFixture);
-    if (liveState.terminal || liveState.started || liveState.explicitLive) {
-      throw new ForbiddenException('Entries are closed because the match has started or finished.');
-    }
-
     const lockMs = new Date((contest as any).lineupLockAt).getTime();
     if (Number.isFinite(lockMs) && Date.now() >= lockMs) {
       throw new ForbiddenException('Entries are closed because the match has started.');
@@ -588,10 +571,6 @@ export class ContestService implements OnModuleInit {
       const currentContest = await tx.contest.findUnique({ where: { id: contest.id } });
       if (!currentContest) throw new NotFoundException('Contest not found.');
       if (currentContest.status === 'COMPLETED' || currentContest.status === 'CANCELLED') throw new ForbiddenException('Contest is already closed.');
-      const currentLockMs = new Date((currentContest as any).lineupLockAt).getTime();
-      if (Number.isFinite(currentLockMs) && Date.now() >= currentLockMs) {
-        throw new ForbiddenException('Entries are closed because the match has started.');
-      }
 
       const currentCount = Number(currentContest.filledSpots || 0);
       // Read the current Neon records before applying the transaction writes.

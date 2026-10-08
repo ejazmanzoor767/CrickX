@@ -82,12 +82,8 @@ export class JwtAuthGuard implements CanActivate {
       // application source of truth. Ensure every authenticated Firebase user
       // has the corresponding application user/profile/wallet records in Neon.
       let user = await this.prisma.user.findUnique({ where: { id: decoded.uid } });
-      const userMatchedByEmail = !user;
       if (!user) {
         user = await this.prisma.user.findFirst({ where: { email } });
-        if (user && user.id !== decoded.uid && !decoded.email_verified) {
-          throw new UnauthorizedException('Verify your Firebase email before linking this existing CrickX account.');
-        }
       }
 
       const now = new Date();
@@ -122,18 +118,10 @@ export class JwtAuthGuard implements CanActivate {
           });
         } catch {
           // A concurrent first request may have created the same user.
-          user = await this.prisma.user.findUnique({ where: { id: decoded.uid } });
-          const fallbackByEmail = user ? null : await this.prisma.user.findFirst({ where: { email } });
-          if (!user && fallbackByEmail && fallbackByEmail.id !== decoded.uid && !decoded.email_verified) {
-            throw new UnauthorizedException('Verify your Firebase email before linking this existing CrickX account.');
-          }
-          user = user ?? fallbackByEmail;
+          user = await this.prisma.user.findUnique({ where: { id: decoded.uid } })
+            ?? await this.prisma.user.findFirst({ where: { email } });
           if (!user) throw new UnauthorizedException('Unable to initialize your CrickX account.');
         }
-      }
-
-      if (userMatchedByEmail && user.id !== decoded.uid && !decoded.email_verified) {
-        throw new UnauthorizedException('Verify your Firebase email before linking this existing CrickX account.');
       }
 
       if (user.status === 'SUSPENDED' || user.status === 'BANNED') {

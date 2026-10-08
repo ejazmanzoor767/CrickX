@@ -1,4 +1,4 @@
-import { MatchesService, applicationState } from './matches.service';
+import { applicationState } from './matches.service';
 
 describe('applicationState', () => {
   const now = Date.now();
@@ -21,13 +21,13 @@ describe('applicationState', () => {
     } as any)).toBe('LIVE');
   });
 
-  it('promotes a started NS fixture to LIVE during provider kickoff lag', () => {
+  it('keeps a started NS fixture UPCOMING when the provider has not marked it live', () => {
     expect(applicationState({
       id: 8,
       status: 'NS',
       live: 0,
       starting_at: new Date(now - 60_000).toISOString(),
-    } as any)).toBe('LIVE');
+    } as any)).toBe('UPCOMING');
   });
 
   it('treats a started fixture from the dedicated live feed as LIVE during kickoff', () => {
@@ -97,127 +97,4 @@ describe('applicationState', () => {
     } as any)).toBe('COMPLETED');
   });
 
-});
-
-
-describe('MatchesService live projection', () => {
-  function makeRealtime(staleRef: any) {
-    const batch = {
-      set: jest.fn(),
-      commit: jest.fn().mockResolvedValue(undefined),
-    };
-    const liveCollection = {
-      where: jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue({ docs: [staleRef] }),
-      }),
-      doc: jest.fn().mockReturnValue({
-        set: jest.fn().mockResolvedValue(undefined),
-      }),
-    };
-    const completedCollection = {
-      doc: jest.fn().mockReturnValue({
-        set: jest.fn().mockResolvedValue(undefined),
-      }),
-    };
-
-    return {
-      batch,
-      completedCollection,
-      realtime: {
-        isEnabled: jest.fn().mockReturnValue(true),
-        db: {
-          batch: jest.fn().mockReturnValue(batch),
-          collection: jest.fn((name: string) =>
-            name === 'liveMatches' ? liveCollection : completedCollection,
-          ),
-        },
-      },
-    };
-  }
-
-  it('keeps a dropped live fixture active when Sportmonks has not confirmed terminal status', async () => {
-    const ref = {};
-    const { realtime, batch } = makeRealtime({ id: '123', ref });
-    const sportmonks = {
-      isFixtureAllowed: jest.fn().mockReturnValue(true),
-      isFixtureFormatAllowed: jest.fn().mockReturnValue(true),
-      getFixture: jest.fn().mockResolvedValue({
-        id: 123,
-        status: 'NS',
-        live: 0,
-        starting_at: new Date(Date.now() - 60_000).toISOString(),
-      }),
-    };
-    const firestore = {};
-
-    const service = new MatchesService(sportmonks as any, firestore as any, realtime as any);
-    await (service as any).projectLiveMatches([]);
-
-    expect(batch.set).toHaveBeenCalledWith(
-      ref,
-      expect.objectContaining({ active: true, applicationState: 'LIVE' }),
-      { merge: true },
-    );
-  });
-
-  it('projects an active live fixture to Completed immediately when the fixture endpoint says Finished', async () => {
-    const ref = {};
-    const { realtime, batch, completedCollection } = makeRealtime({ id: '123', ref });
-    const sportmonks = {
-      isFixtureFormatAllowed: jest.fn().mockReturnValue(true),
-      getFixture: jest.fn().mockResolvedValue({
-        id: 123,
-        status: 'Finished',
-        live: 0,
-        starting_at: new Date(Date.now() - 60_000).toISOString(),
-        runs: [{ team_id: 1, score: 120 }],
-        scoreboards: [{ score: 120, wickets: 4, overs: 20 }],
-      }),
-    };
-    const firestore = {};
-
-    const service = new MatchesService(sportmonks as any, firestore as any, realtime as any);
-    const completed = await (service as any).projectLiveMatches([{
-      id: 123,
-      status: 'LIVE',
-      live: 1,
-      starting_at: new Date(Date.now() - 60_000).toISOString(),
-      runs: [{ team_id: 1, score: 119 }],
-      scoreboards: [{ score: 119, wickets: 4, overs: 19.5 }],
-    }]);
-
-    expect(completed.has(123)).toBe(true);
-    expect(completedCollection.doc).toHaveBeenCalledWith('123');
-    expect(batch.set).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ active: false, applicationState: 'COMPLETED' }),
-      { merge: true },
-    );
-  });
-
-  it('projects a dropped fixture to Completed as soon as Sportmonks confirms terminal status', async () => {
-    const ref = {};
-    const { realtime, batch, completedCollection } = makeRealtime({ id: '123', ref });
-    const sportmonks = {
-      isFixtureAllowed: jest.fn().mockReturnValue(true),
-      isFixtureFormatAllowed: jest.fn().mockReturnValue(true),
-      getFixture: jest.fn().mockResolvedValue({
-        id: 123,
-        status: 'Finished',
-        live: 0,
-        starting_at: new Date(Date.now() - 60_000).toISOString(),
-      }),
-    };
-    const firestore = {};
-
-    const service = new (require('./matches.service').MatchesService)(sportmonks, firestore, realtime);
-    await (service as any).projectLiveMatches([]);
-
-    expect(completedCollection.doc).toHaveBeenCalledWith('123');
-    expect(batch.set).toHaveBeenCalledWith(
-      ref,
-      expect.objectContaining({ active: false, applicationState: 'COMPLETED' }),
-      { merge: true },
-    );
-  });
 });

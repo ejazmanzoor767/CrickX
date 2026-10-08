@@ -26,15 +26,6 @@ function isFirestoreQuotaError(error: unknown) {
   return /RESOURCE_EXHAUSTED|Quota exceeded/i.test(message);
 }
 
-function compareRankedEntries(a: any, b: any) {
-  const points = Number(b?.totalPoints ?? 0) - Number(a?.totalPoints ?? 0);
-  if (points !== 0) return points;
-  const aCreated = new Date(a?.createdAt ?? 0).getTime();
-  const bCreated = new Date(b?.createdAt ?? 0).getTime();
-  if (Number.isFinite(aCreated) && Number.isFinite(bCreated) && aCreated !== bCreated) return aCreated - bCreated;
-  return String(a?.id ?? '').localeCompare(String(b?.id ?? ''));
-}
-
 function isActuallyLive(fixture: any) {
   const value = String(fixture?.status ?? '').trim().toLowerCase();
   const live: 0 | 1 = Number(fixture?.live) === 1 ? 1 : 0;
@@ -55,21 +46,10 @@ function isActuallyLive(fixture: any) {
     const balls = Array.isArray(fixture?.balls) ? fixture.balls : [];
     const batting = Array.isArray(fixture?.batting) ? fixture.batting : [];
     const bowling = Array.isArray(fixture?.bowling) ? fixture.bowling : [];
-    const scoreboards = Array.isArray(fixture?.scoreboards) ? fixture.scoreboards : [];
-    const runs = Array.isArray(fixture?.runs) ? fixture.runs : [];
-
-    // During kickoff Sportmonks can leave status=NS/live=0 briefly. Once the
-    // scheduled start has passed, treat the fixture as live for scoring when
-    // live evidence or any scoreboard/run/ball data has arrived.
-    return (
-      started && (
-        live ||
-        balls.length > 0 ||
-        runs.length > 0 ||
-        scoreboards.length > 0 ||
-        batting.some((row: any) => Number(row?.score ?? row?.runs ?? row?.runs_scored ?? 0) > 0) ||
-        bowling.some((row: any) => Number(row?.wickets ?? row?.wicket ?? 0) > 0)
-      )
+    return live && (
+      balls.length > 0 ||
+      batting.some((row: any) => Number(row?.score ?? row?.runs ?? row?.runs_scored ?? 0) > 0) ||
+      bowling.some((row: any) => Number(row?.wickets ?? row?.wicket ?? 0) > 0)
     );
   }
 
@@ -160,10 +140,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
 
         try {
-          const fixture = await this.sportmonks.getFixture(fixtureId, {
-      forceLive: true,
-      allowUnlistedLeague: true,
-    });
+          const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
           if (!isFinished(fixture.status, fixture.live)) continue;
 
           this.logger.log(
@@ -504,8 +481,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     }
   }
   async scoreFixture(fixtureId: number) {
-    // Live scoring must come from Sportmonks livescores, not /fixtures/{id}.
-    const fixture = await this.sportmonks.getLiveFixture(fixtureId);
+    const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
     const batting = fixture.batting ?? [];
     const bowling = fixture.bowling ?? [];
     const balls = fixture.balls ?? [];
@@ -578,9 +554,9 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     const formatRules = rulesForFormat(fixture.type);
     const userFixtureScores = new Map<string, number>();
 
-    // Every saved fantasy team remains visible on the leaderboard before the
-    // first player-stat payload arrives. Zero is the correct initial score until
-    // Sportmonks provides the corresponding player statistics.
+    // Every saved fantasy team is a leaderboard participant, including before
+    // the first player-stat payload arrives. A zero score is a real placeholder
+    // until Sportmonks provides player statistics, rather than omitting the user.
     for (const team of fantasyTeams) {
       const scored = (batting.length || bowling.length || balls.length)
         ? this.calculateTeamScore(team, battingByPlayer, bowlingByPlayer, fieldingByPlayer, dotBallsByPlayer, formatRules, fixture.winner_team_id, fixture.man_of_match_id)
@@ -618,7 +594,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         if (scored.total > previous) userFixtureScores.set(entry.userId, scored.total);
       }
 
-      const ranked = await this.prisma.contestEntry.findMany({ where: { contestId: contest.id }, orderBy: [{ totalPoints: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }] });
+      const ranked = await this.prisma.contestEntry.findMany({ where: { contestId: contest.id }, orderBy: { totalPoints: 'desc' } });
       await this.prisma.$transaction(ranked.map((entry, index) => this.prisma.contestEntry.update({ where: { id: entry.id }, data: { rank: index + 1 } })));
       if (this.postgres.isEnabled()) {
         for (const [index, entry] of ranked.entries()) {
@@ -804,7 +780,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
     const ranked = await this.prisma.contestEntry.findMany({
       where: { contestId },
-      orderBy: [{ totalPoints: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      orderBy: { totalPoints: 'desc' },
     });
 
     await this.prisma.$transaction(
@@ -851,7 +827,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
       const rankedEntries = [...(contest.entries ?? [])]
         .filter((entry: any) => entry.walletAddress && entry.totalPoints !== null && entry.totalPoints !== undefined)
-        .sort(compareRankedEntries);
+        .sort((a: any, b: any) => Number(b.totalPoints) - Number(a.totalPoints));
 
       if (rankedEntries.length === 0) {
         this.logger.warn(`Contest ${contestId} has no scored entries; postponing on-chain settlement.`);
@@ -1016,7 +992,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         for (const fixtureId of fixtureIds) {
           if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
           try {
-            const fixture = await this.sportmonks.getLiveFixture(fixtureId);
+            const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
             if (isFinished(fixture.status, fixture.live)) continue;
             // Funding is independent of Firestore-based player scoring.
             // Run it first so a Firestore quota incident cannot strand CRX.
@@ -1065,7 +1041,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       for (const fixtureId of fixtureIds) {
         if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
         try {
-          const fixture = await this.sportmonks.getLiveFixture(fixtureId);
+          const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
           if (isFinished(fixture.status, fixture.live)) {
             continue;
           }

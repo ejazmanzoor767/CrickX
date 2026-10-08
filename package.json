@@ -15,7 +15,6 @@
     "@walletconnect/utils": "2.25.0",
     "postcss": "8.5.23",
     "@wagmi/connectors": "6.2.0",
-    "@grpc/grpc-js": "1.14.5",
-    "next": "15.5.27"
+    "@grpc/grpc-js": "1.14.5"
   }
 }
