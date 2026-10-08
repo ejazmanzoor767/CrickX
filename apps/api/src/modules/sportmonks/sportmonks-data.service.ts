@@ -137,6 +137,33 @@ export class SportmonksDataService {
     return this.filterFixtureEnvelope(envelope);
   }
 
+  async listFixturesByDate(date: string) {
+    const rows: SportmonksFixture[] = [];
+    let page = 1;
+    let totalPages = 1;
+    let lastEnvelope: any = null;
+
+    do {
+      const envelope = await this.client.get<SportmonksFixture[]>(
+        `/fixtures/date/${date}`,
+        {
+          include: 'localteam,visitorteam,venue,league,season,stage,runs,scoreboards,tosswon',
+          page,
+        },
+      );
+      lastEnvelope = envelope;
+      const filtered = this.filterFixtureEnvelope(envelope);
+      rows.push(...(filtered.data ?? []));
+      totalPages = Math.max(1, Number(filtered.meta?.pagination?.total_pages ?? page));
+      page += 1;
+    } while (page <= totalPages);
+
+    return {
+      ...(lastEnvelope ?? { data: [] }),
+      data: rows,
+    };
+  }
+
   async listLiveFixtures() {
     // Cricket API 2.0's /livescores feed is the compatible live source for
     // this Sportmonks account. It contains the current day's live/in-play
@@ -193,15 +220,40 @@ export class SportmonksDataService {
 
   async getLiveDetail(fixtureId: number): Promise<SportmonksFixture> {
     try {
-      const liveEnvelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
-      const liveFixture = (liveEnvelope.data ?? []).find((fixture) => Number(fixture.id) === Number(fixtureId));
-      if (liveFixture) return this.getFixture(fixtureId, { forceLive: true });
+      // Sportmonks recommends /livescores for live fixtures. Use the current
+      // provider payload so runs/batting/bowling/balls are not replaced by a
+      // stale fixture-by-id snapshot during live play.
+      const liveEnvelope = await this.client.get<SportmonksFixture[]>(
+        '/livescores',
+        { include: LIVE_FIXTURE_INCLUDES },
+      );
+      const liveFixture = (liveEnvelope.data ?? []).find(
+        (fixture) => Number(fixture.id) === Number(fixtureId),
+      );
+      if (liveFixture) {
+        const normalized = normalizeFixture(liveFixture);
+        if (this.isFixtureFormatAllowed(normalized)) return normalized;
+      }
     } catch {
-      const bareEnvelope = await this.client.get<SportmonksFixture[]>('/livescores');
-      const bareFixture = (bareEnvelope.data ?? []).find((fixture) => Number(fixture.id) === Number(fixtureId));
-      if (bareFixture) return this.getFixture(fixtureId, { forceLive: true });
+      // Some Sportmonks plans may reject the full relationship set. Retry
+      // with the score-focused live payload before falling back to history.
+      try {
+        const scoreEnvelope = await this.client.get<SportmonksFixture[]>(
+          '/livescores',
+          { include: LIVE_SCORECARD_INCLUDES },
+        );
+        const scoreFixture = (scoreEnvelope.data ?? []).find(
+          (fixture) => Number(fixture.id) === Number(fixtureId),
+        );
+        if (scoreFixture) return normalizeFixture(scoreFixture);
+      } catch {
+        // The historical fixture fallback below remains available.
+      }
     }
-    throw new NotFoundException(`Live fixture ${fixtureId} was not returned by Sportmonks /livescores.`);
+
+    // Once a match leaves today's live feed, completed Stats pages still need
+    // the fixture-by-id resource as a fallback.
+    return this.getFixture(fixtureId, { forceLive: true });
   }
 
   async getPlayer(playerId: number): Promise<SportmonksPlayer> {

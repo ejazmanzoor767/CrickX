@@ -28,7 +28,17 @@ const isLiveFixture = (fixture: any) => {
 };
 
 function MatchCard({ fixture, live, completed, teamSaved }: { fixture: any; live?: boolean; completed?: boolean; teamSaved?: boolean }) {
-  const runs = fixture.runs ?? fixture.scoreboards ?? [];
+  const rawRuns = asList(fixture.runs);
+  const runs = rawRuns.length
+    ? rawRuns
+    : asList(fixture.scoreboards)
+        .filter((row: any) => String(row?.type ?? '').toLowerCase() === 'total' || row?.total !== undefined)
+        .map((row: any) => ({
+          ...row,
+          score: row?.score ?? row?.total ?? 0,
+          wickets: row?.wickets ?? 0,
+          overs: row?.overs ?? 0,
+        }));
   const viewTeamHref = `/fantasy/view?fixtureId=${fixture.id}`;
   const hasSavedTeam = Boolean(teamSaved);
 
@@ -104,7 +114,35 @@ export default function MatchesPage() {
       const liveRows = rows
         .filter((row: any) => row?.active !== false && String(row?.applicationState ?? 'LIVE').toUpperCase() === 'LIVE')
         .sort((a: any, b: any) => new Date(a.starting_at ?? 0).getTime() - new Date(b.starting_at ?? 0).getTime());
-      setLive(liveRows);
+
+      // Firestore is a realtime projection, not the score authority. Merge it
+      // into the latest API snapshot so a thinner projection cannot replace
+      // fresh Sportmonks runs/scoreboards and blank out a live score.
+      setLive((previous) => {
+        const merged = new Map<number, any>();
+        for (const fixture of previous) {
+          const id = Number(fixture?.id);
+          if (Number.isFinite(id)) merged.set(id, fixture);
+        }
+        for (const fixture of liveRows) {
+          const id = Number(fixture?.id);
+          if (!Number.isFinite(id)) continue;
+          const existing = merged.get(id);
+          const currentRuns = asList(fixture?.runs);
+          const previousRuns = asList(existing?.runs);
+          const currentScoreboards = asList(fixture?.scoreboards);
+          const previousScoreboards = asList(existing?.scoreboards);
+          merged.set(id, {
+            ...existing,
+            ...fixture,
+            runs: currentRuns.length ? currentRuns : previousRuns,
+            scoreboards: currentScoreboards.length ? currentScoreboards : previousScoreboards,
+          });
+        }
+        return [...merged.values()]
+          .filter((fixture: any) => !isCompletedFixture(fixture))
+          .sort((a: any, b: any) => new Date(a.starting_at ?? 0).getTime() - new Date(b.starting_at ?? 0).getTime());
+      });
     }, () => undefined);
     const timer = window.setInterval(() => void refreshAll(false), 15000);
     return () => {

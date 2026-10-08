@@ -58,7 +58,21 @@ function MatchDetailContent() {
 
   const local = fixture.localteam ?? {};
   const away = fixture.visitorteam ?? {};
-  const runs = rows(fixture.runs).sort((a: any, b: any) => Number(a.inning ?? 0) - Number(b.inning ?? 0));
+  const rawRuns = rows(fixture.runs);
+  const runs = (rawRuns.length
+    ? rawRuns
+    : rows(fixture.scoreboards)
+        .filter((row: any) => String(row?.type ?? '').toLowerCase() === 'total' || row?.total !== undefined)
+        .map((row: any) => ({
+          ...row,
+          score: row?.score ?? row?.total ?? 0,
+          wickets: row?.wickets ?? 0,
+          overs: row?.overs ?? 0,
+        })))
+    .sort((a: any, b: any) =>
+      Number(a.inning ?? String(a.scoreboard ?? '').replace(/^S/i, '')) -
+      Number(b.inning ?? String(b.scoreboard ?? '').replace(/^S/i, '')),
+    );
   const batting = rows(fixture.batting);
   const bowling = rows(fixture.bowling);
   const lineup = rows(fixture.lineup);

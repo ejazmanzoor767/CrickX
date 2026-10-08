@@ -6,6 +6,7 @@ import { SportmonksFixture } from '../sportmonks/sportmonks.types';
 
 function sportmonksDate(value: Date) { return value.toISOString().slice(0, 10); }
 const STALE_NOT_STARTED_MS = 6 * 60 * 60 * 1000;
+const RECENT_COMPLETED_CACHE_MS = 60 * 1000;
 export function isTerminalFixture(fixture: Partial<SportmonksFixture>): boolean {
   const status = String(fixture.status ?? '').trim().toLowerCase();
   return [
@@ -117,6 +118,12 @@ function fallOfWicketsFromFixture(fixture: any) {
 
 @Injectable()
 export class MatchesService {
+  private recentCompletedDateCache: {
+    date: string;
+    expiresAt: number;
+    data: SportmonksFixture[];
+  } | null = null;
+
   constructor(
     private readonly sportmonks: SportmonksDataService,
     private readonly firestore: FirestoreService,
@@ -318,6 +325,30 @@ export class MatchesService {
     return { data, meta: { pagination: { total:data.length,count:data.length,per_page:data.length,current_page:1,total_pages:1 } } };
   }
 
+  private async listRecentCompletedDate(date: string) {
+    const cached = this.recentCompletedDateCache;
+    if (cached && cached.date === date && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
+    try {
+      const envelope = await this.sportmonks.listFixturesByDate(date);
+      const data = Array.isArray(envelope.data) ? envelope.data : [];
+      this.recentCompletedDateCache = {
+        date,
+        expiresAt: Date.now() + RECENT_COMPLETED_CACHE_MS,
+        data,
+      };
+      return data;
+    } catch (error) {
+      console.warn(
+        `Recent completed fixture refresh skipped for ${date}:`,
+        error instanceof Error ? error.message : String(error),
+      );
+      return [];
+    }
+  }
+
   async listCompleted(daysBack = 14) {
     const now = new Date();
     const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
@@ -338,13 +369,19 @@ export class MatchesService {
     // /livescores/now keeps an in-play fixture available for a short period
     // around the end of the match. Reconcile both feeds on every request so
     // Completed does not wait for the slower /fixtures history feed to catch up.
-    const [todayEnvelope, liveEnvelope] = await Promise.all([
+    const previousUtcDay = new Date(now);
+    previousUtcDay.setUTCDate(previousUtcDay.getUTCDate() - 1);
+    const previousUtcDate = sportmonksDate(previousUtcDay);
+
+    const [todayEnvelope, liveEnvelope, recentDateRows] = await Promise.all([
       this.sportmonks.listTodayFixtures(),
       this.sportmonks.listLiveFixtures(),
+      this.listRecentCompletedDate(previousUtcDate),
     ]);
     const realtimeRows = [
       ...(Array.isArray(todayEnvelope.data) ? todayEnvelope.data : []),
       ...(Array.isArray(liveEnvelope.data) ? liveEnvelope.data : []),
+      ...recentDateRows,
     ];
 
     const byId = new Map<number, SportmonksFixture>();
