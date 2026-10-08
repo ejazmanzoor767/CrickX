@@ -36,7 +36,7 @@ services:
         value: 30d
       - key: ALLOWED_SPORTMONKS_LEAGUE_IDS
         sync: false
-      - key: ALLOWED_SPORTSMONKS_FIXTURE_IDS
+      - key: ALLOWED_SPORTMONKS_FIXTURE_IDS
         sync: false
       - key: POLYGON_RPC_URL
         sync: false
