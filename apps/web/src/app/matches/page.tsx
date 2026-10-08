@@ -28,7 +28,12 @@ const isLiveFixture = (fixture: any) => {
 };
 
 function MatchCard({ fixture, live, completed, teamSaved }: { fixture: any; live?: boolean; completed?: boolean; teamSaved?: boolean }) {
-  const runs = fixture.runs ?? fixture.scoreboards ?? [];
+  const runs =
+    Array.isArray(fixture.runs) && fixture.runs.length > 0
+      ? fixture.runs
+      : Array.isArray(fixture.scoreboards)
+        ? fixture.scoreboards
+        : [];
   const viewTeamHref = `/fantasy/view?fixtureId=${fixture.id}`;
   const hasSavedTeam = Boolean(teamSaved);
 
