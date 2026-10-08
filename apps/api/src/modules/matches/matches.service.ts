@@ -222,6 +222,7 @@ export class MatchesService {
         fixtureId,
         applicationState: 'LIVE',
         active: true,
+        type: fixture?.type ?? null,
         status: fixture?.status ?? null,
         live: Number(fixture?.live) === 1 ? 1 : 0,
         starting_at: fixture?.starting_at ?? null,
