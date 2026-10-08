@@ -165,7 +165,12 @@ export class MatchesService {
 
   async listUpcomingAndRecent(page = 1) {
     const result = await this.sportmonks.listFixtures({ page, include: 'localteam,visitorteam,venue,league,season,stage,tosswon' });
-    return { ...result, data: Array.isArray(result.data) ? result.data.map((fixture) => normalize(fixture)) : [] };
+    return {
+      ...result,
+      data: Array.isArray(result.data)
+        ? result.data.map((fixture: SportmonksFixture) => normalize(fixture))
+        : [],
+    };
   }
   async listLeagues() { return this.sportmonks.listLeagues(); }
   async listToday() {
