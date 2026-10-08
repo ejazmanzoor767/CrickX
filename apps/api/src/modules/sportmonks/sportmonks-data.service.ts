@@ -152,6 +152,17 @@ export class SportmonksDataService {
     return this.filterFixtureEnvelope(envelope);
   }
 
+  async listFixturesRaw(params: { leagueId?: number; page?: number; status?: string; startsBetween?: { start: string; end: string }; include?: string; sort?: string }) {
+    const filter: Record<string, string> = {};
+    if (params.leagueId) filter['filter[league_id]'] = String(params.leagueId);
+    if (params.status) filter['filter[status]'] = params.status;
+    if (params.startsBetween) filter['filter[starts_between]'] = `${params.startsBetween.start},${params.startsBetween.end}`;
+    const requestParams: Record<string, string | number> = { include: params.include ?? 'localteam,visitorteam,venue', ...filter };
+    if (params.page !== undefined) requestParams.page = params.page;
+    if (params.sort) requestParams.sort = params.sort;
+    return this.client.get<SportmonksFixture[]>('/fixtures', requestParams);
+  }
+
   async listFixturesPaginated(params: { leagueId?: number; startsBetween?: { start: string; end: string }; status?: string; include?: string; sort?: string }, maxPages = MAX_FIXTURE_PAGES) {
     const rows: SportmonksFixture[] = [];
     let lastEnvelope: any = null;
@@ -173,6 +184,20 @@ export class SportmonksDataService {
     return { ...lastEnvelope, data: rows };
   }
 
+  async listFixturesPaginatedRaw(params: { leagueId?: number; startsBetween?: { start: string; end: string }; status?: string; include?: string; sort?: string }, maxPages = MAX_FIXTURE_PAGES) {
+    const rows: SportmonksFixture[] = [];
+    let lastEnvelope: any = null;
+    for (let page = 1; page <= maxPages; page += 1) {
+      const envelope = await this.listFixturesRaw({ ...params, page });
+      lastEnvelope = envelope;
+      rows.push(...(envelope.data ?? []));
+      const pagination = envelope.meta?.pagination;
+      if (!pagination || pagination.current_page >= pagination.total_pages) break;
+    }
+    if (!lastEnvelope) return { data: [] as SportmonksFixture[] };
+    return { ...lastEnvelope, data: rows };
+  }
+
   async listTodayFixtures() {
     const envelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
     return this.filterFixtureEnvelope(envelope);
@@ -181,6 +206,10 @@ export class SportmonksDataService {
   async listLiveFixtures() {
     const envelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
     return this.filterFixtureEnvelope(envelope);
+  }
+
+  async listLiveFixturesRaw() {
+    return this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
   }
 
   async getFixture(fixtureId: number, opts: { forceLive?: boolean } = {}): Promise<SportmonksFixture> {
