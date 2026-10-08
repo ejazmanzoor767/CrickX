@@ -58,11 +58,32 @@ function MatchDetailContent() {
 
   const local = fixture.localteam ?? {};
   const away = fixture.visitorteam ?? {};
-  const runs = rows(fixture.runs).sort((a: any, b: any) => Number(a.inning ?? 0) - Number(b.inning ?? 0));
+  const rawRuns = rows(fixture.runs);
+  const rawScoreboards = rows(fixture.scoreboards);
+  const scoreboardRuns = rawScoreboards
+    .filter((row: any) => {
+      const type = String(row?.type ?? '').toLowerCase();
+      const score = num(row?.score ?? row?.total);
+      return !['extra', 'extras'].includes(type) &&
+        Number.isFinite(Number(row?.team_id)) &&
+        (score !== null || num(row?.overs) !== null || num(row?.wickets) !== null);
+    })
+    .map((row: any) => ({
+      ...row,
+      inning: row?.inning ?? row?.score_id ?? row?.scoreboard,
+      score: num(row?.score) ?? num(row?.total) ?? 0,
+      wickets: num(row?.wickets) ?? 0,
+      overs: row?.overs ?? 0,
+    }));
+  // Sportmonks may expose the current live innings in scoreboards before the
+  // normalized runs collection is populated. Treat either source as a valid
+  // score source so the scorecard never gets stuck at 0/0 while live data exists.
+  const runs = (rawRuns.length ? rawRuns : scoreboardRuns)
+    .sort((a: any, b: any) => Number(a.inning ?? 0) - Number(b.inning ?? 0));
   const batting = rows(fixture.batting);
   const bowling = rows(fixture.bowling);
   const lineup = rows(fixture.lineup);
-  const scoreboards = rows(fixture.scoreboards);
+  const scoreboards = rawScoreboards;
   const balls = rows(fixture.balls);
   const live = isLive(fixture);
   const currentInning = runs.length ? runs[runs.length - 1] : null;
