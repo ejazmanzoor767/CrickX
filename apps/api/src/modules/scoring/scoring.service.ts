@@ -55,10 +55,21 @@ function isActuallyLive(fixture: any) {
     const balls = Array.isArray(fixture?.balls) ? fixture.balls : [];
     const batting = Array.isArray(fixture?.batting) ? fixture.batting : [];
     const bowling = Array.isArray(fixture?.bowling) ? fixture.bowling : [];
-    return live && (
-      balls.length > 0 ||
-      batting.some((row: any) => Number(row?.score ?? row?.runs ?? row?.runs_scored ?? 0) > 0) ||
-      bowling.some((row: any) => Number(row?.wickets ?? row?.wicket ?? 0) > 0)
+    const scoreboards = Array.isArray(fixture?.scoreboards) ? fixture.scoreboards : [];
+    const runs = Array.isArray(fixture?.runs) ? fixture.runs : [];
+
+    // During kickoff Sportmonks can leave status=NS/live=0 briefly. Once the
+    // scheduled start has passed, treat the fixture as live for scoring when
+    // live evidence or any scoreboard/run/ball data has arrived.
+    return (
+      started && (
+        live ||
+        balls.length > 0 ||
+        runs.length > 0 ||
+        scoreboards.length > 0 ||
+        batting.some((row: any) => Number(row?.score ?? row?.runs ?? row?.runs_scored ?? 0) > 0) ||
+        bowling.some((row: any) => Number(row?.wickets ?? row?.wicket ?? 0) > 0)
+      )
     );
   }
 
@@ -149,7 +160,10 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
 
         try {
-          const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+          const fixture = await this.sportmonks.getFixture(fixtureId, {
+      forceLive: true,
+      allowUnlistedLeague: true,
+    });
           if (!isFinished(fixture.status, fixture.live)) continue;
 
           this.logger.log(
