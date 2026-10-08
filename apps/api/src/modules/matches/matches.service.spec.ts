@@ -1,4 +1,4 @@
-import { applicationState } from './matches.service';
+import { MatchesService, applicationState } from './matches.service';
 
 describe('applicationState', () => {
   const now = Date.now();
@@ -148,7 +148,7 @@ describe('MatchesService live projection', () => {
     };
     const firestore = {};
 
-    const service = new (require('./matches.service').MatchesService)(sportmonks, firestore, realtime);
+    const service = new MatchesService(sportmonks as any, firestore as any, realtime as any);
     await (service as any).projectLiveMatches([]);
 
     expect(batch.set).toHaveBeenCalledWith(
