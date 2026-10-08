@@ -21,13 +21,13 @@ describe('applicationState', () => {
     } as any)).toBe('LIVE');
   });
 
-  it('keeps a started NS fixture UPCOMING when the provider has not marked it live', () => {
+  it('promotes a started NS fixture to LIVE during provider kickoff lag', () => {
     expect(applicationState({
       id: 8,
       status: 'NS',
       live: 0,
       starting_at: new Date(now - 60_000).toISOString(),
-    } as any)).toBe('UPCOMING');
+    } as any)).toBe('LIVE');
   });
 
   it('treats a started fixture from the dedicated live feed as LIVE during kickoff', () => {
