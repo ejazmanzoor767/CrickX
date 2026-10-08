@@ -141,8 +141,8 @@ describe('MatchesService live projection', () => {
     const sportmonks = {
       getFixture: jest.fn().mockResolvedValue({
         id: 123,
-        status: 'Live',
-        live: 1,
+        status: 'NS',
+        live: 0,
         starting_at: new Date(Date.now() - 60_000).toISOString(),
       }),
     };
