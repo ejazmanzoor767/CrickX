@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksClientService } from './sportmonks-client.service';
 import {
@@ -74,10 +75,50 @@ function normalizeFixture(fixture: SportmonksFixture): SportmonksFixture {
 
 @Injectable()
 export class SportmonksDataService {
+  private readonly allowedFixtureIds: Set<number> | null;
+
   constructor(
     private readonly client: SportmonksClientService,
     private readonly prisma: FirestoreService,
-  ) {}
+    private readonly config: ConfigService,
+  ) {
+    const raw = this.config.get<string>('ALLOWED_SPORTSMONKS_FIXTURE_IDS', '');
+    const ids = raw
+      .split(',')
+      .map((value) => Number(value.trim()))
+      .filter((value) => Number.isFinite(value) && value > 0);
+
+    this.allowedFixtureIds = ids.length > 0 ? new Set(ids) : null;
+  }
+
+  /**
+   * When ALLOWED_SPORTSMONKS_FIXTURE_IDS is configured, only those exact
+   * Sportmonks fixture IDs are allowed into any CrickX match/fantasy feed.
+   * An unset/blank variable preserves the existing provider feed behavior.
+   */
+  isFixtureAllowed(fixtureId: number): boolean {
+    if (!this.allowedFixtureIds) return true;
+    return this.allowedFixtureIds.has(Number(fixtureId));
+  }
+
+  private filterFixtures<T extends SportmonksFixture>(fixtures: T[]): T[] {
+    if (!this.allowedFixtureIds) return fixtures;
+    return fixtures.filter((fixture) => this.isFixtureAllowed(Number(fixture?.id)));
+  }
+
+  private filterFixtureEnvelope(envelope: any) {
+    if (!this.allowedFixtureIds || !Array.isArray(envelope?.data)) return envelope;
+    return {
+      ...envelope,
+      data: this.filterFixtures(envelope.data as SportmonksFixture[]),
+    };
+  }
+
+  private assertFixtureAllowed(fixtureId: number) {
+    if (!this.isFixtureAllowed(fixtureId)) {
+      throw new NotFoundException(`Fixture ${fixtureId} is not enabled for CrickX.`);
+    }
+  }
 
   async listLeagues() {
     return this.client.get<any[]>('/leagues', { include: 'season,country' });
@@ -91,7 +132,8 @@ export class SportmonksDataService {
     const requestParams: Record<string, string | number> = { include: params.include ?? 'localteam,visitorteam,venue', ...filter };
     if (params.page !== undefined) requestParams.page = params.page;
     if (params.sort) requestParams.sort = params.sort;
-    return this.client.get<SportmonksFixture[]>('/fixtures', requestParams);
+    const envelope = await this.client.get<SportmonksFixture[]>('/fixtures', requestParams);
+    return this.filterFixtureEnvelope(envelope);
   }
 
   async listFixturesPaginated(params: { leagueId?: number; startsBetween?: { start: string; end: string }; status?: string; include?: string; sort?: string }, maxPages = MAX_FIXTURE_PAGES) {
@@ -109,14 +151,18 @@ export class SportmonksDataService {
   }
 
   async listTodayFixtures() {
-    return this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
+    const envelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
+    return this.filterFixtureEnvelope(envelope);
   }
 
   async listLiveFixtures() {
-    return this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
+    const envelope = await this.client.get<SportmonksFixture[]>('/livescores', { include: LIVE_SCORECARD_INCLUDES });
+    return this.filterFixtureEnvelope(envelope);
   }
 
   async getFixture(fixtureId: number, opts: { forceLive?: boolean } = {}): Promise<SportmonksFixture> {
+    this.assertFixtureAllowed(fixtureId);
+
     // Live/terminal scoring must not perform a Firestore read/write on every poll.
     // The previous implementation cached the full ball-by-ball payload in
     // Firestore, multiplying reads/writes and repeatedly serializing a large
@@ -190,6 +236,8 @@ export class SportmonksDataService {
   }
 
   async getFixtureSquads(fixtureId: number) {
+    this.assertFixtureAllowed(fixtureId);
+
     // Cricket API v2.0 exposes a team's squad through the Teams endpoint:
     // /teams/{teamId}?include=squad&filter[season_id]={seasonId}.
     // The football v3-style /squads/seasons/... endpoint is not valid here.
