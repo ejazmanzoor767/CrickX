@@ -325,7 +325,10 @@ export class MatchesService {
       if (activeIds.has(fixtureId) || completedIds.has(fixtureId)) continue;
 
       // Disable stale realtime documents that carry a blocked format.
-      if (!this.sportmonks.isFixtureFormatAllowed({ type: String(doc.data?.()?.type ?? '') })) {
+      if (!this.sportmonks.isFixtureFormatAllowed({
+        league_id: Number(doc.data?.()?.league_id),
+        type: String(doc.data?.()?.type ?? ''),
+      })) {
         batch.set(doc.ref, { active: false, updatedAt: now }, { merge: true });
         changed = true;
         continue;
@@ -429,7 +432,7 @@ export class MatchesService {
           type.length > 0 &&
           Number.isFinite(leagueId) &&
           this.sportmonks.isLeagueAllowed(leagueId) &&
-          this.sportmonks.isFixtureFormatAllowed({ type }) &&
+          this.sportmonks.isFixtureFormatAllowed({ league_id: leagueId, type }) &&
           Number.isFinite(timestamp) &&
           timestamp >= start.getTime();
       })
