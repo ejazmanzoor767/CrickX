@@ -60,12 +60,24 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
   });
 
   const teamGroups = new Map<number, { teamId: number; team: any; innings: any[] }>();
+  const fixtureTeamIds = [
+    Number(fixture?.localteam_id),
+    Number(fixture?.visitorteam_id),
+  ].filter((id, index, list) => Number.isFinite(id) && id > 0 && list.indexOf(id) === index);
+
+  for (const teamId of fixtureTeamIds) {
+    const team = Number(teamId) === Number(fixture?.localteam_id) ? fixture?.localteam : fixture?.visitorteam;
+    teamGroups.set(teamId, { teamId, team, innings: [] });
+  }
+
   for (const item of innings) {
     if (!item.teamId) continue;
-    const team = Number(item.teamId) === Number(fixture?.localteam_id) ? fixture?.localteam : fixture?.visitorteam;
     const existing = teamGroups.get(item.teamId);
     if (existing) existing.innings.push(item);
-    else teamGroups.set(item.teamId, { teamId: item.teamId, team, innings: [item] });
+    else {
+      const team = Number(item.teamId) === Number(fixture?.localteam_id) ? fixture?.localteam : fixture?.visitorteam;
+      teamGroups.set(item.teamId, { teamId: item.teamId, team, innings: [item] });
+    }
   }
 
   const orderedTeamGroups = [
@@ -91,16 +103,18 @@ function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls,
           .filter(({ teamId }: any) => Number(teamId) === Number(selectedTeamId))
           .map(({ teamId, team, innings: teamInnings }: any) => <div key={`team-group-${teamId}`} style={{ display: 'grid', gap: 'clamp(10px, 2.5vw, 14px)', width: '100%', minWidth: 0 }}>
           <div style={{ display: 'grid', gap: 14 }}>
-            {teamInnings.map((inningData: any, teamInningIndex: number) => {
+            {teamInnings.every((item: any) => !item)
+              ? <div className="card" style={{ padding: 'clamp(12px, 3vw, 18px)', background: 'rgba(255,255,255,.018)' }}>
+                  <strong style={{ display: 'block', fontFamily: 'Barlow Condensed', fontSize: 24, textTransform: 'uppercase' }}>Yet to bat</strong>
+                </div>
+              : teamInnings.map((inningData: any, teamInningIndex: number) => {
           const { run, inning, inningBatting, inningBowling, inningBalls, inningWickets, extras } = inningData ?? {};
           const team = Number(teamId) === Number(fixture?.localteam_id) ? fixture?.localteam : fixture?.visitorteam;
           const teamLabel = teamInningIndex === 0 ? '1st Innings' : '2nd Innings';
           if (!run) {
             return <div className="card" key={`team-${teamId}-missing-${teamInningIndex}`} style={{ padding: 'clamp(12px, 3vw, 18px)', background: 'rgba(255,255,255,.018)' }}>
               <p className="eyebrow">{teamLabel}</p>
-              <h3 style={{ margin: '4px 0 0', fontFamily: 'Barlow Condensed', fontSize: 24 }}>{team?.name ?? 'Team'}</h3>
-              <strong style={{ display: 'block', marginTop: 8, fontFamily: 'Barlow Condensed', fontSize: 24, textTransform: 'uppercase' }}>Yet to bat</strong>
-              <p className="section-subtitle" style={{ margin: '4px 0 0' }}>This innings has not started yet.</p>
+              <p className="section-subtitle" style={{ margin: '6px 0 0' }}>Innings has not started yet.</p>
             </div>;
           }
           const score = Number(run?.score ?? 0);
