@@ -24,6 +24,91 @@ function TeamBadge({ team }: { team: any }) {
     : <div style={{ width: 32, height: 32, borderRadius: 10, border: '1px solid rgba(255,255,255,.09)', display: 'grid', placeItems: 'center', color: '#98a0b3', fontWeight: 900, flexShrink: 0 }}>{String(team?.code ?? team?.name ?? '?').slice(0, 2)}</div>;
 }
 
+
+function inningsNumber(value: any) {
+  const n = Number(value);
+  if (Number.isFinite(n) && n > 0) return n;
+  const match = String(value ?? '').match(/(?:^|[^0-9])S([1-4])(?:$|[^0-9])/i);
+  return match ? Number(match[1]) : null;
+}
+
+function MultiInningsScorecard({ fixture, runs, batting, bowling, lineup, balls, scoreboards, persistedWickets }: {
+  fixture: any; runs: any[]; batting: any[]; bowling: any[]; lineup: any[]; balls: any[]; scoreboards: any[]; persistedWickets: any[];
+}) {
+  const labels = ['1st Innings', '2nd Innings', '3rd Innings', '4th Innings'];
+  const orderedRuns = [...runs].sort((a: any, b: any) => Number(a?.inning ?? 0) - Number(b?.inning ?? 0));
+  const innings = orderedRuns.map((run: any, index: number) => {
+    const inning = Number(run?.inning ?? index + 1);
+    const teamId = Number(run?.team_id ?? 0);
+    const sameInning = (row: any) => inningsNumber(row?.inning ?? row?.scoreboard ?? row?.score_id) === inning;
+    const inningBatting = batting.filter(sameInning);
+    const inningBowling = bowling.filter(sameInning);
+    const inningBalls = balls.filter((row: any) => Number(row?.inning ?? row?.score_id ?? -1) === inning);
+    const inningWickets = persistedWickets.filter((row: any) => inningsNumber(row?.inning) === inning);
+    const ballExtras = inningBalls.reduce((sum: number, row: any) => {
+      const s = row?.score ?? {};
+      return sum + (Number(s?.bye) || 0) + (Number(s?.leg_bye) || 0) + (Number(s?.noball) || 0) + (Number(s?.wide) || 0);
+    }, 0);
+    const scoreboardExtras = scoreboards.filter((row: any) =>
+      String(row?.type ?? '').toLowerCase() === 'extra' &&
+      (inningsNumber(row?.inning ?? row?.scoreboard ?? row?.score_id) === inning || Number(row?.team_id) === teamId)
+    ).reduce((sum: number, row: any) =>
+      sum + (Number(row?.bye) || 0) + (Number(row?.leg_bye) || 0) + (Number(row?.noball) || 0) +
+      (Number(row?.noball_runs) || 0) + (Number(row?.wide) || 0) + (Number(row?.wide_runs) || 0) +
+      (Number(row?.penalty) || 0) + (Number(row?.penalty_runs) || 0), 0);
+    return { run, inning, teamId, inningBatting, inningBowling, inningBalls, inningWickets, extras: ballExtras > 0 ? ballExtras : scoreboardExtras };
+  });
+
+  return <div style={{ display: 'grid', gap: 16 }}>
+    <div className="card" style={{ padding: 18, background: 'linear-gradient(135deg,rgba(155,255,71,.08),rgba(18,23,34,.94))' }}>
+      <p className="eyebrow">TEST / 4-DAY SCORECARD</p>
+      <p className="section-subtitle" style={{ margin: '6px 0 0' }}>Separate innings cards for matches where each team can bat twice.</p>
+    </div>
+
+    {innings.length === 0
+      ? <div className="card"><p className="section-subtitle">Innings data is not available from the cricket feed yet.</p></div>
+      : innings.map(({ run, inning, teamId, inningBatting, inningBowling, inningBalls, inningWickets, extras }: any) => {
+          const team = Number(teamId) === Number(fixture?.localteam_id) ? fixture?.localteam : fixture?.visitorteam;
+          const score = Number(run?.score ?? 0);
+          const wickets = Number(run?.wickets ?? 0);
+          const overs = run?.overs ?? 0;
+          const legalBalls = ballsFromOvers(overs);
+          const rate = legalBalls > 0 ? (score / legalBalls) * 6 : null;
+          return <div className="card" key={`multi-innings-${inning}-${teamId}`} style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <TeamBadge team={team} />
+                  <div><p className="eyebrow" style={{ marginBottom: 3 }}>{labels[inning - 1] ?? `Innings ${inning}`}</p><h2 style={{ margin: 0, fontFamily: 'Barlow Condensed', fontSize: 26, textTransform: 'uppercase' }}>{team?.name ?? 'Team'}</h2></div>
+                </div>
+                <div style={{ textAlign: 'right' }}><div style={{ fontFamily: 'Barlow Condensed', fontSize: 42, lineHeight: .95, fontWeight: 900 }}>{score}/{wickets}</div><div style={{ color: '#98a0b3', fontSize: 13, marginTop: 5 }}>{overs} overs · RR {rate === null ? '—' : rate.toFixed(2)}</div></div>
+              </div>
+            </div>
+
+            <div className="card" style={{ margin: 14, padding: 14, background: 'rgba(255,255,255,.025)' }}>
+              <div className="table-row"><span>Total</span><strong>{score}/{wickets}</strong></div>
+              <div className="table-row"><span>Overs</span><strong>{overs}</strong></div>
+              <div className="table-row"><span>Extras</span><strong>{extras}</strong></div>
+              <div className="table-row"><span>Runs from bat</span><strong>{Math.max(score - extras, 0)}</strong></div>
+            </div>
+
+            <ScoreTable title={`BATTING · ${team?.name ?? 'Team'} · ${labels[inning - 1] ?? `Innings ${inning}`}`} data={inningBatting} empty="Detailed batting figures for this innings are not available yet.">
+              {items => <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}><thead><tr>{['Batter','R','B','4s','6s','SR','Status'].map(h => <th key={h} style={{ textAlign: h === 'Batter' ? 'left' : 'right', padding: '11px 10px', color: '#98a0b3', fontSize: 11, letterSpacing: '.08em' }}>{h}</th>)}</tr></thead><tbody>{items.map((b: any, i: number) => { const dismissed = inningWickets.some((w: any) => Number(w?.playerId ?? w?.player_id) === Number(b?.player_id)); return <tr key={`bat-${inning}-${b?.player_id ?? i}`} style={{ borderTop: '1px solid rgba(255,255,255,.06)' }}><td style={{ padding: '12px 10px', fontWeight: 800 }}>{playerName(b, lineup)}</td><td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 900 }}>{b.score ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.ball ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.four_x ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.six_x ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{num(b.rate) === null ? '—' : Number(b.rate).toFixed(1)}</td><td style={{ padding: '12px 10px', textAlign: 'right', color: dismissed ? '#98a0b3' : '#7dff9a', fontWeight: 900 }}>{dismissed ? 'OUT' : 'NOT OUT'}</td></tr>; })}</tbody></table>}
+            </ScoreTable>
+
+            <ScoreTable title={`BOWLING · ${labels[inning - 1] ?? `Innings ${inning}`}`} data={inningBowling} empty="Detailed bowling figures for this innings are not available yet.">
+              {items => <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}><thead><tr>{['Bowler','O','M','R','W','Econ'].map(h => <th key={h} style={{ textAlign: h === 'Bowler' ? 'left' : 'right', padding: '11px 10px', color: '#98a0b3', fontSize: 11, letterSpacing: '.08em' }}>{h}</th>)}</tr></thead><tbody>{items.map((b: any, i: number) => { const o = Number(b?.overs), r = Number(b?.runs ?? 0); const whole = Number.isFinite(o) ? Math.floor(o) : 0; const part = Number.isFinite(o) ? Math.round((o - whole) * 10) : 0; const bowlBalls = whole * 6 + Math.min(Math.max(part, 0), 5); const econ = bowlBalls > 0 ? (r / bowlBalls) * 6 : null; return <tr key={`bowl-${inning}-${b?.player_id ?? i}`} style={{ borderTop: '1px solid rgba(255,255,255,.06)' }}><td style={{ padding: '12px 10px', fontWeight: 800 }}>{playerName(b, lineup)}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.overs ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.medians ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{b.runs ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 900 }}>{b.wickets ?? 0}</td><td style={{ padding: '12px 10px', textAlign: 'right' }}>{econ === null ? '—' : econ.toFixed(2)}</td></tr>; })}</tbody></table>}
+            </ScoreTable>
+
+            <div className="panel-grid" style={{ margin: 14, alignItems: 'start' }}>
+              <div className="card"><p className="eyebrow">FALL OF WICKETS</p>{inningWickets.length === 0 ? <p className="section-subtitle">No wicket records available yet.</p> : inningWickets.map((w: any, i: number) => <div className="score-row" key={w.id ?? `fow-${inning}-${i}`}><span><strong>{w.score}/{w.wicketNumber}</strong><small style={{ display: 'block', color: '#98a0b3' }}>{w.player ?? `Player ${w.playerId ?? '—'}`} · {w.over ?? '—'} ov</small></span></div>)}</div>
+              <div className="card"><p className="eyebrow">INNINGS INFORMATION</p><div className="table-row"><span>Inning</span><strong>{inning}</strong></div><div className="table-row"><span>Team</span><strong>{team?.name ?? '—'}</strong></div><div className="table-row"><span>Ball records</span><strong>{inningBalls.length}</strong></div><div className="table-row"><span>Match status</span><strong>{fixture?.status ?? '—'}</strong></div></div>
+            </div>
+          </div>;
+        })}
+  </div>;
+}
+
 function MatchDetailContent() {
   const params = useSearchParams();
   const fixtureId = Number(params.get('fixtureId'));
@@ -65,6 +150,8 @@ function MatchDetailContent() {
   const scoreboards = rows(fixture.scoreboards);
   const balls = rows(fixture.balls);
   const live = isLive(fixture);
+  const formatText = String(fixture?.type ?? '');
+  const isMultiInningsFormat = /test|5\\s*day|5day|4\\s*day|4day/i.test(formatText);
   const currentInning = runs.length ? runs[runs.length - 1] : null;
   const currentTeamId = Number(currentInning?.team_id ?? 0);
   const previousInning = runs.length > 1 ? runs[runs.length - 2] : null;
@@ -150,6 +237,8 @@ function MatchDetailContent() {
       </div>
     </div>
 
+    {isMultiInningsFormat ? <MultiInningsScorecard fixture={fixture} runs={runs} batting={batting} bowling={bowling} lineup={lineup} balls={balls} scoreboards={scoreboards} persistedWickets={persistedWickets} /> : <>
+
     <div className="card" style={{ padding: 18, marginBottom: 14, background: 'linear-gradient(135deg,rgba(155,255,71,.08),rgba(18,23,34,.94))' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 14, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><TeamBadge team={activeTeam?.team} /><div><p className="eyebrow" style={{ marginBottom: 4 }}>{activeTeam?.team?.code ?? 'TEAM'}</p><h2 style={{ margin: 0, fontFamily: 'Barlow Condensed', fontSize: 28, textTransform: 'uppercase' }}>{activeTeam?.team?.name ?? 'Team'}</h2></div></div>
@@ -178,6 +267,7 @@ function MatchDetailContent() {
 
     <div className="card match-actions scorecard-actions" style={{ marginTop: 14 }}><div><p className="eyebrow">CRICKX MATCH CENTRE</p><h2>{live ? 'Live data is updating automatically' : 'Match details'}</h2><p className="section-subtitle">{live ? 'The scorecard checks for fresh cricket data every 15 seconds.' : resultText}</p></div><Link className="secondary-button" href="/matches">Back to matches</Link></div>
     {error && <div className="card" style={{ marginTop: 14 }}><p className="error-text">{error}</p></div>}
+    </>}
   </section>;
 }
 
