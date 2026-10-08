@@ -173,6 +173,8 @@ function playerInfoFallback(fixture: any, id: number) {
 function SavedTeamView() {
   const params = useSearchParams();
   const fixtureId = Number(params.get('fixtureId'));
+  const viewedUserId = String(params.get('userId') ?? '').trim();
+  const isPublicView = Boolean(viewedUserId);
   const [fixture, setFixture] = useState<any>(null);
   const [team, setTeam] = useState<any>(null);
   const [playerInfo, setPlayerInfo] = useState<Record<number, any>>({});
@@ -185,11 +187,17 @@ function SavedTeamView() {
     let active = true;
     (async () => {
       try {
-        const [fixtureResult, teamsResult, squadResult] = await Promise.all([api.matchDetail(fixtureId), api.myFantasyTeams(), api.fixtureSquads(fixtureId)]);
+        const [fixtureResult, teamResult, squadResult] = await Promise.all([
+          api.matchDetail(fixtureId),
+          isPublicView ? api.publicFantasyTeam(viewedUserId, fixtureId) : api.myFantasyTeams(),
+          api.fixtureSquads(fixtureId),
+        ]);
         if (!active) return;
-        const teamsPayload: any = teamsResult;
+        const teamsPayload: any = teamResult;
         const teams = Array.isArray(teamsPayload) ? teamsPayload : (teamsPayload?.data ?? []);
-        const saved = teams.find((item: any) => Number(item?.sportmonksFixtureId) === fixtureId);
+        const saved = isPublicView
+          ? teamsPayload
+          : teams.find((item: any) => Number(item?.sportmonksFixtureId) === fixtureId);
         if (!saved) throw new Error('No saved fantasy team was found for this match.');
         const squad = unwrap(squadResult);
         const info: Record<number, any> = {};
@@ -204,7 +212,7 @@ function SavedTeamView() {
       finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
-  }, [fixtureId]);
+  }, [fixtureId, isPublicView, viewedUserId]);
 
   const players = useMemo(() => Array.isArray(team?.players) ? team.players : [], [team]);
   const breakdowns = useMemo(() => {
@@ -259,8 +267,8 @@ function SavedTeamView() {
 
   return <section className="app-page saved-team-page" style={{ paddingBottom: 28 }}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}><Link href="/matches" aria-label="Back to matches" style={{ width: 38, height: 38, borderRadius: 12, display: 'grid', placeItems: 'center', border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.035)', color: 'inherit', fontSize: 22, lineHeight: 1 }}>‹</Link><div style={{ minWidth: 0 }}><p className="eyebrow" style={{ marginBottom: 2 }}>CRICKX FANTASY</p><h1 className="section-title" style={{ margin: 0 }}>Fantasy Team</h1></div></div>
-      <Link className="secondary-button" href={`/fantasy?fixtureId=${fixtureId}`} style={{ padding: '9px 13px', fontSize: 12, flexShrink: 0 }}>Edit Team</Link>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}><Link href={isPublicView ? `/leaderboard?fixtureId=${fixtureId}` : '/matches'} aria-label={isPublicView ? 'Back to leaderboard' : 'Back to matches'} style={{ width: 38, height: 38, borderRadius: 12, display: 'grid', placeItems: 'center', border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.035)', color: 'inherit', fontSize: 22, lineHeight: 1 }}>‹</Link><div style={{ minWidth: 0 }}><p className="eyebrow" style={{ marginBottom: 2 }}>CRICKX FANTASY{isPublicView ? ' · VIEW ONLY' : ''}</p><h1 className="section-title" style={{ margin: 0 }}>Fantasy Team</h1></div></div>
+      {!isPublicView && <Link className="secondary-button" href={`/fantasy?fixtureId=${fixtureId}`} style={{ padding: '9px 13px', fontSize: 12, flexShrink: 0 }}>Edit Team</Link>}
     </div>
 
     <div className="card" style={{ padding: 14, marginBottom: 10 }}><div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 10, alignItems: 'center' }}><div style={{ minWidth: 0 }}><strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fixture?.localteam?.name ?? 'Home'}</strong><span className="section-subtitle">{fixture?.localteam?.short_code ?? fixture?.localteam?.code ?? 'HOME'}</span></div><span className="vs-badge">VS</span><div style={{ textAlign: 'right', minWidth: 0 }}><strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fixture?.visitorteam?.name ?? 'Away'}</strong><span className="section-subtitle">{fixture?.visitorteam?.short_code ?? fixture?.visitorteam?.code ?? 'AWAY'}</span></div></div><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.06)' }}><span className="section-subtitle">{teamName(team)}</span><span className="demo-pill">{players.length}/11 PLAYERS</span></div></div>
