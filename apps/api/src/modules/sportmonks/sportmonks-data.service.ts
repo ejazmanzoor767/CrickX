@@ -198,8 +198,6 @@ export class SportmonksDataService {
   }
 
   async getFixture(fixtureId: number, opts: { forceLive?: boolean } = {}): Promise<SportmonksFixture> {
-    this.assertFixtureAllowed(fixtureId);
-
     // Live/terminal scoring must not perform a Firestore read/write on every poll.
     // The previous implementation cached the full ball-by-ball payload in
     // Firestore, multiplying reads/writes and repeatedly serializing a large
@@ -209,7 +207,9 @@ export class SportmonksDataService {
         where: { sportmonksFixtureId: fixtureId },
       });
       if (cached && cached.expiresAt > new Date()) {
-        return normalizeFixture(cached.payload as unknown as SportmonksFixture);
+        const cachedFixture = normalizeFixture(cached.payload as unknown as SportmonksFixture);
+        this.assertFixtureAllowed(cachedFixture, fixtureId);
+        return cachedFixture;
       }
     }
 
