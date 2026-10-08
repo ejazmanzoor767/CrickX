@@ -35,6 +35,4 @@ export class WalletController {
     if (!order) throw new BadRequestException('order query parameter is required.');
     return this.wallet.earlyBuyPaymentStatus(this.uid(req), order);
   }
-
-
 }
