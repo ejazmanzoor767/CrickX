@@ -810,27 +810,56 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   private async scoreAndSettleFinishedContest(contestId: string, fixtureId: number) {
     const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
     if (!isFinished(fixture.status, fixture.live)) return;
-    await this.fundStartedContestPrizePools(fixtureId);
 
-    const contest = await this.prisma.contest.findUnique({
-      where: { id: contestId },
-      include: {
-        entries: {
-          include: { fantasyTeam: { include: { players: true } } },
-        },
-      },
-    });
+    // Neon/PostgreSQL is authoritative for contest state and contest entries.
+    // Firestore is not used to discover participants, rank entries, or settle prizes.
+    const sqlAuthoritative = this.postgres.isEnabled();
+    if (sqlAuthoritative) await this.fundStartedContestPrizePools(fixtureId);
 
-    if (!contest || contest.status === 'COMPLETED') return;
+    let contest: any;
+    let contestEntries: any[];
+
+    if (sqlAuthoritative) {
+      contest = await this.postgres.getContest(contestId);
+      if (!contest || contest.status === 'COMPLETED') return;
+
+      const sqlEntries = await this.postgres.listContestEntries(contestId);
+      if (sqlEntries.length === 0) {
+        this.logger.warn(`Finished contest ${contestId} has no Neon contest entries; postponing on-chain settlement.`);
+        return;
+      }
+
+      const teamIds = [...new Set(sqlEntries.map((entry: any) => String(entry.fantasyTeamId ?? '')).filter(Boolean))];
+      const fantasyTeams = teamIds.length
+        ? await this.prisma.fantasyTeam.findMany({
+            where: { id: { in: teamIds } },
+            include: { players: true },
+          })
+        : [];
+      const teamsById = new Map(fantasyTeams.map((team: any) => [String(team.id), team]));
+
+      contestEntries = sqlEntries.map((entry: any) => ({
+        ...entry,
+        fantasyTeam: teamsById.get(String(entry.fantasyTeamId)),
+      }));
+    } else {
+      contest = await this.prisma.contest.findUnique({
+        where: { id: contestId },
+        include: { entries: { include: { fantasyTeam: { include: { players: true } } } } },
+      });
+      if (!contest || contest.status === 'COMPLETED') return;
+      contestEntries = contest.entries ?? [];
+      if (contestEntries.length === 0) {
+        this.logger.warn(`Finished contest ${contestId} has no contest entries; postponing on-chain settlement.`);
+        return;
+      }
+    }
 
     const batting = fixture.batting ?? [];
     const bowling = fixture.bowling ?? [];
     const balls = fixture.balls ?? [];
-
     const formatRules = rulesForFormat(fixture.type);
-    const longPerformance = formatRules.long_format
-      ? buildLongFormatPerformance(batting, bowling, balls)
-      : null;
+    const longPerformance = formatRules.long_format ? buildLongFormatPerformance(batting, bowling, balls) : null;
     const battingByPlayer = longPerformance?.battingByPlayer ?? new Map(batting.map((row) => [Number(row.player_id), row]));
     const bowlingByPlayer = longPerformance?.bowlingByPlayer ?? new Map(bowling.map((row) => [Number(row.player_id), row]));
     const fieldingByPlayer = longPerformance?.fieldingByPlayer ?? new Map<number, { catches: number; stumpings: number; runOuts: number }>();
@@ -846,133 +875,100 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         else current.catches += 1;
         fieldingByPlayer.set(fielderId, current);
       }
-
       for (const ball of balls) {
         const score = ball.score ?? {};
         const wide = Number(score.wide ?? 0);
         const noball = Number(score.noball ?? 0);
         const bye = Number(score.bye ?? 0);
         const legBye = Number(score.leg_bye ?? 0);
-        const isLegalDot =
-          Number(score.runs ?? 0) === 0 &&
-          wide === 0 &&
-          noball === 0 &&
-          bye === 0 &&
-          legBye === 0;
+        const isLegalDot = Number(score.runs ?? 0) === 0 && wide === 0 && noball === 0 && bye === 0 && legBye === 0;
         const bowlerId = Number(ball.bowling_player_id);
-        if (isLegalDot && Number.isFinite(bowlerId)) {
-          dotBallsByPlayer.set(
-            bowlerId,
-            (dotBallsByPlayer.get(bowlerId) ?? 0) + 1,
-          );
-        }
-
+        if (isLegalDot && Number.isFinite(bowlerId)) dotBallsByPlayer.set(bowlerId, (dotBallsByPlayer.get(bowlerId) ?? 0) + 1);
         if (score.is_wicket) {
           const text = String(score.name ?? '').toLowerCase();
           const playerId = Number(ball.batsman_id);
-          const fielderId = Number(
-            (score as any).player_out_id ??
-              (score as any).catch_stump_player_id ??
-              0,
-          );
+          const fielderId = Number((score as any).player_out_id ?? (score as any).catch_stump_player_id ?? 0);
           if (fielderId) {
-            const current =
-              fieldingByPlayer.get(fielderId) ??
-              { catches: 0, stumpings: 0, runOuts: 0 };
+            const current = fieldingByPlayer.get(fielderId) ?? { catches: 0, stumpings: 0, runOuts: 0 };
             if (text.includes('stump')) current.stumpings += 1;
             else if (text.includes('run out')) current.runOuts += 1;
             else if (text.includes('catch')) current.catches += 1;
             fieldingByPlayer.set(fielderId, current);
           } else if (text.includes('run out') && playerId) {
-            const current =
-              fieldingByPlayer.get(playerId) ??
-              { catches: 0, stumpings: 0, runOuts: 0 };
+            const current = fieldingByPlayer.get(playerId) ?? { catches: 0, stumpings: 0, runOuts: 0 };
             current.runOuts += 1;
             fieldingByPlayer.set(playerId, current);
           }
         }
       }
     }
+
     const scoringRuleSetId = (contest as any).scoringRuleSetId;
     const configuredRuleSet = scoringRuleSetId
       ? await this.prisma.scoringRuleSet.findUnique({ where: { id: scoringRuleSetId } })
       : null;
     const configuredRules = configuredRuleSet?.rules as Partial<ScoringRules> | undefined;
-    const rules: ScoringRules = formatRules.long_format
-      ? formatRules
-      : { ...formatRules, ...(configuredRules ?? {}) };
+    const rules: ScoringRules = formatRules.long_format ? formatRules : { ...formatRules, ...(configuredRules ?? {}) };
 
-    for (const entry of contest.entries ?? []) {
+    let scoredEntries = 0;
+    for (const entry of contestEntries) {
       const fantasyTeam = (entry as any).fantasyTeam;
-      if (!fantasyTeam) continue;
-
-      if (!fantasyTeam.isLocked) {
-        await this.prisma.fantasyTeam.update({
-          where: { id: fantasyTeam.id },
-          data: { isLocked: true },
-        });
+      if (!fantasyTeam) {
+        this.logger.warn(`Finished contest ${contestId} entry=${String(entry.id)} has no fantasy team record; skipping score calculation.`);
+        continue;
       }
 
       const storedScore = this.calculateTeamScore(
-        fantasyTeam,
-        battingByPlayer,
-        bowlingByPlayer,
-        fieldingByPlayer,
-        dotBallsByPlayer,
-        formatRules,
-        fixture.winner_team_id,
-        fixture.man_of_match_id,
+        fantasyTeam, battingByPlayer, bowlingByPlayer, fieldingByPlayer, dotBallsByPlayer,
+        formatRules, fixture.winner_team_id, fixture.man_of_match_id,
       );
       await this.persistTeamPlayerScores(fantasyTeam, storedScore.playerScores);
 
       const scored = this.calculateTeamScore(
-        fantasyTeam,
-        battingByPlayer,
-        bowlingByPlayer,
-        fieldingByPlayer,
-        dotBallsByPlayer,
-        rules,
-        fixture.winner_team_id,
-        fixture.man_of_match_id,
+        fantasyTeam, battingByPlayer, bowlingByPlayer, fieldingByPlayer, dotBallsByPlayer,
+        rules, fixture.winner_team_id, fixture.man_of_match_id,
       );
 
-      await this.prisma.contestEntry.update({
-        where: { id: entry.id },
-        data: { totalPoints: scored.total },
+      if (sqlAuthoritative) {
+        await this.postgres.updateContestEntry(entry.id, { totalPoints: scored.total });
+      } else {
+        await this.prisma.contestEntry.update({ where: { id: entry.id }, data: { totalPoints: scored.total } });
+      }
+      scoredEntries += 1;
+    }
+
+    if (scoredEntries === 0) {
+      this.logger.warn(`Finished contest ${contestId} has no scorable entries; postponing on-chain settlement.`);
+      return;
+    }
+
+    let ranked: any[];
+    if (sqlAuthoritative) {
+      ranked = await this.postgres.rankContestEntries(contestId);
+    } else {
+      ranked = await this.prisma.contestEntry.findMany({ where: { contestId }, orderBy: { totalPoints: 'desc' } });
+      await this.prisma.$transaction(
+        ranked.map((entry, index) => this.prisma.contestEntry.update({ where: { id: entry.id }, data: { rank: index + 1 } })),
+      );
+      await this.prisma.leaderboardSnapshot.create({
+        data: {
+          contestId,
+          isFinal: true,
+          standings: ranked.map((entry, index) => ({
+            contestEntryId: entry.id,
+            userId: entry.userId,
+            rank: index + 1,
+            totalPoints: Number(entry.totalPoints) || 0,
+          })),
+        },
       });
     }
 
-    const ranked = await this.prisma.contestEntry.findMany({
-      where: { contestId },
-      orderBy: { totalPoints: 'desc' },
-    });
-
-    await this.prisma.$transaction(
-      ranked.map((entry, index) =>
-        this.prisma.contestEntry.update({
-          where: { id: entry.id },
-          data: { rank: index + 1 },
-        }),
-      ),
-    );
-
-    await this.prisma.leaderboardSnapshot.create({
-      data: {
-        contestId,
-        isFinal: true,
-        standings: ranked.map((entry, index) => ({
-          contestEntryId: entry.id,
-          userId: entry.userId,
-          rank: index + 1,
-          totalPoints: Number(entry.totalPoints) || 0,
-        })),
-      },
-    });
-
     this.logger.log(
       'Finished contest scored directly: contest=' + contestId +
-        ', fixture=' + fixtureId +
-        ', entries=' + ranked.length,
+      ', fixture=' + fixtureId +
+      ', entries=' + ranked.length +
+      ', storage=' + (sqlAuthoritative ? 'NEON' : 'FIRESTORE'),
     );
 
     await this.settleContest(contestId);
