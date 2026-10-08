@@ -222,6 +222,7 @@ export class MatchesService {
         fixtureId,
         applicationState: 'LIVE',
         active: true,
+        league_id: fixture?.league_id ?? null,
         type: fixture?.type ?? null,
         status: fixture?.status ?? null,
         live: Number(fixture?.live) === 1 ? 1 : 0,
@@ -243,10 +244,10 @@ export class MatchesService {
       const fixtureId = Number(doc.id);
       if (!Number.isFinite(fixtureId)) continue;
 
-      // Disable stale realtime documents for fixtures that are no longer
-      // allowlisted or that use a blocked red-ball format.
+      // Disable stale realtime documents that carry a blocked format.
+      // Older documents may not contain type; direct Sportmonks verification
+      // below will then enforce the configured league/format restrictions.
       if (
-        !this.sportmonks.isFixtureAllowed(fixtureId) ||
         !this.sportmonks.isFixtureFormatAllowed({ type: String(doc.data?.()?.type ?? '') })
       ) {
         batch.set(doc.ref, { active: false, updatedAt: now }, { merge: true });
@@ -294,9 +295,19 @@ export class MatchesService {
           continue;
         }
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (
+          message.includes('not in an enabled CrickX league') ||
+          message.includes('Test/First Class multi-day format')
+        ) {
+          batch.set(doc.ref, { active: false, updatedAt: now }, { merge: true });
+          changed = true;
+          continue;
+        }
+
         console.warn(
           `Unable to verify fixture ${fixtureId} after it left the live feed:`,
-          error instanceof Error ? error.message : String(error),
+          message,
         );
       }
 
@@ -320,7 +331,7 @@ export class MatchesService {
       .filter((row) => {
         const fixtureId = Number(row?.id ?? row?.fixtureId);
         const timestamp = new Date(row?.starting_at ?? '').getTime();
-        return this.sportmonks.isFixtureAllowed(fixtureId) &&
+        return this.sportmonks.isLeagueAllowed(Number(row?.league_id)) &&
           this.sportmonks.isFixtureFormatAllowed({ type: String(row?.type ?? '') }) &&
           Number.isFinite(timestamp) &&
           timestamp >= start.getTime();
