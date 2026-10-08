@@ -85,12 +85,6 @@ export class SportmonksDataService {
    * Block red-ball / multi-day formats at the provider boundary.
    */
   isFixtureFormatAllowed(fixture: Pick<SportmonksFixture, 'type' | 'league_id'>): boolean {
-    const leagueId = Number((fixture as any)?.league_id);
-    // Explicitly configured league IDs are the product allowlist. If an
-    // allowlisted competition is First Class/Test/multi-day, it must remain
-    // visible instead of being rejected by the generic red-ball safeguard.
-    if (this.allowedLeagueIds?.has(leagueId)) return true;
-
     const type = String(fixture?.type ?? '')
       .trim()
       .toLowerCase()
@@ -98,12 +92,21 @@ export class SportmonksDataService {
       .replace(/\s+/g, ' ');
 
     if (!type) return true;
+
+    // Test and explicit 4/5-day formats are always excluded.
+    // The league allowlist must not override these product rules.
     if (/\btest(?:\s+match|\s+cricket)?\b/.test(type)) return false;
-    if (/\bfirst\s*[- ]?\s*class\b/.test(type)) return false;
     if (/\b(?:4|four|5|five)\s*[- ]?\s*day(?:s)?\b/.test(type)) return false;
+
+    // Generic First Class fixtures are allowed only when their league is
+    // explicitly allowlisted.
+    if (/\bfirst\s*[- ]?\s*class\b/.test(type)) {
+      const leagueId = Number((fixture as any)?.league_id);
+      return this.allowedLeagueIds?.has(leagueId) ?? false;
+    }
+
     return true;
   }
-
   private assertFixtureAllowed(
     fixture: Pick<SportmonksFixture, 'league_id' | 'type'>,
     fixtureId: number,
