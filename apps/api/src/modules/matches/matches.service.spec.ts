@@ -139,6 +139,8 @@ describe('MatchesService live projection', () => {
     const ref = {};
     const { realtime, batch } = makeRealtime({ id: '123', ref });
     const sportmonks = {
+      isFixtureAllowed: jest.fn().mockReturnValue(true),
+      isFixtureFormatAllowed: jest.fn().mockReturnValue(true),
       getFixture: jest.fn().mockResolvedValue({
         id: 123,
         status: 'NS',
@@ -162,6 +164,8 @@ describe('MatchesService live projection', () => {
     const ref = {};
     const { realtime, batch, completedCollection } = makeRealtime({ id: '123', ref });
     const sportmonks = {
+      isFixtureAllowed: jest.fn().mockReturnValue(true),
+      isFixtureFormatAllowed: jest.fn().mockReturnValue(true),
       getFixture: jest.fn().mockResolvedValue({
         id: 123,
         status: 'Finished',
