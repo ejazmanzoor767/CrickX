@@ -982,10 +982,18 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
     this.settlingContests.add(contestId);
     try {
-      const contest = await this.prisma.contest.findUnique({ where: { id: contestId }, include: { entries: true } });
+      const sqlAuthoritative = this.postgres.isEnabled();
+      const contest = sqlAuthoritative
+        ? await this.postgres.getContest(contestId)
+        : await this.prisma.contest.findUnique({ where: { id: contestId }, include: { entries: true } });
+
       if (!contest || contest.status === 'COMPLETED') return;
 
-      const rankedEntries = [...(contest.entries ?? [])]
+      const entries = sqlAuthoritative
+        ? await this.postgres.listContestEntries(contestId)
+        : (contest.entries ?? []);
+
+      const rankedEntries = [...entries]
         .filter((entry: any) => entry.walletAddress && entry.totalPoints !== null && entry.totalPoints !== undefined)
         .sort((a: any, b: any) => Number(b.totalPoints) - Number(a.totalPoints));
 
@@ -1006,44 +1014,66 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         ', entries=' + rankedEntries.length +
         ', onchainParticipants=' + summary.participantCount +
         ', stage=' + summary.stage +
-        ', totalPool=' + summary.totalPool,
+        ', totalPool=' + summary.totalPool +
+        ', storage=' + (sqlAuthoritative ? 'NEON' : 'FIRESTORE'),
       );
 
       if (summary.stage >= 2) {
         await this.markSettledEntries(contestId, rankedEntries, summary.totalPool, summary.participantCount);
-        await this.prisma.contest.update({
-          where: { id: contestId },
-          data: { status: 'COMPLETED', prizePoolTotal: summary.totalPool, entryFee: 0 },
-        });
+        if (sqlAuthoritative) {
+          await this.postgres.updateContest(contestId, {
+            status: 'COMPLETED',
+            prizePoolTotal: summary.totalPool,
+            entryFee: 0,
+          });
+        } else {
+          await this.prisma.contest.update({
+            where: { id: contestId },
+            data: { status: 'COMPLETED', prizePoolTotal: summary.totalPool, entryFee: 0 },
+          });
+        }
         return;
       }
 
-      // Recovery path: if the live-start funding trigger was missed, fund the
-      // complete pool once at settlement time before finalizing the ranking.
+      // Recovery path: if live-start funding was missed, fund the complete pool
+      // once at settlement time. The on-chain helper is idempotent.
       if (summary.stage === 0 && (!summary.fundingComplete || summary.participantCount === 0 || summary.totalPool <= 0)) {
         try {
           const funding = await this.onchain.fundContestPrizePool(chainContestId, rankedEntries.length);
           summary = await this.onchain.summary(chainContestId);
-          await this.prisma.contest.update({
-            where: { id: contestId },
-            data: {
-              prizePoolFundingStatus: 'FUNDED',
-              prizePoolFundedAmount: summary.totalPool,
-              prizePoolFundingTxHash: funding.fundingTxHash ?? (contest as any).prizePoolFundingTxHash ?? null,
-              prizePoolFundingAt: new Date(),
-              prizePoolFundingError: null,
-            },
-          });
+          const fundingState = {
+            prizePoolFundingStatus: 'FUNDED',
+            prizePoolFundedAmount: summary.totalPool,
+            prizePoolFundingTxHash: funding.fundingTxHash ?? (contest as any).prizePoolFundingTxHash ?? null,
+            prizePoolFundingAt: new Date(),
+            prizePoolFundingError: null,
+          };
+
+          if (sqlAuthoritative) {
+            await this.postgres.updateContest(contestId, fundingState);
+          } else {
+            await this.prisma.contest.update({ where: { id: contestId }, data: fundingState });
+          }
+
           this.logger.log(
             `Contest ${contestId} funding recovery complete: participants=${summary.participantCount} pool=${summary.totalPool} tokenTx=${funding.fundingTxHash ?? 'none'} accountingTx=${funding.registrationTxHash ?? 'none'}`,
           );
         } catch (error) {
           const detail = error instanceof Error ? error.message : String(error);
-          await this.prisma.contest.update({
-            where: { id: contestId },
-            data: { prizePoolFundingStatus: 'FAILED', prizePoolFundingError: detail.slice(0, 1000) },
-          }).catch(() => undefined);
-          throw new BadRequestException(`Contest ${contestId} cannot settle because its on-chain prize pool is not funded: ${detail}`);
+          const failureState = {
+            prizePoolFundingStatus: 'FAILED',
+            prizePoolFundingError: detail.slice(0, 1000),
+          };
+
+          if (sqlAuthoritative) {
+            await this.postgres.updateContest(contestId, failureState).catch(() => undefined);
+          } else {
+            await this.prisma.contest.update({ where: { id: contestId }, data: failureState }).catch(() => undefined);
+          }
+
+          throw new BadRequestException(
+            `Contest ${contestId} cannot settle because its on-chain prize pool is not funded: ${detail}`,
+          );
         }
       }
 
@@ -1057,26 +1087,32 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         'Submitting on-chain settlement contest=' + contestId +
         ', chainContestId=' + chainContestId +
-        ', participants=' + winnerWallets.length,
+        ', participants=' + winnerWallets.length +
+        ', storage=' + (sqlAuthoritative ? 'NEON' : 'FIRESTORE'),
       );
 
       const settlement = await this.onchain.settleFinal(chainContestId, winnerWallets);
       summary = await this.onchain.summary(chainContestId);
 
       if (summary.stage !== 2) {
-        throw new BadRequestException(`On-chain contest did not reach Distributed stage. Current stage=${summary.stage}.`);
+        throw new BadRequestException(
+          `On-chain contest did not reach Distributed stage. Current stage=${summary.stage}.`,
+        );
       }
 
       await this.markSettledEntries(contestId, rankedEntries, summary.totalPool, summary.participantCount);
 
-      await this.prisma.contest.update({
-        where: { id: contestId },
-        data: {
-          status: 'COMPLETED',
-          prizePoolTotal: summary.totalPool,
-          entryFee: 0,
-        },
-      });
+      const completedState = {
+        status: 'COMPLETED',
+        prizePoolTotal: summary.totalPool,
+        entryFee: 0,
+      };
+
+      if (sqlAuthoritative) {
+        await this.postgres.updateContest(contestId, completedState);
+      } else {
+        await this.prisma.contest.update({ where: { id: contestId }, data: completedState });
+      }
 
       this.logger.log(
         `Contest ${contestId} settled on-chain. participants=${summary.participantCount} tx=${settlement.finalPrizeTxHash}`,
@@ -1086,7 +1122,12 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async markSettledEntries(contestId: string, rankedEntries: any[], totalPool: number, participantCount: number) {
+  private async markSettledEntries(
+    contestId: string,
+    rankedEntries: any[],
+    totalPool: number,
+    participantCount: number,
+  ) {
     if (participantCount !== rankedEntries.length) {
       throw new BadRequestException(
         `Cannot write final prizes: on-chain participants=${participantCount}, ranked entries=${rankedEntries.length}.`,
@@ -1106,14 +1147,22 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       const amount = Math.max(0, Math.floor(rawAmount * 1_000_000) / 1_000_000);
       distributed += rawAmount;
 
-      await this.prisma.contestEntry.update({
-        where: { id: entry.id },
-        data: {
+      if (this.postgres.isEnabled()) {
+        await this.postgres.updateContestEntry(entry.id, {
           rank,
           prizeWon: amount,
           paymentStatus: 'SUBSCRIPTION_ACTIVE',
-        },
-      });
+        });
+      } else {
+        await this.prisma.contestEntry.update({
+          where: { id: entry.id },
+          data: {
+            rank,
+            prizeWon: amount,
+            paymentStatus: 'SUBSCRIPTION_ACTIVE',
+          },
+        });
+      }
     }
   }
 
