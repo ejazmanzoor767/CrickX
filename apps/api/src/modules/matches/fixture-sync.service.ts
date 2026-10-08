@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { MatchesService } from './matches.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
+import { SportmonksFixture } from '../sportmonks/sportmonks.types';
 
 /**
  * Pre-warms the Sportmonks fixture cache for upcoming matches so the
@@ -23,7 +24,7 @@ export class FixtureSyncService {
   async syncUpcoming() {
     try {
       const { data: fixtures } = await this.matches.listUpcomingAndRecent(1);
-      const soon = fixtures.filter((f) => {
+      const soon = fixtures.filter((f: SportmonksFixture) => {
         const startsInMs = new Date(f.starting_at).getTime() - Date.now();
         return startsInMs > 0 && startsInMs < 24 * 60 * 60 * 1000; // within next 24h
       });
