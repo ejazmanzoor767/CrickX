@@ -235,7 +235,17 @@ export class MatchesService {
 
     for (const doc of stale.docs) {
       const fixtureId = Number(doc.id);
-      if (!Number.isFinite(fixtureId) || activeIds.has(fixtureId)) continue;
+      if (!Number.isFinite(fixtureId)) continue;
+
+      // Disable stale realtime documents for fixtures that are no longer
+      // allowlisted. They must not survive in the Live Firestore feed.
+      if (!this.sportmonks.isFixtureAllowed(fixtureId)) {
+        batch.set(doc.ref, { active: false, updatedAt: now }, { merge: true });
+        changed = true;
+        continue;
+      }
+
+      if (activeIds.has(fixtureId)) continue;
 
       // /livescores can remove a fixture before the schedule feed catches up.
       // Verify the fixture directly with Sportmonks before deciding what the
@@ -299,8 +309,11 @@ export class MatchesService {
     return snapshot.docs
       .map((doc) => doc.data() as any)
       .filter((row) => {
+        const fixtureId = Number(row?.id ?? row?.fixtureId);
         const timestamp = new Date(row?.starting_at ?? '').getTime();
-        return Number.isFinite(timestamp) && timestamp >= start.getTime();
+        return this.sportmonks.isFixtureAllowed(fixtureId) &&
+          Number.isFinite(timestamp) &&
+          timestamp >= start.getTime();
       })
       .map((row) => normalize(row, 'COMPLETED'));
   }
