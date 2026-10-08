@@ -15,9 +15,6 @@ const FIXTURE_INCLUDES = 'localteam,visitorteam,scoreboards,runs,batting,bowling
 const LIVE_FIXTURE_INCLUDES = FIXTURE_INCLUDES;
 const LIVE_SCORECARD_INCLUDES = 'localteam,visitorteam,scoreboards,runs';
 
-const TTL_LIVE_MS = 15 * 1000;
-const TTL_UPCOMING_MS = 5 * 60 * 1000;
-const TTL_PLAYER_MS = 60 * 60 * 1000;
 const MAX_FIXTURE_PAGES = 5;
 
 const asRows = (value: any): any[] => Array.isArray(value) ? value : Array.isArray(value?.data) ? value.data : [];
@@ -198,21 +195,6 @@ export class SportmonksDataService {
   }
 
   async getFixture(fixtureId: number, opts: { forceLive?: boolean } = {}): Promise<SportmonksFixture> {
-    // Live/terminal scoring must not perform a Firestore read/write on every poll.
-    // The previous implementation cached the full ball-by-ball payload in
-    // Firestore, multiplying reads/writes and repeatedly serializing a large
-    // object. Use the persistent cache only for normal/non-live lookups.
-    if (!opts.forceLive) {
-      const cached = await this.prisma.cachedFixture.findUnique({
-        where: { sportmonksFixtureId: fixtureId },
-      });
-      if (cached && cached.expiresAt > new Date()) {
-        const cachedFixture = normalizeFixture(cached.payload as unknown as SportmonksFixture);
-        this.assertFixtureAllowed(cachedFixture, fixtureId);
-        return cachedFixture;
-      }
-    }
-
     const includes = opts.forceLive ? LIVE_FIXTURE_INCLUDES : FIXTURE_INCLUDES;
     const envelope = await this.client.get<SportmonksFixture>(
       `/fixtures/${fixtureId}`,
@@ -220,25 +202,6 @@ export class SportmonksDataService {
     );
     const incoming = normalizeFixture(envelope.data);
     this.assertFixtureAllowed(incoming, fixtureId);
-
-    // Only persist non-live snapshots. High-frequency live/terminal refreshes
-    // return the provider response directly and do not write the huge ball list
-    // back to Firestore.
-    if (!opts.forceLive) {
-      const ttlMs = incoming.live === 1 ? TTL_LIVE_MS : TTL_UPCOMING_MS;
-      await this.prisma.cachedFixture.upsert({
-        where: { sportmonksFixtureId: fixtureId },
-        create: {
-          sportmonksFixtureId: fixtureId,
-          payload: incoming as unknown as object,
-          expiresAt: new Date(Date.now() + ttlMs),
-        },
-        update: {
-          payload: incoming as unknown as object,
-          expiresAt: new Date(Date.now() + ttlMs),
-        },
-      });
-    }
 
     return incoming;
   }
@@ -257,14 +220,7 @@ export class SportmonksDataService {
   }
 
   async getPlayer(playerId: number): Promise<SportmonksPlayer> {
-    const cached = await this.prisma.cachedPlayer.findUnique({ where: { sportmonksPlayerId: playerId } });
-    if (cached && cached.expiresAt > new Date()) return cached.payload as unknown as SportmonksPlayer;
     const envelope = await this.client.get<SportmonksPlayer>(`/players/${playerId}`);
-    await this.prisma.cachedPlayer.upsert({
-      where: { sportmonksPlayerId: playerId },
-      create: { sportmonksPlayerId: playerId, payload: envelope.data as unknown as object, expiresAt: new Date(Date.now() + TTL_PLAYER_MS) },
-      update: { payload: envelope.data as unknown as object, expiresAt: new Date(Date.now() + TTL_PLAYER_MS) },
-    });
     return envelope.data;
   }
 
