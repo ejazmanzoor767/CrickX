@@ -34,9 +34,15 @@ describe('WalletService.mutateBalance', () => {
     return { prisma, wallet };
   }
 
+  const buildConfigMock = () => ({
+    get: jest.fn((_key: string, fallback?: unknown) => fallback),
+  });
+
+  const buildOxaPayMock = () => ({} as any);
+
   it('is idempotent — replaying the same idempotencyKey does not double-apply', async () => {
     const { prisma } = buildPrismaMock({ depositBalance: 100, version: 0 });
-    const service = new WalletService(prisma, {} as any, { get: jest.fn((_key: string, fallback?: unknown) => fallback) } as any);
+    const service = new WalletService(prisma, buildConfigMock() as any, buildOxaPayMock());
 
     const first = await service.mutateBalance({
       userId: 'u1', bucket: 'DEPOSIT', delta: 50, type: 'DEPOSIT', idempotencyKey: 'dep-1',
@@ -51,7 +57,7 @@ describe('WalletService.mutateBalance', () => {
 
   it('rejects a debit that would take a balance negative', async () => {
     const { prisma } = buildPrismaMock({ depositBalance: 10, version: 0 });
-    const service = new WalletService(prisma as any, {} as any, { get: jest.fn((_key: string, fallback?: unknown) => fallback) } as any);
+    const service = new WalletService(prisma as any, buildConfigMock() as any, buildOxaPayMock());
 
     await expect(
       service.mutateBalance({ userId: 'u1', bucket: 'DEPOSIT', delta: -20, type: 'CONTEST_ENTRY_DEBIT', idempotencyKey: 'debit-1' }),
@@ -60,7 +66,7 @@ describe('WalletService.mutateBalance', () => {
 
   it('rejects on optimistic-lock version mismatch (concurrent update)', async () => {
     const { prisma, wallet } = buildPrismaMock({ depositBalance: 100, version: 0 });
-    const service = new WalletService(prisma as any, {} as any, { get: jest.fn((_key: string, fallback?: unknown) => fallback) } as any);
+    const service = new WalletService(prisma as any, buildConfigMock() as any, buildOxaPayMock());
 
     // Simulate a concurrent writer bumping the version between read and write.
     prisma.wallet.findUnique.mockResolvedValueOnce({ ...wallet, version: 0 });
@@ -73,7 +79,7 @@ describe('WalletService.mutateBalance', () => {
 
   it('correctly applies a credit and returns the resulting transaction record', async () => {
     const { prisma, wallet } = buildPrismaMock({ depositBalance: 0, version: 0 });
-    const service = new WalletService(prisma as any, {} as any, { get: jest.fn((_key: string, fallback?: unknown) => fallback) } as any);
+    const service = new WalletService(prisma as any, buildConfigMock() as any, buildOxaPayMock());
 
     const tx = await service.mutateBalance({
       userId: 'u1', bucket: 'DEPOSIT', delta: 250, type: 'DEPOSIT', idempotencyKey: 'dep-3',
