@@ -14,7 +14,7 @@ const FIXTURE_INCLUDES = 'localteam,visitorteam,scoreboards,runs,batting,bowling
 const LIVE_FIXTURE_INCLUDES = FIXTURE_INCLUDES;
 const LIVE_SCORECARD_INCLUDES = 'localteam,visitorteam,scoreboards,runs';
 
-const MAX_FIXTURE_PAGES = 5;
+const MAX_FIXTURE_PAGES = 50;
 
 const asRows = (value: any): any[] => Array.isArray(value) ? value : Array.isArray(value?.data) ? value.data : [];
 
