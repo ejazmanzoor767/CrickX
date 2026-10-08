@@ -240,7 +240,10 @@ export class MatchesService {
       }
 
       try {
-        const latest = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
+        const latest = await this.sportmonks.getFixture(fixtureId, {
+          forceLive: true,
+          allowUnlistedLeague: true,
+        });
         return { fixture, fixtureId, latest, verified: true };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -412,8 +415,12 @@ export class MatchesService {
 
   async syncLiveProjection() {
     if (!this.realtime.isEnabled()) return [] as number[];
-    const liveResult = await this.sportmonks.listLiveFixtures();
-    const liveRows = Array.isArray(liveResult.data) ? liveResult.data : [];
+    const liveResult = await this.sportmonks.listLiveFixturesRaw();
+    const liveRows = Array.isArray(liveResult.data)
+      ? liveResult.data.filter((fixture: SportmonksFixture) =>
+          this.sportmonks.isFixtureFormatAllowed(fixture),
+        )
+      : [];
     const completed = await this.projectLiveMatches(liveRows);
     return Array.from(completed);
   }
