@@ -26,6 +26,15 @@ function isFirestoreQuotaError(error: unknown) {
   return /RESOURCE_EXHAUSTED|Quota exceeded/i.test(message);
 }
 
+function compareRankedEntries(a: any, b: any) {
+  const points = Number(b?.totalPoints ?? 0) - Number(a?.totalPoints ?? 0);
+  if (points !== 0) return points;
+  const aCreated = new Date(a?.createdAt ?? 0).getTime();
+  const bCreated = new Date(b?.createdAt ?? 0).getTime();
+  if (Number.isFinite(aCreated) && Number.isFinite(bCreated) && aCreated !== bCreated) return aCreated - bCreated;
+  return String(a?.id ?? '').localeCompare(String(b?.id ?? ''));
+}
+
 function isActuallyLive(fixture: any) {
   const value = String(fixture?.status ?? '').trim().toLowerCase();
   const live: 0 | 1 = Number(fixture?.live) === 1 ? 1 : 0;
@@ -594,7 +603,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         if (scored.total > previous) userFixtureScores.set(entry.userId, scored.total);
       }
 
-      const ranked = await this.prisma.contestEntry.findMany({ where: { contestId: contest.id }, orderBy: { totalPoints: 'desc' } });
+      const ranked = await this.prisma.contestEntry.findMany({ where: { contestId: contest.id }, orderBy: [{ totalPoints: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }] });
       await this.prisma.$transaction(ranked.map((entry, index) => this.prisma.contestEntry.update({ where: { id: entry.id }, data: { rank: index + 1 } })));
       if (this.postgres.isEnabled()) {
         for (const [index, entry] of ranked.entries()) {
@@ -780,7 +789,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
     const ranked = await this.prisma.contestEntry.findMany({
       where: { contestId },
-      orderBy: { totalPoints: 'desc' },
+      orderBy: [{ totalPoints: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
     });
 
     await this.prisma.$transaction(
@@ -827,7 +836,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
       const rankedEntries = [...(contest.entries ?? [])]
         .filter((entry: any) => entry.walletAddress && entry.totalPoints !== null && entry.totalPoints !== undefined)
-        .sort((a: any, b: any) => Number(b.totalPoints) - Number(a.totalPoints));
+        .sort(compareRankedEntries);
 
       if (rankedEntries.length === 0) {
         this.logger.warn(`Contest ${contestId} has no scored entries; postponing on-chain settlement.`);
