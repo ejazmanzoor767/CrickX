@@ -331,8 +331,12 @@ export class MatchesService {
       .filter((row) => {
         const fixtureId = Number(row?.id ?? row?.fixtureId);
         const timestamp = new Date(row?.starting_at ?? '').getTime();
-        return this.sportmonks.isLeagueAllowed(Number(row?.league_id)) &&
-          this.sportmonks.isFixtureFormatAllowed({ type: String(row?.type ?? '') }) &&
+        const leagueId = Number(row?.league_id);
+        const type = String(row?.type ?? '').trim();
+        return type.length > 0 &&
+          Number.isFinite(leagueId) &&
+          this.sportmonks.isLeagueAllowed(leagueId) &&
+          this.sportmonks.isFixtureFormatAllowed({ type }) &&
           Number.isFinite(timestamp) &&
           timestamp >= start.getTime();
       })
