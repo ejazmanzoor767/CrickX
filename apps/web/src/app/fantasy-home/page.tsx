@@ -80,8 +80,25 @@ export default function FantasyHomePage() {
           .sort((a: any, b: any) => new Date(a.starting_at ?? 0).getTime() - new Date(b.starting_at ?? 0).getTime());
         if (liveRows.length) {
           setMatches((current) => {
+            // Keep API-discovered live fixtures even when the realtime
+            // projection is briefly behind. The normal API refresh remains
+            // authoritative for removing completed fixtures.
+            const mergedLive = new Map<number, any>();
+            for (const item of current.filter((item: any) => isLive(item))) {
+              const id = Number(item?.id);
+              if (Number.isFinite(id)) mergedLive.set(id, item);
+            }
+            for (const live of liveRows) {
+              const id = Number(live?.id);
+              if (Number.isFinite(id)) mergedLive.set(id, live);
+            }
             const nonLive = current.filter((item: any) => !isLive(item));
-            return [...liveRows, ...nonLive.filter((item: any) => !liveRows.some((live: any) => Number(live.id) === Number(item.id)))];
+            return [
+              ...[...mergedLive.values()].sort(
+                (a: any, b: any) => new Date(a.starting_at ?? 0).getTime() - new Date(b.starting_at ?? 0).getTime(),
+              ),
+              ...nonLive.filter((item: any) => ![...mergedLive.keys()].includes(Number(item?.id))),
+            ];
           });
         }
       }, () => undefined);
