@@ -740,7 +740,9 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
 
     for (const contest of contests) {
       const configuredRules = contest.scoringRuleSet?.rules as Partial<ScoringRules> | undefined;
-      const rules: ScoringRules = { ...formatRules, ...(configuredRules ?? {}) };
+      const rules: ScoringRules = formatRules.long_format
+        ? formatRules
+        : { ...formatRules, ...(configuredRules ?? {}) };
 
       for (const entry of contest.entries) {
         const scored = this.calculateTeamScore(entry.fantasyTeam, battingByPlayer, bowlingByPlayer, fieldingByPlayer, dotBallsByPlayer, rules, fixture.winner_team_id, fixture.man_of_match_id);
@@ -896,7 +898,9 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       ? await this.prisma.scoringRuleSet.findUnique({ where: { id: scoringRuleSetId } })
       : null;
     const configuredRules = configuredRuleSet?.rules as Partial<ScoringRules> | undefined;
-    const rules: ScoringRules = { ...formatRules, ...(configuredRules ?? {}) };
+    const rules: ScoringRules = formatRules.long_format
+      ? formatRules
+      : { ...formatRules, ...(configuredRules ?? {}) };
 
     for (const entry of contest.entries ?? []) {
       const fantasyTeam = (entry as any).fantasyTeam;
