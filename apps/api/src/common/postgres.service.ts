@@ -43,7 +43,9 @@ export class PostgresService implements OnModuleInit, OnModuleDestroy {
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
       ssl: String(process.env.POSTGRES_SSL ?? 'true').toLowerCase() === 'true'
-        ? { rejectUnauthorized: false }
+        ? {
+            rejectUnauthorized: String(process.env.POSTGRES_SSL_REJECT_UNAUTHORIZED ?? 'true').toLowerCase() !== 'false',
+          }
         : undefined,
       application_name: 'crickx-api',
     });
