@@ -1,4 +1,4 @@
-import { IsNumber, IsString, Min, Max, MaxLength, MinLength, Matches } from 'class-validator';
+import { IsNumber, Min, Max, Matches } from 'class-validator';
 
 export class EarlyBuyCheckoutDto {
   @IsNumber() @Min(1) @Max(100_000) amountUsd!: number;
