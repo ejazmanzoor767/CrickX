@@ -82,7 +82,7 @@ export class SportmonksDataService {
     private readonly prisma: FirestoreService,
     private readonly config: ConfigService,
   ) {
-    const raw = this.config.get<string>('ALLOWED_SPORTSMONKS_FIXTURE_IDS', '');
+    const raw = this.config.get<string>('ALLOWED_SPORTMONKS_FIXTURE_IDS', '');
     const ids = raw
       .split(',')
       .map((value) => Number(value.trim()))
@@ -92,7 +92,7 @@ export class SportmonksDataService {
   }
 
   /**
-   * When ALLOWED_SPORTSMONKS_FIXTURE_IDS is configured, only those exact
+   * When ALLOWED_SPORTMONKS_FIXTURE_IDS is configured, only those exact
    * Sportmonks fixture IDs are allowed into any CrickX match/fantasy feed.
    * An unset/blank variable preserves the existing provider feed behavior.
    */
