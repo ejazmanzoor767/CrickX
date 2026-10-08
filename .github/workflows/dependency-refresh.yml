@@ -1,0 +1,119 @@
+name: Security Dependency Refresh
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "package.json"
+      - "apps/api/package.json"
+      - "apps/web/package.json"
+      - "apps/mobile/package.json"
+      - ".github/workflows/dependency-refresh.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Serialized refresh from the latest main commit prevents stale lockfile pushes.
+# The workflow always starts from the current main branch so its generated lockfile cannot overwrite newer commits.
+# It also re-runs the application build checks after dependency resolution so this workflow remains a release-readiness check.
+
+concurrency:
+  group: security-dependency-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Refresh lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf node_modules apps/*/node_modules
+          rm -f package-lock.json
+          npm install --workspaces --include-workspace-root --no-audit --no-fund
+          cd apps/mobile
+          npx expo install --fix --npm
+          cd ../..
+          npm install --package-lock-only --workspaces --include-workspace-root --ignore-scripts --no-audit --no-fund
+          git diff -- package.json apps/api/package.json apps/web/package.json apps/mobile/package.json package-lock.json
+
+      - name: Commit refreshed dependency tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for attempt in 1 2 3; do
+            echo "Dependency refresh push attempt $attempt"
+            git fetch origin main
+
+            if ! git diff --quiet || ! git diff --cached --quiet; then
+              git reset --hard HEAD
+            fi
+
+            # Rebase onto the newest main so this generated lockfile cannot
+            # overwrite commits that landed while dependency resolution ran.
+            git rebase origin/main
+
+            # Re-resolve the lockfile from the latest repository manifests.
+            rm -rf node_modules apps/*/node_modules
+            npm install --workspaces --include-workspace-root --no-audit --no-fund
+            (
+              cd apps/mobile
+              npx expo install --fix --npm
+            )
+            npm install --package-lock-only --workspaces --include-workspace-root --ignore-scripts --no-audit --no-fund
+
+            git add package.json package-lock.json apps/api/package.json apps/web/package.json apps/mobile/package.json
+            if git diff --cached --quiet; then
+              echo "No dependency changes are required on the latest main."
+              exit 0
+            fi
+
+            git commit -m "chore(security): refresh dependency tree"
+
+            if git push origin HEAD:main; then
+              echo "Dependency refresh pushed successfully."
+              exit 0
+            fi
+
+            git rebase --abort 2>/dev/null || true
+            echo "Main advanced during push; retrying against the latest main..."
+            sleep 2
+          done
+
+          echo "Unable to publish dependency refresh after 3 retries."
+          exit 1
+
+      - name: Verify clean install
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --workspaces --include-workspace-root --no-audit --no-fund
+
+      - name: Audit all dependencies
+        shell: bash
+        run: |
+          npm audit --audit-level=moderate
+
+      - name: Build API
+        run: npm run build --workspace @fantasy-cricket/api
+
+      - name: Build web
+        run: npm run build --workspace @fantasy-cricket/web

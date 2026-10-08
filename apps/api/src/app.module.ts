@@ -1,0 +1,45 @@
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
+import { SportmonksModule } from './modules/sportmonks/sportmonks.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { MatchesModule } from './modules/matches/matches.module';
+import { FantasyModule } from './modules/fantasy/fantasy.module';
+import { WalletModule } from './modules/wallet/wallet.module';
+import { ProfileModule } from './modules/profile/profile.module';
+import { ScoringModule } from './modules/scoring/scoring.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { PredictionModule } from './modules/prediction/prediction.module';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { HealthController } from './health.controller';
+import { CommonModule } from './common/common.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    ScheduleModule.forRoot(),
+    CommonModule,
+    SportmonksModule,
+    AuthModule,
+    MatchesModule,
+    FantasyModule,
+    WalletModule,
+    SubscriptionModule,
+    PredictionModule,
+    ProfileModule,
+    ScoringModule,
+    AdminModule,
+  ],
+  controllers: [HealthController],
+  providers: [
+    JwtAuthGuard,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
+  exports: [JwtAuthGuard],
+})
+export class AppModule {}

@@ -1,0 +1,70 @@
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { Request } from 'express';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/guards/roles.decorator';
+import { FantasyDraftService } from './fantasy-draft.service';
+import { FantasyTeamService } from './fantasy-team.service';
+import { ContestService } from './contest.service';
+import { CreateFantasyTeamDto, CreateContestDto, JoinContestDto, PrepareJoinContestDto, SaveFantasyDraftDto } from './dto';
+
+function uid(req: Request) {
+  return (req as unknown as { user: { userId: string } }).user.userId;
+}
+
+@Controller('fantasy/teams')
+@UseGuards(JwtAuthGuard)
+export class FantasyTeamController {
+  constructor(private readonly teams: FantasyTeamService, private readonly drafts: FantasyDraftService) {}
+
+  @Post()
+  create(@Req() req: Request, @Body() dto: CreateFantasyTeamDto) { return this.teams.createTeam(uid(req), dto); }
+
+  @Put(':teamId')
+  edit(@Req() req: Request, @Param('teamId') teamId: string, @Body() dto: CreateFantasyTeamDto) { return this.teams.editTeam(uid(req), teamId, dto); }
+
+  @Get()
+  mine(@Req() req: Request) { return this.teams.listMine(uid(req)); }
+
+  @Get('draft/:fixtureId')
+  draft(@Req() req: Request, @Param('fixtureId', ParseIntPipe) fixtureId: number) { return this.drafts.get(uid(req), fixtureId); }
+
+  @Put('draft/:fixtureId')
+  saveDraft(@Req() req: Request, @Param('fixtureId', ParseIntPipe) fixtureId: number, @Body() dto: SaveFantasyDraftDto) { return this.drafts.save(uid(req), fixtureId, dto); }
+
+  @Get(':teamId')
+  one(@Req() req: Request, @Param('teamId') teamId: string) { return this.teams.getOne(uid(req), teamId); }
+}
+
+@Controller('fantasy/contests')
+@UseGuards(JwtAuthGuard)
+export class ContestController {
+  constructor(private readonly contests: ContestService) {}
+
+  @Post()
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  create(@Body() dto: CreateContestDto) { return this.contests.create(dto); }
+
+  @Get('fixture/:fixtureId')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  forFixture(@Param('fixtureId', ParseIntPipe) fixtureId: number) { return this.contests.listForFixture(fixtureId); }
+
+  @Get('fixture/:fixtureId/active')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  active(@Param('fixtureId', ParseIntPipe) fixtureId: number) { return this.contests.active(fixtureId); }
+
+  @Post('prepare')
+  prepare(@Req() req: Request, @Body() dto: PrepareJoinContestDto) { return this.contests.prepareJoin(uid(req), dto); }
+
+  @Post('join')
+  join(@Req() req: Request, @Body() dto: JoinContestDto) { return this.contests.confirmJoin(uid(req), dto); }
+
+  @Get('mine/entries')
+  myEntries(@Req() req: Request) { return this.contests.myEntries(uid(req)); }
+
+  @Get(':contestId/leaderboard')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  leaderboard(@Param('contestId') contestId: string) { return this.contests.leaderboard(contestId); }
+}

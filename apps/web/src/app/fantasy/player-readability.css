@@ -1,0 +1,42 @@
+/* High-contrast player rows for the XI builder. */
+button.card,
+button.card:hover,
+button.card:focus-visible {
+  color: #f7f8fb;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+button.card strong {
+  color: #f7f8fb;
+  font-weight: 900;
+}
+
+button.card .section-subtitle {
+  color: #b8c2d2;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Make the team logo/flag large enough to read at a glance. */
+button.card img {
+  width: 44px !important;
+  height: 44px !important;
+  flex: 0 0 44px;
+  padding: 6px !important;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.10) !important;
+  border-radius: 50%;
+}
+
+button.card {
+  background: rgba(14,18,28,.96);
+  border-color: rgba(255,255,255,.12);
+}
+
+/* Selected player rows stay clearly green without sacrificing text contrast. */
+button.card[style*="rgba(155,255,71,.07)"] {
+  background: rgba(155,255,71,.10) !important;
+  border-color: rgba(155,255,71,.62) !important;
+}
