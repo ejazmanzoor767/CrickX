@@ -1160,9 +1160,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     }
 
     const contests = (await this.postgres.listContestsByFixture(fixtureId, true))
-      .filter((contest): contest is NonNullable<typeof contest> =>
-        Boolean(contest) && ['UPCOMING', 'LIVE'].includes(String(contest.status ?? '')),
-      );
+      .filter((contest): contest is Exclude<typeof contest, null> => contest !== null);
 
     for (const row of contests) {
       try {
