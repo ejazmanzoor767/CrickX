@@ -290,7 +290,7 @@ export class MatchesService {
         starting_at: live?.starting_at ?? null,
         localteam: live?.localteam ?? null,
         visitorteam: live?.visitorteam ?? null,
-        league: live?.league ?? null,
+        league: (live as any)?.league ?? (fixture as any)?.league ?? null,
         runs: Array.isArray(live?.runs) ? live.runs : [],
         scoreboards: Array.isArray(live?.scoreboards) ? live.scoreboards : [],
         updatedAt: now,
