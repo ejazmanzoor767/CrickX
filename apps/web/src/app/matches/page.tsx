@@ -69,8 +69,16 @@ export default function MatchesPage() {
   async function refreshAll(spinner = false) {
     if (spinner) setLoading(true);
     try {
-      const [liveResult, todayResult, upcomingResult, completedResult, teamsResult] = await Promise.all([
-        api.liveMatches(), api.todayMatches(), api.upcomingMatches(4), api.completedMatches(14), user ? api.myFantasyTeams().catch(() => []) : Promise.resolve([]),
+      // Reconcile Live first. The backend checks live fixtures directly against
+      // Sportmonks' fixture status and projects newly finished matches into
+      // completedMatches, so the Completed tab sees the transition in the same
+      // refresh instead of waiting for a later poll/provider page update.
+      const liveResult = await api.liveMatches();
+      const [todayResult, upcomingResult, completedResult, teamsResult] = await Promise.all([
+        api.todayMatches(),
+        api.upcomingMatches(4),
+        api.completedMatches(14),
+        user ? api.myFantasyTeams().catch(() => []) : Promise.resolve([]),
       ]);
       const liveFeed = asList(liveResult);
       const todayFeed = asList(todayResult);
