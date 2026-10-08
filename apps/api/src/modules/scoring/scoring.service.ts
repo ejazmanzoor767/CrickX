@@ -226,10 +226,9 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    // PostgreSQL is authoritative when enabled. Firestore remains a realtime
-    // projection, so scoring startup must not scan Firestore for bootstrap data.
-    // Recovery is intentionally infrequent. The main 30-second scoring loop
-    // handles live contests; this sweep is only a terminal-state safety net.
+    // Neon is authoritative for contest state and entries. Firestore is only
+    // an optional realtime UI projection; it is never used to discover contests
+    // for scoring or settlement. Recovery is intentionally infrequent.
     void this.runFinishedContestSweep();
     this.settlementSweepTimer = setInterval(() => {
       void this.runFinishedContestSweep();
@@ -246,73 +245,57 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     this.settlementSweepRunning = true;
 
     try {
-      // Avoid FirestoreService.findMany() here: it materializes the entire
-      // contests collection in memory. Query only the small set of fields needed
-      // for the sweep, then process fixtures sequentially so one sweep cannot
-      // exhaust the Render instance.
-      const now = Date.now();
-      const [liveSnapshot, startedSnapshot] = await Promise.all([
-        this.prisma.db
-          .collection('contests')
-          .where('status', '==', 'LIVE')
-          .select('sportmonksFixtureId', 'lineupLockAt')
-          .limit(100)
-          .get(),
-        this.prisma.db
-          .collection('contests')
-          .where('status', '==', 'UPCOMING')
-          .select('sportmonksFixtureId', 'lineupLockAt')
-          .limit(100)
-          .get(),
-      ]);
+      // Neon is the authoritative contest store. The provider is the only
+      // source used to decide whether a fixture is actually finished.
+      if (!this.postgres.isEnabled()) {
+        this.logger.warn('Finished-contest sweep skipped: Neon/PostgreSQL is not ready.');
+        return;
+      }
 
-      const contests = [...liveSnapshot.docs, ...startedSnapshot.docs]
-        .map((doc) => {
-          const data = doc.data() as any;
-          const lockValue = data.lineupLockAt;
-          const lockMs =
-            lockValue && typeof lockValue.toDate === 'function'
-              ? lockValue.toDate().getTime()
-              : lockValue instanceof Date
-                ? lockValue.getTime()
-                : Number.NaN;
-          return {
-            id: doc.id,
-            sportmonksFixtureId: data.sportmonksFixtureId,
-            lineupLockAt: lockMs,
-          };
-        })
-        .filter((contest) => {
-          const lockMs = Number(contest.lineupLockAt);
-          return !Number.isFinite(lockMs) || lockMs <= now;
-        });
+      const activeContests = await this.postgres.listStartedActiveContests();
+      const contestsByFixture = new Map<number, any[]>();
 
-      for (const contest of contests) {
-        const fixtureId = Number(contest.sportmonksFixtureId);
+      for (const contest of activeContests) {
+        const fixtureId = Number(contest?.sportmonksFixtureId);
         if (!Number.isFinite(fixtureId) || fixtureId <= 0) continue;
 
+        const bucket = contestsByFixture.get(fixtureId) ?? [];
+        bucket.push(contest);
+        contestsByFixture.set(fixtureId, bucket);
+      }
+
+      for (const [fixtureId, contests] of contestsByFixture.entries()) {
         try {
+          // Fresh terminal-state check: do not trust cached contest status.
           const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: true });
           if (!isFinished(fixture.status, fixture.live)) continue;
 
           this.logger.log(
-            'Finished-contest sweep found terminal fixture=' + fixtureId + ', contest=' + contest.id,
+            'Finished-contest sweep found terminal fixture=' + fixtureId +
+            ', contests=' + contests.length + ', storage=NEON',
           );
 
-          // Finished contests get a dedicated lightweight scoring path. This
-          // computes only this contest's entries, then submits settlement, without
-          // materializing all fantasy teams/contests in the process.
-          await this.scoreAndSettleFinishedContest(contest.id, fixtureId);
+          // Score and settle every active Neon contest for this finished fixture.
+          for (const contest of contests) {
+            try {
+              await this.scoreAndSettleFinishedContest(String(contest.id), fixtureId);
+            } catch (err) {
+              this.logger.error(
+                'Finished-contest scoring failed for fixture=' + fixtureId + ', contest=' + contest.id,
+                err instanceof Error ? err.stack : String(err),
+              );
+            }
+          }
         } catch (err) {
           this.logger.error(
-            'Finished-contest sweep failed for fixture=' + fixtureId + ', contest=' + contest.id,
+            'Finished-contest sweep failed for fixture=' + fixtureId,
             err instanceof Error ? err.stack : String(err),
           );
         }
       }
     } catch (err) {
       this.logger.error(
-        'Finished-contest sweep could not read Firestore contests',
+        'Finished-contest sweep could not read Neon contests',
         err instanceof Error ? err.stack : String(err),
       );
     } finally {
@@ -1171,10 +1154,13 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
     const final = isFinished(fixture.status, fixture.live);
     if (!final) return;
 
-    const contests = (await this.prisma.contest.findMany({
-      where: { sportmonksFixtureId: fixtureId },
-      select: { id: true, status: true },
-    })).filter((contest: any) => ['UPCOMING', 'LIVE'].includes(String(contest.status ?? '')));
+    if (!this.postgres.isEnabled()) {
+      this.logger.warn('Finished-contest recovery skipped: Neon/PostgreSQL is not ready.');
+      return;
+    }
+
+    const contests = (await this.postgres.listContestsByFixture(fixtureId, true))
+      .filter((contest: any) => ['UPCOMING', 'LIVE'].includes(String(contest.status ?? '')));
 
     for (const row of contests) {
       try {
