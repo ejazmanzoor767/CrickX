@@ -41,7 +41,7 @@ describe('SubscriptionService payment recovery', () => {
       id: 'sub-1',
       userId: 'user-1',
       plan: 'WEEKLY',
-      amount: 0.18,
+      amount: 0.08,
       currency: 'USD',
       status: 'PENDING',
       basketId: 'CRX-SUB-123',
@@ -54,7 +54,7 @@ describe('SubscriptionService payment recovery', () => {
       basketId: subscription.basketId,
       provider: 'OXAPAY',
       status: 'INITIATED',
-      amount: 0.18,
+      amount: 0.08,
       currency: 'USD',
       gatewayTxnRef: 'track-1',
       createdAt,
@@ -66,7 +66,7 @@ describe('SubscriptionService payment recovery', () => {
       status: 'Paid',
       order_id: subscription.basketId,
       track_id: 'track-1',
-      amount: 0.18,
+      amount: 0.08,
       currency: 'USD',
     });
 
@@ -89,13 +89,13 @@ describe('SubscriptionService payment recovery', () => {
     );
   });
 
-  it('activates a monthly pending subscription for 30 days at $0.60', async () => {
+  it('activates a monthly pending subscription for 30 days at $0.28', async () => {
     const createdAt = new Date(Date.now() - 60_000);
     const subscription = {
       id: 'sub-monthly',
       userId: 'user-monthly',
       plan: 'MONTHLY',
-      amount: 0.60,
+      amount: 0.28,
       currency: 'USD',
       status: 'PENDING',
       basketId: 'CRX-SUB-MONTHLY',
@@ -108,7 +108,7 @@ describe('SubscriptionService payment recovery', () => {
       basketId: subscription.basketId,
       provider: 'OXAPAY',
       status: 'INITIATED',
-      amount: 0.60,
+      amount: 0.28,
       currency: 'USD',
       gatewayTxnRef: 'track-monthly',
       createdAt,
@@ -120,7 +120,7 @@ describe('SubscriptionService payment recovery', () => {
       status: 'Paid',
       order_id: subscription.basketId,
       track_id: 'track-monthly',
-      amount: 0.60,
+      amount: 0.28,
       currency: 'USD',
     });
 
@@ -273,13 +273,55 @@ describe('SubscriptionService payment recovery', () => {
     );
   });
 
+  it('still recovers a previously issued weekly invoice at its original $0.18 price after the price change', async () => {
+    const createdAt = new Date(Date.now() - 60_000);
+    const subscription = {
+      id: 'sub-old-price',
+      userId: 'user-old-price',
+      plan: 'WEEKLY',
+      amount: 0.18,
+      currency: 'USD',
+      status: 'PENDING',
+      basketId: 'CRX-SUB-OLD-PRICE',
+      createdAt,
+    };
+    const payment = {
+      id: 'pay-old-price',
+      userId: 'user-old-price',
+      subscriptionId: subscription.id,
+      basketId: subscription.basketId,
+      provider: 'OXAPAY',
+      status: 'INITIATED',
+      amount: 0.18,
+      currency: 'USD',
+      gatewayTxnRef: 'track-old-price',
+      createdAt,
+    };
+    const { service, firestore, oxapay } = buildService();
+    firestore.subscription.findMany.mockResolvedValue([subscription]);
+    firestore.subscriptionPayment.findFirst.mockResolvedValue(payment);
+    oxapay.getPaymentInfo.mockResolvedValue({
+      status: 'Paid',
+      order_id: subscription.basketId,
+      track_id: payment.gatewayTxnRef,
+      amount: 0.18,
+      currency: 'USD',
+    });
+
+    const result = await service.status('user-old-price');
+
+    expect(result.active).toBe(true);
+    expect(result.amount).toBe(0.18);
+    expect(result.durationDays).toBe(7);
+  });
+
   it('does not activate a pending subscription when the gateway order does not match', async () => {
     const createdAt = new Date(Date.now() - 60_000);
     const subscription = {
       id: 'sub-2',
       userId: 'user-2',
       plan: 'WEEKLY',
-      amount: 0.18,
+      amount: 0.08,
       currency: 'USD',
       status: 'PENDING',
       basketId: 'CRX-SUB-456',
@@ -292,7 +334,7 @@ describe('SubscriptionService payment recovery', () => {
       basketId: subscription.basketId,
       provider: 'OXAPAY',
       status: 'INITIATED',
-      amount: 0.18,
+      amount: 0.08,
       currency: 'USD',
       gatewayTxnRef: 'track-2',
       createdAt,
@@ -304,7 +346,7 @@ describe('SubscriptionService payment recovery', () => {
       status: 'Paid',
       order_id: 'CRX-SUB-WRONG',
       track_id: 'track-2',
-      amount: 0.18,
+      amount: 0.08,
       currency: 'USD',
     });
 

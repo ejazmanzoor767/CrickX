@@ -156,12 +156,12 @@ CrickX currently uses a paid subscription to unlock fantasy and prediction parti
 
 ### Weekly
 
-- Price: **$0.18**
+- Price: **$0.08**
 - Access period: **7 days**
 
 ### Monthly
 
-- Price: **$0.60**
+- Price: **$0.28**
 - Access period: **30 days**
 
 The subscription is separate from contest prize funding.

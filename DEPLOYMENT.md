@@ -34,7 +34,7 @@ The frontend never receives the RapidGateway client secret, webhook secret or OA
 
 ## Subscription
 
-The current subscription plans are $0.18 for 7 days or $0.60 for 30 days. Contest joining is free while the subscription is active. The current integration uses a new RapidGateway checkout for each weekly renewal; the supplied RapidGateway documentation does not define an automatic recurring mandate flow, so CrickX does not assume that RECURRING_TXN creates an automatic weekly charge.
+The current subscription plans are $0.08 for 7 days or $0.28 for 30 days. Contest joining is free while the subscription is active. The current integration uses a new RapidGateway checkout for each weekly renewal; the supplied RapidGateway documentation does not define an automatic recurring mandate flow, so CrickX does not assume that RECURRING_TXN creates an automatic weekly charge.
 
 ## Contest prize funding
 

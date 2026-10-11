@@ -7,14 +7,14 @@ import { OxaPayService } from './oxapay.service';
 const SUBSCRIPTION_PLANS = {
   WEEKLY: {
     plan: 'WEEKLY',
-    amount: 0.18,
+    amount: 0.08,
     durationDays: 7,
     durationMs: 7 * 24 * 60 * 60 * 1000,
     label: 'Weekly',
   },
   MONTHLY: {
     plan: 'MONTHLY',
-    amount: 0.60,
+    amount: 0.28,
     durationDays: 30,
     durationMs: 30 * 24 * 60 * 60 * 1000,
     label: 'Monthly',
@@ -292,6 +292,12 @@ export class SubscriptionService {
       return null;
     }
 
+    // Keep invoices issued before a plan-price change valid at their recorded price.
+    const expectedAmount = Number(pendingPayment.amount);
+    if (!Number.isFinite(expectedAmount) || expectedAmount <= 0 || Number(subscription.amount) !== expectedAmount) {
+      return null;
+    }
+
     const createdMs = this.asDate(pendingPayment.createdAt)?.getTime() ?? 0;
     if (!createdMs || Date.now() - createdMs < 5_000) return null;
 
@@ -313,8 +319,7 @@ export class SubscriptionService {
       gatewayOrderId !== String(subscription.basketId) ||
       gatewayTrackId !== String(pendingPayment.gatewayTxnRef) ||
       !Number.isFinite(gatewayAmount) ||
-      Math.abs(gatewayAmount - planConfig.amount) > 0.000001 ||
-      Number(pendingPayment.amount) !== planConfig.amount ||
+      Math.abs(gatewayAmount - expectedAmount) > 0.000001 ||
       String(pendingPayment.currency).toUpperCase() !== 'USD' ||
       gatewayCurrency !== 'USD'
     ) {
@@ -643,6 +648,7 @@ export class SubscriptionService {
 
     const status = String(payload?.status || '').toLowerCase();
     const amount = Number(payload?.amount);
+    const expectedAmount = Number(payment.amount);
     const currency = String(payload?.currency || '').toUpperCase();
     const gatewayTxnRef = payload?.track_id !== undefined && payload?.track_id !== null
       ? String(payload.track_id)
@@ -654,8 +660,10 @@ export class SubscriptionService {
       }
       if (
         !Number.isFinite(amount) ||
-        Math.abs(amount - planConfig.amount) > 0.000001 ||
-        Number(payment.amount) !== planConfig.amount ||
+        !Number.isFinite(expectedAmount) ||
+        expectedAmount <= 0 ||
+        Math.abs(amount - expectedAmount) > 0.000001 ||
+        Number(subscription.amount) !== expectedAmount ||
         String(payment.currency).toUpperCase() !== 'USD'
       ) {
         await this.firestore.subscriptionPayment.update({
