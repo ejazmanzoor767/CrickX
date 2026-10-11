@@ -63,6 +63,12 @@ export class JwtAuthGuard implements CanActivate {
       const decoded = await getAuth(app).verifyIdToken(token, true);
       const email = decoded.email?.trim().toLowerCase();
       if (!email) throw new UnauthorizedException('Firebase account has no email address.');
+      if (!email.endsWith('@gmail.com')) {
+        throw new UnauthorizedException('CrickX accounts must use a Gmail address ending in @gmail.com.');
+      }
+      if (decoded.email_verified !== true) {
+        throw new UnauthorizedException('Verify your Gmail address with the 6-digit code sent to your inbox before using CrickX.');
+      }
 
       const hit = cachedUser(decoded.uid);
       if (hit) {
