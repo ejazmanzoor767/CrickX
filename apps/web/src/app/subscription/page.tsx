@@ -255,7 +255,81 @@ export default function SubscriptionPage() {
                       ? 'Active plan'
                       : payingPlan === plan
                         ? 'Opening secure checkout…'
-                        : 'Subscribe for                 </button>
+                        : 'Subscribe for 
+              </div>
+            );
+          })}
+        </div>
+
+        {active ? (
+          <div className="notice" style={{ marginTop: 18 }}>
+            {isTrial ? (
+              <>
+                <strong>Your 7-day free trial is active.</strong>
+                <div style={{ marginTop: 4 }}>Contests and predictions are unlocked until {expires}.</div>
+                <div style={{ marginTop: 4 }}>{trialDaysRemaining} days and {trialHoursRemaining} hours remaining.</div>
+              </>
+            ) : (
+              <>
+                <strong>{activePlanConfig.name} subscription active.</strong>
+                <div style={{ marginTop: 4 }}>Your access is available until {expires}.</div>
+              </>
+            )}
+            <Link className="primary-button" href="/fantasy-home" style={{ marginTop: 14 }}>Open Fantasy</Link>
+          </div>
+        ) : (
+          <div style={{ marginTop: 18, padding: '14px 15px', borderRadius: 15, background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)' }}>
+            <span className="eyebrow">PAYMENT</span>
+            <p className="section-subtitle" style={{ margin: '6px 0 0' }}>
+              You will be redirected to OxaPay's secure checkout. CrickX activates access only after a verified OxaPay <code>Paid</code> webhook.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ lineHeight: 1.7 }}>
+        <p className="eyebrow">SUBSCRIPTION ACCESS</p>
+        <p className="section-subtitle" style={{ marginBottom: 0 }}>
+          Weekly access costs $0.18 for 7 days. Monthly access costs $0.60 for 30 days. Your subscription is tied to your CrickX account and verified payment.
+        </p>
+      </div>
+    </section>
+  );
+}
+ + config.amount.toFixed(2)}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {active ? (
+          <div className="notice" style={{ marginTop: 18 }}>
+            <strong>{activePlanConfig.name} subscription active.</strong>
+            <div style={{ marginTop: 4 }}>Your access is available until {expires}.</div>
+            <Link className="primary-button" href="/fantasy-home" style={{ marginTop: 14 }}>Open Fantasy</Link>
+          </div>
+        ) : (
+          <div style={{ marginTop: 18, padding: '14px 15px', borderRadius: 15, background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)' }}>
+            <span className="eyebrow">PAYMENT</span>
+            <p className="section-subtitle" style={{ margin: '6px 0 0' }}>
+              You will be redirected to OxaPay's secure checkout. CrickX activates access only after a verified OxaPay <code>Paid</code> webhook.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ lineHeight: 1.7 }}>
+        <p className="eyebrow">SUBSCRIPTION ACCESS</p>
+        <p className="section-subtitle" style={{ marginBottom: 0 }}>
+          Weekly access costs $0.18 for 7 days. Monthly access costs $0.60 for 30 days. Your subscription is tied to your CrickX account and verified payment.
+        </p>
+      </div>
+    </section>
+  );
+}
+ + config.amount.toFixed(2)}
+                </button>
               </div>
             );
           })}
