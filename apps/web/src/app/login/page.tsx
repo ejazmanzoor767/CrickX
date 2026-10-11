@@ -77,17 +77,13 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-        <FirebaseAuthOptions onAuthenticated={async (_user, providerId) => {
+        <FirebaseAuthOptions onAuthenticated={async () => {
           setError('');
           try {
-            if (providerId === 'password') {
-              setError('Use the email and password form above to complete email verification.');
-              return;
-            }
             await api.activateTrial();
             router.push('/matches');
           } catch (err) {
-            setError(err instanceof Error ? err.message : 'Unable to finish Firebase sign-in.');
+            setError(err instanceof Error ? err.message : 'Unable to finish Google sign-in.');
           }
         }} />
         <p style={{ marginTop: 22 }}>New to CrickX? <Link href="/register" style={{ color: 'var(--accent)', fontWeight: 800 }}>Create your account</Link></p>

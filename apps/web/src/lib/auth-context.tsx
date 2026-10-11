@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { FacebookAuthProvider, GithubAuthProvider, GoogleAuthProvider, OAuthProvider, TwitterAuthProvider, createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from 'firebase/auth';
+import { GoogleAuthProvider, createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from 'firebase/auth';
 import { getClientAuth } from './firebase';
 
 interface AuthContextValue {
@@ -42,37 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return result.user;
     },
     async signInWithProvider(providerId) {
-      const auth = getClientAuth();
-      let provider;
-      switch (providerId) {
-        case 'google.com':
-          provider = new GoogleAuthProvider();
-          provider.addScope('email');
-          break;
-        case 'facebook.com':
-          provider = new FacebookAuthProvider();
-          provider.addScope('email');
-          break;
-        case 'twitter.com':
-          provider = new TwitterAuthProvider();
-          break;
-        case 'github.com':
-          provider = new GithubAuthProvider();
-          provider.addScope('user:email');
-          break;
-        case 'apple.com':
-          provider = new OAuthProvider('apple.com');
-          provider.addScope('email');
-          provider.addScope('name');
-          break;
-        case 'microsoft.com':
-          provider = new OAuthProvider('microsoft.com');
-          provider.addScope('email');
-          provider.addScope('profile');
-          break;
-        default:
-          throw new Error('This Firebase sign-in provider is not supported by CrickX.');
+      if (providerId !== 'google.com') {
+        throw new Error('CrickX supports Google and Email/Password sign-in only.');
       }
+      const auth = getClientAuth();
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
       const result = await signInWithPopup(auth, provider);
       return result.user;
     },

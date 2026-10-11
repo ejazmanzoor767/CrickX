@@ -45,14 +45,16 @@ export class EmailVerificationService {
       const decoded = await getAuth(this.firebaseApp()).verifyIdToken(token, true);
       const provider = String((decoded as any).firebase?.sign_in_provider || '');
       const email = String(decoded.email || '').trim().toLowerCase();
-      const allowedProviders = new Set(['password', 'google.com', 'facebook.com', 'twitter.com', 'github.com', 'apple.com', 'microsoft.com', 'phone']);
-      if (!allowedProviders.has(provider)) {
-        throw new UnauthorizedException('This Firebase sign-in provider is not enabled for CrickX.');
+      if (!['password', 'google.com'].includes(provider)) {
+        throw new UnauthorizedException('CrickX supports Google and Email/Password sign-in only.');
       }
-      if (provider === 'password' && (!email || !email.endsWith('@gmail.com'))) {
+      if (!email) {
+        throw new UnauthorizedException('Firebase account has no email address.');
+      }
+      if (provider === 'password' && !email.endsWith('@gmail.com')) {
         throw new UnauthorizedException('CrickX Email/Password signup requires a Gmail address ending in @gmail.com.');
       }
-      return { uid: decoded.uid, email: email || null, provider, emailVerified: decoded.email_verified === true };
+      return { uid: decoded.uid, email, provider, emailVerified: decoded.email_verified === true };
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
       throw new UnauthorizedException('Your sign-in session is invalid or expired. Please sign in again.');
@@ -111,7 +113,7 @@ export class EmailVerificationService {
   async sendCode(authorization?: string) {
     const { uid, email, provider } = await this.identity(authorization);
     if (provider !== 'password' || !email) {
-      throw new BadRequestException('The 6-digit email code is only for CrickX Email/Password accounts. Social and phone sign-in are verified by Firebase.');
+      throw new BadRequestException('The 6-digit email code is only for CrickX Email/Password accounts. Google sign-in is verified by Firebase.');
     }
     const firebaseUser = await getAuth(this.firebaseApp()).getUser(uid);
     if (firebaseUser.emailVerified) {
@@ -169,8 +171,8 @@ export class EmailVerificationService {
     const trialRef = this.firestore.db.collection('userTrials').doc(identity.uid);
     let trialSnapshot = await trialRef.get();
     if (!trialSnapshot.exists) {
-      // Start social/phone trials from Firebase account creation time so old accounts
-      // cannot receive a fresh 7-day trial simply by signing in after this rollout.
+        // Use Firebase's original account creation time for both supported methods.
+      // This grants new signups seven days without resetting trials on later sign-ins.
       const createdAt = this.date(firebaseUser.metadata.creationTime) ?? new Date();
       const trialEndsAt = new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000);
       await trialRef.set({
@@ -230,20 +232,24 @@ export class EmailVerificationService {
       throw new BadRequestException('That verification code is incorrect. Please try again.');
     }
 
-    // The Firebase Auth verified flag is authoritative for guarded API requests.
-    await getAuth(this.firebaseApp()).updateUser(uid, { emailVerified: true });
+    // Firebase Auth's verified flag is authoritative for guarded API requests.
+    const adminAuth = getAuth(this.firebaseApp());
+    const firebaseUser = await adminAuth.getUser(uid);
+    await adminAuth.updateUser(uid, { emailVerified: true });
 
-    // This record is created once, keyed by Firebase UID, so re-login/resends cannot restart the trial.
+    // The record is keyed by Firebase UID and never resets on later sign-ins.
     const trialRef = this.firestore.db.collection('userTrials').doc(uid);
     const trialSnapshot = await trialRef.get();
     if (!trialSnapshot.exists) {
       const now = new Date();
-      const trialEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const trialStartedAt = this.date(firebaseUser.metadata.creationTime) ?? now;
+      const trialEndsAt = new Date(trialStartedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
       await trialRef.set({
         id: uid,
         userId: uid,
         email,
-        trialStartedAt: now,
+        provider: 'password',
+        trialStartedAt,
         trialEndsAt,
         createdAt: now,
         updatedAt: now,

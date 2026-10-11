@@ -83,17 +83,20 @@ export default function RegisterPage() {
             {loading ? 'Creating account…' : 'Create account'}
           </button>
         </form>
-        <FirebaseAuthOptions onAuthenticated={async (_user, providerId) => {
+        <FirebaseAuthOptions onAuthenticated={async () => {
           setError('');
           try {
-            if (providerId === 'password') {
-              setError('Use the email and password form above to verify your Gmail address.');
-              return;
+            if (referralCode.trim()) {
+              try {
+                await api.applyReferral(referralCode.trim().toUpperCase());
+              } catch (referralError) {
+                console.warn('Referral code could not be applied:', referralError);
+              }
             }
             await api.activateTrial();
             router.push('/matches');
           } catch (err) {
-            setError(err instanceof Error ? err.message : 'Unable to finish Firebase sign-in.');
+            setError(err instanceof Error ? err.message : 'Unable to finish Google sign-in.');
           }
         }} />
         <p style={{ marginTop: 22 }}>Already have an account? <Link href="/login" style={{ color: 'var(--accent)', fontWeight: 800 }}>Sign in</Link></p>
