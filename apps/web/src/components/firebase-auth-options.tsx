@@ -75,7 +75,7 @@ export default function FirebaseAuthOptions({ onAuthenticated }: Props) {
     try {
       const auth = getClientAuth();
       if (!verifierRef.current) {
-        verifierRef.current = new RecaptchaVerifier(auth, 'crickx-phone-recaptcha', { size: 'invisible' });
+        verifierRef.current = new RecaptchaVerifier(auth, 'crickx-send-phone-code', { size: 'invisible' });
       }
       const result = await signInWithPhoneNumber(auth, phoneNumber.trim(), verifierRef.current);
       setConfirmation(result);
@@ -138,7 +138,7 @@ export default function FirebaseAuthOptions({ onAuthenticated }: Props) {
               onChange={(e) => setPhoneNumber(e.target.value)}
               required
             />
-            <button className="secondary-button full" type="submit" disabled={!!busyProvider} style={{ marginTop: 10 }}>
+            <button id="crickx-send-phone-code" className="secondary-button full" type="submit" disabled={!!busyProvider} style={{ marginTop: 10 }}>
               {busyProvider === 'phone' ? 'Sending SMS…' : 'Continue with phone'}
             </button>
           </form>
@@ -161,7 +161,6 @@ export default function FirebaseAuthOptions({ onAuthenticated }: Props) {
             </button>
           </form>
         )}
-        <div id="crickx-phone-recaptcha" />
         {phoneNotice && <p className="notice" style={{ marginTop: 10 }}>{phoneNotice}</p>}
         {error && <p className="error-text" style={{ marginTop: 10 }}>{error}</p>}
       </div>
