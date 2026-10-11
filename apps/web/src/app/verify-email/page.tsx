@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { reload } from 'firebase/auth';
+import { reload, signOut } from 'firebase/auth';
 import { api } from '../../lib/api';
 import { getClientAuth } from '../../lib/firebase';
 import { useAuth } from '../../lib/auth-context';
@@ -106,7 +106,7 @@ export default function VerifyEmailPage() {
         <button className="secondary-button" type="button" onClick={() => void resend()} disabled={resending} style={{ width: '100%', marginTop: 12 }}>
           {resending ? 'Sending code…' : 'Resend code'}
         </button>
-        <p style={{ marginTop: 22 }}>Wrong email? <button type="button" className="text-button" onClick={() => { void getClientAuth().signOut().then(() => router.replace('/register')); }}>Start again</button></p>
+        <p style={{ marginTop: 22 }}>Wrong email? <button type="button" className="text-button" onClick={() => { void signOut(getClientAuth()).then(() => router.replace('/register')); }}>Start again</button></p>
         <p style={{ marginTop: 12 }}><Link href="/login" style={{ color: 'var(--accent)', fontWeight: 800 }}>Back to sign in</Link></p>
       </div>
     </div>
