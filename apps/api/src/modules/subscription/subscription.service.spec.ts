@@ -13,7 +13,7 @@ describe('SubscriptionService payment recovery', () => {
         update: jest.fn().mockResolvedValue(undefined),
       },
       db: {
-        collection: jest.fn((name: string) => {
+        collection: jest.fn<any, [string]>().mockImplementation((name: string) => {
           if (name === 'userTrials') {
             return {
               doc: jest.fn(() => ({
