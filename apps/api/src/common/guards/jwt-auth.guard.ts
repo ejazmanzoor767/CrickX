@@ -61,8 +61,22 @@ export class JwtAuthGuard implements CanActivate {
     try {
       const app = getFirebaseApp();
       const decoded = await getAuth(app).verifyIdToken(token, true);
-      const email = decoded.email?.trim().toLowerCase();
-      if (!email) throw new UnauthorizedException('Firebase account has no email address.');
+      const signInProvider = String((decoded as any).firebase?.sign_in_provider || '');
+      const email = decoded.email?.trim().toLowerCase() || '';
+      if (!['password', 'google.com'].includes(signInProvider)) {
+        throw new UnauthorizedException('CrickX supports Google and Email/Password sign-in only.');
+      }
+      if (!email) {
+        throw new UnauthorizedException('Firebase account has no email address.');
+      }
+      if (signInProvider === 'password') {
+        if (!email.endsWith('@gmail.com')) {
+          throw new UnauthorizedException('CrickX Email/Password accounts must use a Gmail address.');
+        }
+        if (decoded.email_verified !== true) {
+          throw new UnauthorizedException('Verify your Gmail address with the 6-digit code sent to your inbox before using CrickX.');
+        }
+      }
 
       const hit = cachedUser(decoded.uid);
       if (hit) {
@@ -93,7 +107,7 @@ export class JwtAuthGuard implements CanActivate {
             data: {
               id: decoded.uid,
               email,
-              passwordHash: 'FIREBASE_AUTH_MANAGED',
+                            passwordHash: 'FIREBASE_AUTH_MANAGED',
               role: 'USER',
               status: 'ACTIVE',
               emailVerifiedAt: decoded.email_verified ? now : null,

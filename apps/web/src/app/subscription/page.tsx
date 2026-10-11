@@ -125,6 +125,10 @@ export default function SubscriptionPage() {
   const expiresDate = status?.expiresAt ? new Date(status.expiresAt) : null;
   const expiresMs = expiresDate && !Number.isNaN(expiresDate.getTime()) ? expiresDate.getTime() : 0;
   const active = (Boolean(status?.active) || status?.status === 'ACTIVE') && expiresMs > Date.now();
+  const isTrial = active && status?.isTrial === true;
+  const trialRemainingMs = Math.max(0, expiresMs - Date.now());
+  const trialDaysRemaining = Math.floor(trialRemainingMs / 86400000);
+  const trialHoursRemaining = Math.floor((trialRemainingMs % 86400000) / 3600000);
   const activePlan = (status?.plan === 'MONTHLY' ? 'MONTHLY' : 'WEEKLY') as SubscriptionPlan;
   const activePlanConfig = PLANS[activePlan];
   const expires = expiresMs > 0
@@ -137,7 +141,7 @@ export default function SubscriptionPage() {
         <div>
           <p className="eyebrow">CRICKX MEMBERSHIP</p>
           <h1 className="section-title">Subscription</h1>
-          <p className="section-subtitle">Choose weekly or monthly access and follow the CRX token launch countdown.</p><p className="section-subtitle" style={{ fontSize: 11, marginTop: 6 }}>Last updated: September 30, 2026.</p>
+          <p className="section-subtitle">Start with 7 days of free fantasy access after verifying your Gmail, then choose weekly or monthly access.</p><p className="section-subtitle" style={{ fontSize: 11, marginTop: 6 }}>Last updated: October 11, 2026.</p>
         </div>
         <Link className="secondary-button" href="/profile">Profile</Link>
       </div>
@@ -210,7 +214,7 @@ export default function SubscriptionPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 14 }}>
           {(Object.keys(PLANS) as SubscriptionPlan[]).map((plan) => {
             const config = PLANS[plan];
-            const currentPlan = active && activePlan === plan;
+            const currentPlan = active && !isTrial && activePlan === plan;
 
             return (
               <div
@@ -241,15 +245,17 @@ export default function SubscriptionPage() {
                 <button
                   className={currentPlan ? 'secondary-button full' : 'primary-button full'}
                   type="button"
-                  disabled={active || payingPlan !== null}
+                  disabled={(active && !isTrial) || isTrial || payingPlan !== null}
                   onClick={() => void subscribe(plan)}
                   style={{ marginTop: 18 }}
                 >
-                  {currentPlan
-                    ? 'Active plan'
-                    : payingPlan === plan
-                      ? 'Opening secure checkout…'
-                      : 'Subscribe for $' + config.amount.toFixed(2)}
+                  {isTrial
+                    ? 'Available after free trial'
+                    : currentPlan
+                      ? 'Active plan'
+                      : payingPlan === plan
+                        ? 'Opening secure checkout…'
+                        : 'Subscribe for ' + String.fromCharCode(36) + config.amount.toFixed(2)}
                 </button>
               </div>
             );
@@ -258,8 +264,18 @@ export default function SubscriptionPage() {
 
         {active ? (
           <div className="notice" style={{ marginTop: 18 }}>
-            <strong>{activePlanConfig.name} subscription active.</strong>
-            <div style={{ marginTop: 4 }}>Your access is available until {expires}.</div>
+            {isTrial ? (
+              <>
+                <strong>Your 7-day free trial is active.</strong>
+                <div style={{ marginTop: 4 }}>Contests and predictions are unlocked until {expires}.</div>
+                <div style={{ marginTop: 4 }}>{trialDaysRemaining} days and {trialHoursRemaining} hours remaining.</div>
+              </>
+            ) : (
+              <>
+                <strong>{activePlanConfig.name} subscription active.</strong>
+                <div style={{ marginTop: 4 }}>Your access is available until {expires}.</div>
+              </>
+            )}
             <Link className="primary-button" href="/fantasy-home" style={{ marginTop: 14 }}>Open Fantasy</Link>
           </div>
         ) : (

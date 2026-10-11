@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut, updateProfile, type User } from 'firebase/auth';
+import { GoogleAuthProvider, createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from 'firebase/auth';
 import { getClientAuth } from './firebase';
 
 interface AuthContextValue {
@@ -9,6 +9,7 @@ interface AuthContextValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<User>;
   signUp: (email: string, password: string, displayName: string) => Promise<User>;
+  signInWithProvider: (providerId: string) => Promise<User>;
   logout: () => Promise<void>;
 }
 
@@ -38,6 +39,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const auth = getClientAuth();
       const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
       if (displayName.trim()) await updateProfile(result.user, { displayName: displayName.trim() });
+      return result.user;
+    },
+    async signInWithProvider(providerId) {
+      if (providerId !== 'google.com') {
+        throw new Error('CrickX supports Google and Email/Password sign-in only.');
+      }
+      const auth = getClientAuth();
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      const result = await signInWithPopup(auth, provider);
       return result.user;
     },
     logout: () => signOut(getClientAuth()),

@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { CreateFantasyTeamDto } from './dto';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 const SQUAD_SIZE = 11;
 const MAX_CREDITS = 100;
@@ -13,7 +14,15 @@ export class FantasyTeamService {
   constructor(
     private readonly prisma: FirestoreService,
     private readonly sportmonks: SportmonksDataService,
+    private readonly subscriptions: SubscriptionService,
   ) {}
+
+  private async requireFantasyAccess(userId: string) {
+    const entitlement = await this.subscriptions.status(userId);
+    if (!entitlement.active) {
+      throw new ForbiddenException('An active CrickX subscription or unexpired 7-day free trial is required to create or edit fantasy teams.');
+    }
+  }
 
   private async assertSquadEligible(fixtureId: number, playerIds: number[]) {
     // The scheduled start is the hard fantasy lock. Do not trust raw provider
@@ -57,6 +66,7 @@ export class FantasyTeamService {
   }
 
   async createTeam(userId: string, dto: CreateFantasyTeamDto) {
+    await this.requireFantasyAccess(userId);
     const playerIds = dto.sportmonksPlayerIds.map(Number);
     const uniqueIds = new Set(playerIds);
     if (uniqueIds.size !== SQUAD_SIZE) throw new BadRequestException('Squad must contain 11 unique players.');
@@ -99,6 +109,7 @@ export class FantasyTeamService {
   async editTeam(userId: string, teamId: string, dto: CreateFantasyTeamDto) {
     const existing = await this.prisma.fantasyTeam.findUnique({ where: { id: teamId }, include: { players: true } });
     if (!existing || existing.userId !== userId) throw new NotFoundException('Fantasy team not found.');
+    await this.requireFantasyAccess(userId);
     if (existing.isLocked) throw new ForbiddenException('Team is locked and can no longer be edited.');
     if (existing.sportmonksFixtureId !== dto.sportmonksFixtureId) throw new BadRequestException('This fantasy team belongs to a different match.');
     const playerIds = dto.sportmonksPlayerIds.map(Number);

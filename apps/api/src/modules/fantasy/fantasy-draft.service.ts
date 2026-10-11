@@ -1,13 +1,22 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { FirestoreService } from '../../common/firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 @Injectable()
 export class FantasyDraftService {
   constructor(
     private readonly firestore: FirestoreService,
     private readonly sportmonks: SportmonksDataService,
+    private readonly subscriptions: SubscriptionService,
   ) {}
+
+  private async requireFantasyAccess(userId: string) {
+    const entitlement = await this.subscriptions.status(userId);
+    if (!entitlement.active) {
+      throw new ForbiddenException('An active CrickX subscription or unexpired 7-day free trial is required to create or edit fantasy teams.');
+    }
+  }
 
   private id(userId: string, fixtureId: number) {
     return `${userId}_${fixtureId}`;
@@ -24,6 +33,7 @@ export class FantasyDraftService {
     captainSportmonksPlayerId?: number | null;
     viceCaptainSportmonksPlayerId?: number | null;
   }) {
+    await this.requireFantasyAccess(userId);
     const fixture = await this.sportmonks.getFixture(fixtureId, { forceLive: false });
     if (new Date(fixture.starting_at) <= new Date() || fixture.live === 1) {
       throw new ForbiddenException('This fantasy draft is locked because the match has started.');

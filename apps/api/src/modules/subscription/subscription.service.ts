@@ -65,6 +65,10 @@ export class SubscriptionService {
     return date ? date.toISOString() : null;
   }
 
+  private async trialRecord(userId: string) {
+    const snapshot = await this.firestore.db.collection('userTrials').doc(userId).get();
+    return snapshot.exists ? (snapshot.data() as any) : null;
+  }
 
   private async ensureReferralCode(userId: string) {
     const existing = await this.firestore.db.collection('referralCodes').where('userId', '==', userId).limit(1).get();
@@ -350,17 +354,41 @@ export class SubscriptionService {
   }
 
   async status(userId: string) {
+    const trial = await this.trialRecord(userId);
+    const trialStartedAt = this.isoDate(trial?.trialStartedAt);
+    const trialEndsAt = this.isoDate(trial?.trialEndsAt);
+    const trialActive = !!trialEndsAt && new Date(trialEndsAt).getTime() > Date.now();
+    const trialAccess = () => ({
+      id: null,
+      active: true,
+      isTrial: true,
+      trialActive: true,
+      trialStartedAt,
+      trialEndsAt,
+      plan: 'TRIAL',
+      amount: 0,
+      currency: 'USD',
+      durationDays: 7,
+      status: 'TRIAL',
+      expiresAt: trialEndsAt,
+      basketId: null,
+    });
     const rows = await this.subscriptionsForUser(userId);
     if (!rows.length) {
+      if (trialActive) return trialAccess();
       return {
         id: null,
         active: false,
+        isTrial: false,
+        trialActive: false,
+        trialStartedAt,
+        trialEndsAt,
         plan: 'WEEKLY',
         amount: SUBSCRIPTION_PLANS.WEEKLY.amount,
         currency: 'USD',
         durationDays: SUBSCRIPTION_PLANS.WEEKLY.durationDays,
-        status: 'NONE',
-        expiresAt: null,
+        status: trial ? 'TRIAL_EXPIRED' : 'NONE',
+        expiresAt: trialEndsAt,
         basketId: null,
       };
     }
@@ -399,6 +427,10 @@ export class SubscriptionService {
       const current = active.row;
       return {
         active: true,
+        isTrial: false,
+        trialActive: false,
+        trialStartedAt,
+        trialEndsAt,
         plan: getPlanConfig(current.plan).plan,
         amount: Number(current.amount),
         currency: current.currency,
@@ -425,11 +457,17 @@ export class SubscriptionService {
       }
     }
 
+    if (trialActive) return trialAccess();
+
     const current = [...normalized].sort((a, b) => b.createdMs - a.createdMs)[0].row;
     const currentExpiresDate = this.asDate(current.expiresAt);
 
     return {
       active: false,
+      isTrial: false,
+      trialActive: false,
+      trialStartedAt,
+      trialEndsAt,
       plan: getPlanConfig(current.plan).plan,
       amount: Number(current.amount),
       currency: current.currency,
@@ -457,7 +495,8 @@ export class SubscriptionService {
       const expiresLabel = expiresAt && !Number.isNaN(expiresAt.getTime())
         ? expiresAt.toLocaleString('en-PK')
         : 'the current expiry date';
-      throw new ConflictException(`Your subscription is already active until ${expiresLabel}.`);
+      const accessType = current.isTrial ? 'free trial' : 'subscription';
+      throw new ConflictException(`Your ${accessType} is active until ${expiresLabel}. You can subscribe after it expires.`);
     }
 
     if (current.status === 'PENDING' && current.basketId && current.id) {

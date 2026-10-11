@@ -12,7 +12,18 @@ describe('SubscriptionService payment recovery', () => {
         findFirst: jest.fn(),
         update: jest.fn().mockResolvedValue(undefined),
       },
-      db: { collection: jest.fn() },
+      db: {
+        collection: jest.fn<any, [string]>().mockImplementation((name: string) => {
+          if (name === 'userTrials') {
+            return {
+              doc: jest.fn(() => ({
+                get: jest.fn().mockResolvedValue({ exists: false }),
+              })),
+            };
+          }
+          return {};
+        }),
+      },
       ...overrides,
     };
     const config = { get: jest.fn().mockReturnValue('false') };

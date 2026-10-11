@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { FirebaseError } from 'firebase/app';
 import { useAuth } from '../../lib/auth-context';
+import FirebaseAuthOptions from '../../components/firebase-auth-options';
 
 function friendlyError(error: unknown) {
   if (error instanceof FirebaseError) {
@@ -37,17 +38,24 @@ export default function RegisterPage() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError('');
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^[^@\s]+@gmail\.com$/.test(normalizedEmail)) {
+      setError('Please use a valid @gmail.com address. CrickX signup requires Gmail verification.');
+      return;
+    }
     setLoading(true);
     try {
-      await signUp(email, password, displayName);
-      if (referralCode.trim()) {
-        try {
-          await api.applyReferral(referralCode.trim().toUpperCase());
-        } catch (referralError) {
-          console.warn('Referral code could not be applied:', referralError);
-        }
+      await signUp(normalizedEmail, password, displayName);
+      const params = new URLSearchParams();
+      if (referralCode.trim()) params.set('ref', referralCode.trim().toUpperCase());
+      try {
+        await api.sendVerificationCode();
+      } catch (sendError) {
+        console.warn('Initial verification code could not be sent:', sendError);
+        params.set('send', 'failed');
       }
-      router.push('/matches');
+      const query = params.toString();
+      router.push('/verify-email' + (query ? '?' + query : ''));
     } catch (err) {
       setError(friendlyError(err));
     } finally {
@@ -60,12 +68,12 @@ export default function RegisterPage() {
       <div className="auth-card">
         <p className="eyebrow">Create your squad identity</p>
         <h1>JOIN<br /><span style={{ color: 'var(--accent)' }}>CRICKX.</span></h1>
-        <p>Your Firebase account powers secure sign-in across your fantasy teams, contests and profile.</p>
+        <p>Use a valid Gmail inbox. Enter the 6-digit code we email you to activate your account and start your 7-day free fantasy trial.</p>
         <form onSubmit={submit}>
           <label className="form-label">Display name</label>
           <input placeholder="Your cricket name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
           <label className="form-label">Email</label>
-          <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input type="email" placeholder="you@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <label className="form-label">Password</label>
           <input type="password" placeholder="At least 8 characters" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
           <label className="form-label">Referral code <span style={{ color: 'var(--muted)', fontWeight: 500 }}>(optional)</span></label>
@@ -75,6 +83,22 @@ export default function RegisterPage() {
             {loading ? 'Creating account…' : 'Create account'}
           </button>
         </form>
+        <FirebaseAuthOptions onAuthenticated={async () => {
+          setError('');
+          try {
+            if (referralCode.trim()) {
+              try {
+                await api.applyReferral(referralCode.trim().toUpperCase());
+              } catch (referralError) {
+                console.warn('Referral code could not be applied:', referralError);
+              }
+            }
+            await api.activateTrial();
+            router.push('/matches');
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Unable to finish Google sign-in.');
+          }
+        }} />
         <p style={{ marginTop: 22 }}>Already have an account? <Link href="/login" style={{ color: 'var(--accent)', fontWeight: 800 }}>Sign in</Link></p>
       </div>
     </div>

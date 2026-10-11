@@ -113,6 +113,10 @@ export const api = {
   leaderboardFixture: (fixtureId: number, limit = 100) => leaderboard(`/fixture/${fixtureId}`, { limit }),
   leaderboardContest: (contestId: string, limit = 100) => leaderboard(`/contest/${contestId}`, { limit }),
 
+  sendVerificationCode: () => apiFetch('/auth/email-verification/send', { method: 'POST', body: JSON.stringify({}) }),
+  verifyEmailCode: (code: string) => apiFetch('/auth/email-verification/verify', { method: 'POST', body: JSON.stringify({ code }) }),
+  activateTrial: () => apiFetch('/auth/trial/activate', { method: 'POST', body: JSON.stringify({}) }),
+
   subscription: () => apiFetch(`/subscription?_=${Date.now()}`, { cache: 'no-store' }),
   createSubscriptionCheckout: (plan: 'WEEKLY' | 'MONTHLY', customerMobile?: string) => apiFetch('/subscription/checkout', {
     method: 'POST',

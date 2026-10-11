@@ -50,7 +50,7 @@ describe('FantasyTeamService.createTeam', () => {
 
   it('accepts a valid 11-player squad within credit cap and team-composition limits', async () => {
     const { sportmonks, prisma } = buildDeps({ credits: 8 }); // 11 * 8 = 88 <= 100
-    const service = new FantasyTeamService(prisma as any, sportmonks as any);
+    const service = new FantasyTeamService(prisma as any, sportmonks as any, { status: jest.fn().mockResolvedValue({ active: true }) } as any);
 
     const squad = [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105]; // 6 from team1, 5 from team2
     const result = await service.createTeam('user1', {
@@ -66,7 +66,7 @@ describe('FantasyTeamService.createTeam', () => {
 
   it('rejects a squad that is not exactly 11 unique players', async () => {
     const { sportmonks, prisma } = buildDeps();
-    const service = new FantasyTeamService(prisma as any, sportmonks as any);
+    const service = new FantasyTeamService(prisma as any, sportmonks as any, { status: jest.fn().mockResolvedValue({ active: true }) } as any);
 
     await expect(
       service.createTeam('user1', {
@@ -81,7 +81,7 @@ describe('FantasyTeamService.createTeam', () => {
 
   it('rejects more than 7 players from a single real-world team', async () => {
     const { sportmonks, prisma } = buildDeps();
-    const service = new FantasyTeamService(prisma as any, sportmonks as any);
+    const service = new FantasyTeamService(prisma as any, sportmonks as any, { status: jest.fn().mockResolvedValue({ active: true }) } as any);
 
     const squad = [1, 2, 3, 4, 5, 6, 7, 8, 101, 102, 103]; // 8 from team1
     await expect(
@@ -97,7 +97,7 @@ describe('FantasyTeamService.createTeam', () => {
 
   it('rejects players not present in the real Sportmonks-announced lineup', async () => {
     const { sportmonks, prisma } = buildDeps();
-    const service = new FantasyTeamService(prisma as any, sportmonks as any);
+    const service = new FantasyTeamService(prisma as any, sportmonks as any, { status: jest.fn().mockResolvedValue({ active: true }) } as any);
 
     const squad = [1, 2, 3, 4, 5, 101, 102, 103, 104, 105, 999]; // 999 doesn't exist in lineup
     await expect(
@@ -113,7 +113,7 @@ describe('FantasyTeamService.createTeam', () => {
 
   it('rejects a squad that exceeds the 100-credit cap', async () => {
     const { sportmonks, prisma } = buildDeps({ credits: 10 }); // 11 * 10 = 110 > 100
-    const service = new FantasyTeamService(prisma as any, sportmonks as any);
+    const service = new FantasyTeamService(prisma as any, sportmonks as any, { status: jest.fn().mockResolvedValue({ active: true }) } as any);
 
     const squad = [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105];
     await expect(
@@ -148,7 +148,7 @@ describe('FantasyTeamService.createTeam', () => {
       }),
     };
     const prisma = { playerFixtureCredit: { findMany: jest.fn() }, fantasyTeam: { create: jest.fn() } };
-    const service = new FantasyTeamService(prisma as any, sportmonks as any);
+    const service = new FantasyTeamService(prisma as any, sportmonks as any, { status: jest.fn().mockResolvedValue({ active: true }) } as any);
 
     await expect(
       service.createTeam('user1', {
@@ -185,7 +185,7 @@ describe('FantasyTeamService.createTeam', () => {
       playerFixtureCredit: { findMany: jest.fn() },
       fantasyTeam: { findUnique: jest.fn() },
     } as any;
-    const service = new FantasyTeamService(prisma, sportmonks as any);
+    const service = new FantasyTeamService(prisma, sportmonks as any, { status: jest.fn().mockResolvedValue({ active: true }) } as any);
 
     await expect(service.createTeam('user1', {
       sportmonksFixtureId: fixtureId,

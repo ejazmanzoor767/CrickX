@@ -2,11 +2,33 @@ import { Body, Controller, Post, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
+import { EmailVerificationService } from './email-verification.service';
 import { RegisterDto, LoginDto, RefreshDto } from './dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly emailVerification: EmailVerificationService,
+  ) {}
+
+  @Post('email-verification/send')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  sendVerificationCode(@Req() req: Request) {
+    return this.emailVerification.sendCode(req.headers.authorization);
+  }
+
+  @Post('email-verification/verify')
+  @Throttle({ default: { limit: 8, ttl: 60_000 } })
+  verifyEmailCode(@Req() req: Request, @Body() body: { code?: string }) {
+    return this.emailVerification.verifyCode(req.headers.authorization, body?.code);
+  }
+
+  @Post('trial/activate')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  activateTrial(@Req() req: Request) {
+    return this.emailVerification.activateTrial(req.headers.authorization);
+  }
 
   @Post('register')
   @Throttle({ default: { limit: 3, ttl: 60_000 } })
