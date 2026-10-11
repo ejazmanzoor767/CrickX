@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { FirebaseError } from 'firebase/app';
+import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 
 function friendlyError(error: unknown) {
@@ -21,7 +22,7 @@ function friendlyError(error: unknown) {
 }
 
 export default function LoginPage() {
-  const { signIn } = useAuth();
+  const { signIn, logout } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,7 +34,23 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await signIn(email, password);
+      const signedInUser = await signIn(email.trim(), password);
+      if (!String(signedInUser.email ?? email).trim().toLowerCase().endsWith('@gmail.com')) {
+        await logout();
+        setError('CrickX sign-in requires a Gmail address ending in @gmail.com.');
+        return;
+      }
+      if (!signedInUser.emailVerified) {
+        let sendFailed = false;
+        try {
+          await api.sendVerificationCode();
+        } catch (sendError) {
+          console.warn('Verification code could not be sent during sign-in:', sendError);
+          sendFailed = true;
+        }
+        router.push('/verify-email' + (sendFailed ? '?send=failed' : ''));
+        return;
+      }
       router.push('/matches');
     } catch (err) {
       setError(friendlyError(err));
@@ -47,10 +64,10 @@ export default function LoginPage() {
       <div className="auth-card">
         <p className="eyebrow">Welcome back</p>
         <h1>ENTER THE<br /><span style={{ color: 'var(--accent)' }}>XI.</span></h1>
-        <p>Sign in with Firebase to build teams, track your wallet and compete in live contests.</p>
+        <p>Sign in with your verified Gmail account. Unverified addresses must confirm the 6-digit code before using CrickX.</p>
         <form onSubmit={submit}>
           <label className="form-label">Email</label>
-          <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input type="email" placeholder="you@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <label className="form-label">Password</label>
           <input type="password" placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           {error && <p className="error-text">{error}</p>}
