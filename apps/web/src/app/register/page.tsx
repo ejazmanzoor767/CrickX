@@ -38,7 +38,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     const normalizedEmail = email.trim().toLowerCase();
-    if (!/^[^@\\s]+@gmail\\.com$/.test(normalizedEmail)) {
+    if (!/^[^@\s]+@gmail\.com$/.test(normalizedEmail)) {
       setError('Please use a valid @gmail.com address. CrickX signup requires Gmail verification.');
       return;
     }
@@ -53,7 +53,8 @@ export default function RegisterPage() {
         console.warn('Initial verification code could not be sent:', sendError);
         params.set('send', 'failed');
       }
-      router.push('/verify-email' + (params.size ? '?' + params.toString() : ''));
+      const query = params.toString();
+      router.push('/verify-email' + (query ? '?' + query : ''));
     } catch (err) {
       setError(friendlyError(err));
     } finally {
