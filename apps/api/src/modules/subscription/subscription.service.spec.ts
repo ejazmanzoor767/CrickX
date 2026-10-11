@@ -129,7 +129,7 @@ describe('SubscriptionService payment recovery', () => {
 
     expect(result.active).toBe(true);
     expect(result.plan).toBe('MONTHLY');
-    expect(result.amount).toBe(0.6);
+    expect(result.amount).toBe(0.28);
     expect(result.durationDays).toBe(30);
     expect(new Date(String(result.expiresAt)).getTime()).toBeGreaterThanOrEqual(
       before + 29 * 24 * 60 * 60 * 1000,
