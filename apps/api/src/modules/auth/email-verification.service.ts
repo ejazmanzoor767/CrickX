@@ -43,11 +43,16 @@ export class EmailVerificationService {
     if (!token) throw new UnauthorizedException('Sign in before verifying your Gmail address.');
     try {
       const decoded = await getAuth(this.firebaseApp()).verifyIdToken(token, true);
+      const provider = String((decoded as any).firebase?.sign_in_provider || '');
       const email = String(decoded.email || '').trim().toLowerCase();
-      if (!email.endsWith('@gmail.com')) {
-        throw new UnauthorizedException('CrickX signup requires a Gmail address ending in @gmail.com.');
+      const allowedProviders = new Set(['password', 'google.com', 'facebook.com', 'twitter.com', 'github.com', 'apple.com', 'microsoft.com', 'phone']);
+      if (!allowedProviders.has(provider)) {
+        throw new UnauthorizedException('This Firebase sign-in provider is not enabled for CrickX.');
       }
-      return { uid: decoded.uid, email };
+      if (provider === 'password' && (!email || !email.endsWith('@gmail.com'))) {
+        throw new UnauthorizedException('CrickX Email/Password signup requires a Gmail address ending in @gmail.com.');
+      }
+      return { uid: decoded.uid, email: email || null, provider, emailVerified: decoded.email_verified === true };
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
       throw new UnauthorizedException('Your sign-in session is invalid or expired. Please sign in again.');
@@ -104,7 +109,10 @@ export class EmailVerificationService {
   }
 
   async sendCode(authorization?: string) {
-    const { uid, email } = await this.identity(authorization);
+    const { uid, email, provider } = await this.identity(authorization);
+    if (provider !== 'password' || !email) {
+      throw new BadRequestException('The 6-digit email code is only for CrickX Email/Password accounts. Social and phone sign-in are verified by Firebase.');
+    }
     const firebaseUser = await getAuth(this.firebaseApp()).getUser(uid);
     if (firebaseUser.emailVerified) {
       throw new ConflictException('This Gmail address is already verified. Please sign in to continue.');
@@ -150,8 +158,51 @@ export class EmailVerificationService {
     return { sent: true, expiresInSeconds: Math.floor(CODE_TTL_MS / 1000) };
   }
 
+  async activateTrial(authorization?: string) {
+    const identity = await this.identity(authorization);
+    const adminAuth = getAuth(this.firebaseApp());
+    const firebaseUser = await adminAuth.getUser(identity.uid);
+    if (identity.provider === 'password' && (!identity.emailVerified || !firebaseUser.emailVerified)) {
+      throw new UnauthorizedException('Verify your Gmail address using the 6-digit code before starting the free trial.');
+    }
+
+    const trialRef = this.firestore.db.collection('userTrials').doc(identity.uid);
+    let trialSnapshot = await trialRef.get();
+    if (!trialSnapshot.exists) {
+      // Start social/phone trials from Firebase account creation time so old accounts
+      // cannot receive a fresh 7-day trial simply by signing in after this rollout.
+      const createdAt = this.date(firebaseUser.metadata.creationTime) ?? new Date();
+      const trialEndsAt = new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+      await trialRef.set({
+        id: identity.uid,
+        userId: identity.uid,
+        email: identity.email,
+        provider: identity.provider,
+        trialStartedAt: createdAt,
+        trialEndsAt,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }, { merge: false });
+      trialSnapshot = await trialRef.get();
+    }
+
+    const data = trialSnapshot.data() as any;
+    const trialStartedAt = this.date(data?.trialStartedAt);
+    const trialEndsAt = this.date(data?.trialEndsAt);
+    return {
+      activated: true,
+      trialActive: !!trialEndsAt && trialEndsAt.getTime() > Date.now(),
+      trialStartedAt: trialStartedAt?.toISOString() ?? null,
+      trialEndsAt: trialEndsAt?.toISOString() ?? null,
+      trialDurationDays: 7,
+    };
+  }
+
   async verifyCode(authorization: string | undefined, inputCode: unknown) {
-    const { uid, email } = await this.identity(authorization);
+    const { uid, email, provider } = await this.identity(authorization);
+    if (provider !== 'password' || !email) {
+      throw new BadRequestException('Only CrickX Email/Password accounts can use the 6-digit email code.');
+    }
     const code = String(inputCode ?? '').trim();
     if (!/^\d{6}$/.test(code)) throw new BadRequestException('Enter the 6-digit verification code.');
 

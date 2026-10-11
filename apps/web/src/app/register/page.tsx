@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { FirebaseError } from 'firebase/app';
 import { useAuth } from '../../lib/auth-context';
+import FirebaseAuthOptions from '../../components/firebase-auth-options';
 
 function friendlyError(error: unknown) {
   if (error instanceof FirebaseError) {
@@ -82,6 +83,19 @@ export default function RegisterPage() {
             {loading ? 'Creating account…' : 'Create account'}
           </button>
         </form>
+        <FirebaseAuthOptions onAuthenticated={async (_user, providerId) => {
+          setError('');
+          try {
+            if (providerId === 'password') {
+              setError('Use the email and password form above to verify your Gmail address.');
+              return;
+            }
+            await api.activateTrial();
+            router.push('/matches');
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Unable to finish Firebase sign-in.');
+          }
+        }} />
         <p style={{ marginTop: 22 }}>Already have an account? <Link href="/login" style={{ color: 'var(--accent)', fontWeight: 800 }}>Sign in</Link></p>
       </div>
     </div>

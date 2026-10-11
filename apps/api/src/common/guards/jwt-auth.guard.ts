@@ -61,14 +61,25 @@ export class JwtAuthGuard implements CanActivate {
     try {
       const app = getFirebaseApp();
       const decoded = await getAuth(app).verifyIdToken(token, true);
-      const email = decoded.email?.trim().toLowerCase();
-      if (!email) throw new UnauthorizedException('Firebase account has no email address.');
-      if (!email.endsWith('@gmail.com')) {
-        throw new UnauthorizedException('CrickX accounts must use a Gmail address ending in @gmail.com.');
+      const signInProvider = String((decoded as any).firebase?.sign_in_provider || '');
+      const verifiedEmail = decoded.email?.trim().toLowerCase() || '';
+      const phoneNumber = String((decoded as any).phone_number || '').trim();
+      const allowedProviders = new Set(['password', 'google.com', 'facebook.com', 'twitter.com', 'github.com', 'apple.com', 'microsoft.com', 'phone']);
+      if (!allowedProviders.has(signInProvider)) {
+        throw new UnauthorizedException('This Firebase sign-in provider is not enabled for CrickX.');
       }
-      if (decoded.email_verified !== true) {
-        throw new UnauthorizedException('Verify your Gmail address with the 6-digit code sent to your inbox before using CrickX.');
+      if (signInProvider === 'password') {
+        if (!verifiedEmail || !verifiedEmail.endsWith('@gmail.com')) {
+          throw new UnauthorizedException('CrickX Email/Password accounts must use a Gmail address.');
+        }
+        if (decoded.email_verified !== true) {
+          throw new UnauthorizedException('Verify your Gmail address with the 6-digit code sent to your inbox before using CrickX.');
+        }
       }
+      if (signInProvider === 'phone' && !phoneNumber) {
+        throw new UnauthorizedException('Firebase did not return a verified phone number.');
+      }
+      const email = verifiedEmail || `firebase-${signInProvider.replace(/[^a-z0-9]+/gi, '-')}-${decoded.uid}@auth.crickxfantasy.site`;
 
       const hit = cachedUser(decoded.uid);
       if (hit) {
@@ -99,6 +110,7 @@ export class JwtAuthGuard implements CanActivate {
             data: {
               id: decoded.uid,
               email,
+              ...(phoneNumber ? { phone: phoneNumber } : {}),
               passwordHash: 'FIREBASE_AUTH_MANAGED',
               role: 'USER',
               status: 'ACTIVE',
@@ -106,7 +118,7 @@ export class JwtAuthGuard implements CanActivate {
               lastLoginAt: now,
               profile: {
                 create: {
-                  displayName: decoded.name || email.split('@')[0] || 'Player',
+                  displayName: decoded.name || phoneNumber || email.split('@')[0] || 'Player'
                   country: 'PK',
                 },
               },
@@ -140,7 +152,7 @@ export class JwtAuthGuard implements CanActivate {
         await this.prisma.profile.create({
           data: {
             userId: user.id,
-            displayName: decoded.name || email.split('@')[0] || 'Player',
+            displayName: decoded.name || phoneNumber || email.split('@')[0] || 'Player'
             country: 'PK',
           },
         });

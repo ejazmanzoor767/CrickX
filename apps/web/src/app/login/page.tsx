@@ -6,6 +6,7 @@ import { FormEvent, useState } from 'react';
 import { FirebaseError } from 'firebase/app';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
+import FirebaseAuthOptions from '../../components/firebase-auth-options';
 
 function friendlyError(error: unknown) {
   if (error instanceof FirebaseError) {
@@ -51,6 +52,7 @@ export default function LoginPage() {
         router.push('/verify-email' + (sendFailed ? '?send=failed' : ''));
         return;
       }
+      await api.activateTrial();
       router.push('/matches');
     } catch (err) {
       setError(friendlyError(err));
@@ -75,6 +77,19 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+        <FirebaseAuthOptions onAuthenticated={async (_user, providerId) => {
+          setError('');
+          try {
+            if (providerId === 'password') {
+              setError('Use the email and password form above to complete email verification.');
+              return;
+            }
+            await api.activateTrial();
+            router.push('/matches');
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Unable to finish Firebase sign-in.');
+          }
+        }} />
         <p style={{ marginTop: 22 }}>New to CrickX? <Link href="/register" style={{ color: 'var(--accent)', fontWeight: 800 }}>Create your account</Link></p>
       </div>
     </div>
