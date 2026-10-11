@@ -6,7 +6,7 @@ CrickX uses one deployed CRXContestPool contract that manages one contest per Sp
 
 1. User logs in.
 2. User opens the Subscription page.
-3. User selects the currently published weekly ($0.08 / 7 days) or monthly ($0.28 / 30 days) plan.
+3. User selects the currently published weekly ($0.10 / 7 days) or monthly ($0.30 / 30 days) plan.
 4. The configured payment provider hosts checkout and sends a signed completion webhook to the CrickX API.
 5. CrickX verifies the webhook signature and activates the subscription only after successful payment confirmation.
 6. User creates or saves a fantasy XI for a fixture.
