@@ -31,7 +31,7 @@ export class EmailVerificationService {
     if (raw) return initializeApp({ credential: cert(JSON.parse(raw)) });
     if (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
       const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'crickx-3d806';
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\\n').replace(/\\\\n/g, '\\n');
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
       return initializeApp({ credential: cert({ projectId, clientEmail: process.env.FIREBASE_CLIENT_EMAIL, privateKey }) });
     }
     return initializeApp({ projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'crickx-3d806' });
@@ -104,6 +104,10 @@ export class EmailVerificationService {
 
   async sendCode(authorization?: string) {
     const { uid, email } = await this.identity(authorization);
+    const firebaseUser = await getAuth(this.firebaseApp()).getUser(uid);
+    if (firebaseUser.emailVerified) {
+      throw new ConflictException('This Gmail address is already verified. Please sign in to continue.');
+    }
     const ref = this.firestore.db.collection('emailVerificationCodes').doc(uid);
     const existingSnapshot = await ref.get();
     const existing = existingSnapshot.exists ? (existingSnapshot.data() as any) : {};
