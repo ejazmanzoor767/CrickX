@@ -255,7 +255,8 @@ export default function SubscriptionPage() {
                       ? 'Active plan'
                       : payingPlan === plan
                         ? 'Opening secure checkout…'
-                        : 'Subscribe for 
+                        : 'Subscribe for ' + String.fromCharCode(36) + config.amount.toFixed(2)}
+                </button>
               </div>
             );
           })}
