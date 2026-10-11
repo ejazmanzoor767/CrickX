@@ -7,7 +7,7 @@ const sections = [
   ['Problem', 'CrickX connects match discovery, fantasy selection, predictions, scoring, rankings and CRX settlement in one match-centered experience.'],
   ['Architecture', 'Web and Android clients use the CrickX API, while Sportmonks supplies cricket data and Polygon handles CRX token and prize settlement.'],
   ['CRX Token', 'CRX is an ERC-20 utility token on Polygon. Current contract: 0x6A7BeF6Bff1CE03C14D25bC97b1AF7097894b05E.'],
-  ['Subscription', 'Current access plans are $0.08 for 7 days or $0.28 for 30 days.'],
+  ['Subscription', 'Current access plans are $0.10 for 7 days or $0.30 for 30 days.'],
   ['CRX Wallet & Early Buy', 'Users can view and transfer CRX on Polygon. Early Buy currently starts at $1 at the displayed rate of 1 CRX = $0.002 through OxaPay.'],
   ['Fantasy Cricket', 'Users build an 11-player XI within a 100-credit budget and a maximum of 7 players from one real team.'],
   ['Contest Model', 'Contest entry is free. The platform allocates 10 CRX per participant and funds the prize pool for on-chain settlement.'],
@@ -46,8 +46,8 @@ export default function WhitepaperPage() {
             ['Network', 'Polygon'],
             ['Token', 'CRX'],
             ['Supply', '500M CRX'],
-            ['Weekly', '$0.08 / 7 days'],
-            ['Monthly', '$0.28 / 30 days'],
+            ['Weekly', '$0.10 / 7 days'],
+            ['Monthly', '$0.30 / 30 days'],
           ].map(([k, v]) => (
             <div key={k} style={{ padding: 13, borderRadius: 14, border: '1px solid rgba(255,255,255,.07)', background: 'rgba(255,255,255,.02)' }}>
               <span className="eyebrow" style={{ marginBottom: 5 }}>{k}</span>
@@ -101,8 +101,8 @@ export default function WhitepaperPage() {
 
         <Section n={5} title="Subscription Model">
           <InfoTable rows={[
-            ['Weekly', '$0.08 · 7 days'],
-            ['Monthly', '$0.28 · 30 days'],
+            ['Weekly', '$0.10 · 7 days'],
+            ['Monthly', '$0.30 · 30 days'],
             ['Provider', 'OxaPay hosted checkout'],
           ]} />
           <p>Subscription access is separate from contest prize funding. CrickX activates access after a verified successful payment webhook.</p>

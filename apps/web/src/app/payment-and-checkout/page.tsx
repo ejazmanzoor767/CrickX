@@ -8,7 +8,7 @@ export default function PaymentAndCheckoutPage() {
     </div>
     <div className="card" style={{lineHeight:1.7}}>
       <h2>Subscription payment</h2>
-      <p>CrickX currently offers a Weekly plan for $0.08 for 7 days and a Monthly plan for $0.28 for 30 days. These are digital access services and are separate from blockchain prize funding.</p>
+      <p>CrickX currently offers a Weekly plan for $0.10 for 7 days and a Monthly plan for $0.30 for 30 days. These are digital access services and are separate from blockchain prize funding.</p>
       <h2>Checkout provider</h2>
       <p>Subscription payments are handled through OxaPay's hosted checkout. The customer is redirected to the provider's secure checkout to complete payment.</p>
       <h2>Payment confirmation</h2>
