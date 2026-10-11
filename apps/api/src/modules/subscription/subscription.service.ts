@@ -7,14 +7,14 @@ import { OxaPayService } from './oxapay.service';
 const SUBSCRIPTION_PLANS = {
   WEEKLY: {
     plan: 'WEEKLY',
-    amount: 0.08,
+    amount: 0.10,
     durationDays: 7,
     durationMs: 7 * 24 * 60 * 60 * 1000,
     label: 'Weekly',
   },
   MONTHLY: {
     plan: 'MONTHLY',
-    amount: 0.28,
+    amount: 0.30,
     durationDays: 30,
     durationMs: 30 * 24 * 60 * 60 * 1000,
     label: 'Monthly',

@@ -35,13 +35,13 @@ describe('SubscriptionService payment recovery', () => {
     return { service, firestore, oxapay };
   }
 
-  it('activates a pending subscription when OxaPay confirms the exact invoice was paid', async () => {
+  it('activates a weekly $0.10 subscription when OxaPay confirms the exact invoice was paid', async () => {
     const createdAt = new Date(Date.now() - 60_000);
     const subscription = {
       id: 'sub-1',
       userId: 'user-1',
       plan: 'WEEKLY',
-      amount: 0.08,
+      amount: 0.10,
       currency: 'USD',
       status: 'PENDING',
       basketId: 'CRX-SUB-123',
@@ -54,7 +54,7 @@ describe('SubscriptionService payment recovery', () => {
       basketId: subscription.basketId,
       provider: 'OXAPAY',
       status: 'INITIATED',
-      amount: 0.08,
+      amount: 0.10,
       currency: 'USD',
       gatewayTxnRef: 'track-1',
       createdAt,
@@ -66,7 +66,7 @@ describe('SubscriptionService payment recovery', () => {
       status: 'Paid',
       order_id: subscription.basketId,
       track_id: 'track-1',
-      amount: 0.08,
+      amount: 0.10,
       currency: 'USD',
     });
 
@@ -74,6 +74,7 @@ describe('SubscriptionService payment recovery', () => {
 
     expect(result.active).toBe(true);
     expect(result.status).toBe('ACTIVE');
+    expect(result.amount).toBe(0.10);
     expect(result.basketId).toBe(subscription.basketId);
     expect(firestore.subscription.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -89,13 +90,13 @@ describe('SubscriptionService payment recovery', () => {
     );
   });
 
-  it('activates a monthly pending subscription for 30 days at $0.28', async () => {
+  it('activates a monthly pending subscription for 30 days at $0.30', async () => {
     const createdAt = new Date(Date.now() - 60_000);
     const subscription = {
       id: 'sub-monthly',
       userId: 'user-monthly',
       plan: 'MONTHLY',
-      amount: 0.28,
+      amount: 0.30,
       currency: 'USD',
       status: 'PENDING',
       basketId: 'CRX-SUB-MONTHLY',
@@ -108,7 +109,7 @@ describe('SubscriptionService payment recovery', () => {
       basketId: subscription.basketId,
       provider: 'OXAPAY',
       status: 'INITIATED',
-      amount: 0.28,
+      amount: 0.30,
       currency: 'USD',
       gatewayTxnRef: 'track-monthly',
       createdAt,
@@ -120,7 +121,7 @@ describe('SubscriptionService payment recovery', () => {
       status: 'Paid',
       order_id: subscription.basketId,
       track_id: 'track-monthly',
-      amount: 0.28,
+      amount: 0.30,
       currency: 'USD',
     });
 
@@ -129,7 +130,7 @@ describe('SubscriptionService payment recovery', () => {
 
     expect(result.active).toBe(true);
     expect(result.plan).toBe('MONTHLY');
-    expect(result.amount).toBe(0.28);
+    expect(result.amount).toBe(0.30);
     expect(result.durationDays).toBe(30);
     expect(new Date(String(result.expiresAt)).getTime()).toBeGreaterThanOrEqual(
       before + 29 * 24 * 60 * 60 * 1000,
@@ -321,7 +322,7 @@ describe('SubscriptionService payment recovery', () => {
       id: 'sub-2',
       userId: 'user-2',
       plan: 'WEEKLY',
-      amount: 0.08,
+      amount: 0.10,
       currency: 'USD',
       status: 'PENDING',
       basketId: 'CRX-SUB-456',
@@ -334,7 +335,7 @@ describe('SubscriptionService payment recovery', () => {
       basketId: subscription.basketId,
       provider: 'OXAPAY',
       status: 'INITIATED',
-      amount: 0.08,
+      amount: 0.10,
       currency: 'USD',
       gatewayTxnRef: 'track-2',
       createdAt,
@@ -346,7 +347,7 @@ describe('SubscriptionService payment recovery', () => {
       status: 'Paid',
       order_id: 'CRX-SUB-WRONG',
       track_id: 'track-2',
-      amount: 0.08,
+      amount: 0.10,
       currency: 'USD',
     });
 

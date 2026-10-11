@@ -16,13 +16,13 @@ const PLANS: Record<SubscriptionPlan, {
 }> = {
   WEEKLY: {
     name: 'Weekly',
-    amount: 0.08,
+    amount: 0.10,
     durationDays: 7,
     description: '7 days of access to CrickX fantasy features.',
   },
   MONTHLY: {
     name: 'Monthly',
-    amount: 0.28,
+    amount: 0.30,
     durationDays: 30,
     description: '30 days of access to CrickX fantasy features.',
   },
@@ -291,7 +291,7 @@ export default function SubscriptionPage() {
       <div className="card" style={{ lineHeight: 1.7 }}>
         <p className="eyebrow">SUBSCRIPTION ACCESS</p>
         <p className="section-subtitle" style={{ marginBottom: 0 }}>
-          Weekly access costs $0.08 for 7 days. Monthly access costs $0.28 for 30 days. Your subscription is tied to your CrickX account and verified payment.
+          Weekly access costs $0.10 for 7 days. Monthly access costs $0.30 for 30 days. Your subscription is tied to your CrickX account and verified payment.
         </p>
       </div>
     </section>
