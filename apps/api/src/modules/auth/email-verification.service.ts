@@ -2,8 +2,9 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  HttpException,
+  HttpStatus,
   ServiceUnavailableException,
-  TooManyRequestsException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -114,14 +115,14 @@ export class EmailVerificationService {
     const now = new Date();
     const lastSentAt = this.date(existing.lastSentAt);
     if (lastSentAt && now.getTime() - lastSentAt.getTime() < RESEND_COOLDOWN_MS) {
-      throw new TooManyRequestsException('Please wait 60 seconds before requesting another verification code.');
+      throw new HttpException('Please wait 60 seconds before requesting another verification code.', HttpStatus.TOO_MANY_REQUESTS);
     }
 
     const oldWindow = this.date(existing.windowStartedAt);
     const sameWindow = oldWindow && now.getTime() - oldWindow.getTime() < SEND_WINDOW_MS;
     const sendCount = sameWindow ? Number(existing.sendCount || 0) + 1 : 1;
     if (sendCount > MAX_SENDS_PER_WINDOW) {
-      throw new TooManyRequestsException('You have requested too many codes. Try again in about one hour.');
+      throw new HttpException('You have requested too many codes. Try again in about one hour.', HttpStatus.TOO_MANY_REQUESTS);
     }
 
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
@@ -168,7 +169,7 @@ export class EmailVerificationService {
     }
     const attempts = Number(record.attempts || 0);
     if (attempts >= MAX_CODE_ATTEMPTS) {
-      throw new TooManyRequestsException('Too many incorrect codes. Request a new code.');
+      throw new HttpException('Too many incorrect codes. Request a new code.', HttpStatus.TOO_MANY_REQUESTS);
     }
 
     const expected = Buffer.from(String(record.codeHash), 'hex');
