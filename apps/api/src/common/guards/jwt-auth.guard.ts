@@ -118,7 +118,7 @@ export class JwtAuthGuard implements CanActivate {
               lastLoginAt: now,
               profile: {
                 create: {
-                  displayName: decoded.name || phoneNumber || email.split('@')[0] || 'Player'
+                  displayName: decoded.name || phoneNumber || email.split('@')[0] || 'Player',
                   country: 'PK',
                 },
               },
@@ -152,7 +152,7 @@ export class JwtAuthGuard implements CanActivate {
         await this.prisma.profile.create({
           data: {
             userId: user.id,
-            displayName: decoded.name || phoneNumber || email.split('@')[0] || 'Player'
+            displayName: decoded.name || phoneNumber || email.split('@')[0] || 'Player',
             country: 'PK',
           },
         });
