@@ -17,7 +17,7 @@ CrickX is a fantasy-cricket platform that combines live cricket data, fantasy te
 
 The platform is designed around a simple product loop:
 
-1. A user creates an account and subscribes to CrickX access.
+1. A user creates a free CrickX account.
 2. The user browses live and upcoming cricket matches.
 3. The user builds an XI from eligible players using the platform's fantasy rules.
 4. The user joins the match contest without paying CRX to enter.
@@ -57,7 +57,7 @@ CrickX aims to build a cricket competition layer in which:
 - contest prize funding is expressed in CRX;
 - the prize pool is ultimately held and distributed by an on-chain contract;
 - prediction games use a fixed five-question format per match;
-- payment, subscription and customer-service flows are handled through normal web payments rather than forcing users to acquire CRX merely to access fantasy features.
+- payment and customer-service flows are handled through normal web payments rather than forcing users to acquire CRX merely to access fantasy features.
 
 The objective is not to replace cricket data providers or blockchain networks. CrickX combines these services into one user-facing application.
 
@@ -91,7 +91,7 @@ The backend is implemented in NestJS/TypeScript and contains modules for:
 - fantasy teams;
 - contest participation;
 - scoring;
-- subscriptions and payment verification;
+- payment verification;
 - wallet/account records;
 - predictions;
 - referral functionality;
@@ -150,27 +150,11 @@ CRX should not be interpreted as an equity instrument, ownership share, deposit 
 
 ---
 
-## 6. Subscription Model
+## 6. Free Access Model
 
-CrickX currently uses a paid subscription to unlock fantasy and prediction participation.
+Registered users can create fantasy teams, join eligible contests and submit match predictions. Match eligibility, match-start locking, account security and fair-play rules continue to apply.
 
-### Weekly
-
-- Price: **$0.10**
-- Access period: **7 days**
-
-### Monthly
-
-- Price: **$0.30**
-- Access period: **30 days**
-
-The subscription is separate from contest prize funding.
-
-CrickX currently uses OxaPay-hosted checkout and activates a subscription only after the backend receives and verifies the payment provider's successful webhook.
-
-The platform does not require a user to spend CRX to purchase the subscription.
-
-The current customer-facing app displays a token-launch countdown to October 17, 2027. The displayed date is a product schedule and may change.
+The optional Early Buy CRX flow, where available, is separate from access to fantasy and prediction features.
 
 ---
 
@@ -300,7 +284,7 @@ The featured batter and bowler are selected from the match squad using the platf
 
 ### Prediction access
 
-An active CrickX subscription is required.
+Registered users can submit predictions before the match starts.
 
 Predictions:
 
@@ -347,7 +331,7 @@ CrickX has two distinct financial concepts.
 
 ### Fiat/checkout layer
 
-Subscriptions and other supported paid services can use hosted payment providers such as OxaPay.
+Optional Early Buy CRX purchases can use hosted payment providers such as OxaPay.
 
 The provider confirms payment through a server-side webhook.
 
@@ -367,7 +351,7 @@ The separation means a user does not need to make a CRX transfer merely to join 
 
 ## 13. Referral System
 
-CrickX includes a referral model in which referral validity can be tied to subscription participation.
+Referral codes are considered valid once the referred user successfully applies them.
 
 The intended purpose is to attribute new users to an existing CrickX referral code and measure valid referral activity.
 
@@ -430,7 +414,7 @@ CrickX stores application-owned data such as:
 
 - accounts;
 - fantasy teams;
-- subscriptions;
+
 - contest entries;
 - prediction entries;
 - application records;
@@ -446,11 +430,11 @@ The project repository is maintained as the project's technical source repositor
 
 A standard fantasy-user journey is:
 
-**Discover → Subscribe → Select Match → Build XI → Sign Wallet → Join Contest → Match Goes Live → Live Scoring → Final Ranking → CRX Settlement**
+**Discover → Register → Select Match → Build XI → Sign Wallet → Join Contest → Match Goes Live → Live Scoring → Final Ranking → CRX Settlement**
 
 A prediction journey is:
 
-**Open Match → Subscribe → Answer 5 Questions → Sign Wallet → Predictions Lock → Match Completes → Results Calculated → CRX Prize Settlement**
+**Open Match → Sign In → Answer 5 Questions → Sign Wallet → Predictions Lock → Match Completes → Results Calculated → CRX Prize Settlement**
 
 This structure keeps the user journey centered on the actual cricket fixture.
 
@@ -488,7 +472,7 @@ The mobile client is designed to consume the same product and API logic as the w
 
 ### Phase 2 — Payments and growth
 
-- Subscription billing
+- Optional CRX purchase integrations
 - Referral program
 - Wallet improvements
 - Customer-support and business pages
@@ -536,7 +520,7 @@ Live scores and player information depend on third-party cricket-data infrastruc
 
 ### Payment-provider risk
 
-Subscription availability depends on payment-provider systems, webhook delivery and provider policies.
+Optional CRX purchase availability depends on payment-provider systems, webhook delivery and provider policies.
 
 ### Regulatory risk
 
@@ -629,7 +613,7 @@ The public founder identity is limited to information that can be tied directly 
 
 ## 24. Conclusion
 
-CrickX combines cricket data, fantasy competition, predictions, subscriptions and blockchain settlement into one match-centered platform.
+CrickX combines cricket data, fantasy competition, predictions and blockchain settlement into one match-centered platform.
 
 The key design principle is selective use of blockchain: ordinary application activity remains fast and server-managed, while CRX prize custody and settlement use Polygon smart contracts where public token movement and deterministic distribution provide useful transparency.
 

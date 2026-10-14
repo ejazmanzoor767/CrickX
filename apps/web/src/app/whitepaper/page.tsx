@@ -7,7 +7,7 @@ const sections = [
   ['Problem', 'CrickX connects match discovery, fantasy selection, predictions, scoring, rankings and CRX settlement in one match-centered experience.'],
   ['Architecture', 'Web and Android clients use the CrickX API, while Sportmonks supplies cricket data and Polygon handles CRX token and prize settlement.'],
   ['CRX Token', 'CRX is an ERC-20 utility token on Polygon. Current contract: 0x6A7BeF6Bff1CE03C14D25bC97b1AF7097894b05E.'],
-  ['Subscription', 'Current access plans are $0.10 for 7 days or $0.30 for 30 days.'],
+  ['Free Access', 'Registered users can use core fantasy and prediction features without an access charge.'],
   ['CRX Wallet & Early Buy', 'Users can view and transfer CRX on Polygon. Early Buy currently starts at $1 at the displayed rate of 1 CRX = $0.002 through OxaPay.'],
   ['Fantasy Cricket', 'Users build an 11-player XI within a 100-credit budget and a maximum of 7 players from one real team.'],
   ['Contest Model', 'Contest entry is free. The platform allocates 10 CRX per participant and funds the prize pool for on-chain settlement.'],
@@ -15,7 +15,7 @@ const sections = [
   ['Security Model', 'Application controls, payment verification, wallet signatures and smart-contract operations are separated by responsibility.'],
   ['Roadmap', 'The roadmap covers core fantasy, payments and growth, prediction expansion, and scaling.'],
   ['Risks', 'Users should consider token, smart-contract, wallet, data-provider, payment, regulatory and operational risks.'],
-  ['Current release', 'The app includes web and Android access, self-custody CRX wallet tools, referrals, subscription plans and on-chain fantasy/prediction settlement.'],
+  ['Current release', 'The app includes web and Android access, self-custody CRX wallet tools, referrals, free fantasy access and on-chain fantasy/prediction settlement.'],
   ['Founder', 'Ejaz Manzoor is the Founder & Developer of CrickX. His public project identity is tied to the CrickX GitHub repository.'],
 ];
 
@@ -38,7 +38,7 @@ export default function WhitepaperPage() {
         <p className="eyebrow">CRICKX</p>
         <h2 style={{ marginTop: 0 }}>Fantasy Cricket + CRX</h2>
         <p className="section-subtitle" style={{ marginBottom: 12 }}>
-          CrickX combines live cricket data, fantasy competition, prediction games, subscriptions, and Polygon-based CRX prize settlement.
+          CrickX combines live cricket data, free fantasy competition, prediction games, and Polygon-based CRX prize settlement.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10 }}>
           {[
@@ -46,8 +46,7 @@ export default function WhitepaperPage() {
             ['Network', 'Polygon'],
             ['Token', 'CRX'],
             ['Supply', '500M CRX'],
-            ['Weekly', '$0.10 / 7 days'],
-            ['Monthly', '$0.30 / 30 days'],
+            ['Access', 'Free for registered users'],
           ].map(([k, v]) => (
             <div key={k} style={{ padding: 13, borderRadius: 14, border: '1px solid rgba(255,255,255,.07)', background: 'rgba(255,255,255,.02)' }}>
               <span className="eyebrow" style={{ marginBottom: 5 }}>{k}</span>
@@ -82,7 +81,7 @@ export default function WhitepaperPage() {
 
         <Section n={3} title="Platform Architecture">
           <p><strong>Client:</strong> Next.js/React web application plus an Expo/React Native Android shell.</p>
-          <p><strong>Application:</strong> NestJS/TypeScript backend responsible for authentication, subscriptions, fantasy, contests, predictions, scoring and settlement orchestration.</p>
+          <p><strong>Application:</strong> NestJS/TypeScript backend responsible for authentication, fantasy, contests, predictions, scoring and settlement orchestration.</p>
           <p><strong>Cricket data:</strong> Sportmonks supplies fixtures, squads, players, scores and ball-by-ball information.</p>
           <p><strong>Blockchain:</strong> Polygon hosts the CRX ERC-20 token and the contest settlement contracts.</p>
         </Section>
@@ -99,13 +98,8 @@ export default function WhitepaperPage() {
           <p>CRX is used for contest and prediction prize pools and for other token utilities enabled by the platform.</p>
         </Section>
 
-        <Section n={5} title="Subscription Model">
-          <InfoTable rows={[
-            ['Weekly', '$0.10 · 7 days'],
-            ['Monthly', '$0.30 · 30 days'],
-            ['Provider', 'OxaPay hosted checkout'],
-          ]} />
-          <p>Subscription access is separate from contest prize funding. CrickX activates access after a verified successful payment webhook.</p>
+        <Section n={5} title="Free Access Model">
+          <p>Registered users can create fantasy teams, join eligible contests and submit match predictions. Match eligibility, match-start locking, account security and fair-play rules continue to apply.</p>
         </Section>
 
         <Section n={6} title="Fantasy Cricket">
@@ -127,7 +121,7 @@ export default function WhitepaperPage() {
 
         <Section n={8} title="Prediction System">
           <p>Each eligible match has five prediction questions. The current formats cover the match winner, a featured bowler, a featured batter, a powerplay threshold and the total number of match sixes.</p>
-          <p>Voting closes when the match goes live. An active subscription is required. Users need at least 3 correct answers to qualify for a prize. The current prediction pool allocation is 25 CRX per participant, with 50% / 30% / 20% correctness tiers for 5 / 4 / 3 correct answers.</p>
+          <p>Voting closes when the match goes live. Registered users can participate before the match goes live. Users need at least 3 correct answers to qualify for a prize. The current prediction pool allocation is 25 CRX per participant, with 50% / 30% / 20% correctness tiers for 5 / 4 / 3 correct answers.</p>
         </Section>
 
         <Section n={9} title="Security Model">
@@ -141,7 +135,7 @@ export default function WhitepaperPage() {
           <div style={{ display: 'grid', gap: 10 }}>
             {[
               ['Phase 1', 'Core fantasy, match centre, live scoring, contest settlement, web and Android.'],
-              ['Phase 2', 'Subscriptions, payments, referrals, wallet improvements and customer-support infrastructure.'],
+              ['Phase 2', 'Optional CRX purchases, referrals, wallet improvements and customer-support infrastructure.'],
               ['Phase 3', 'Prediction pools, automated result calculation and expanded prediction formats.'],
               ['Phase 4', 'Scaling, analytics, broader cricket coverage and additional CRX utilities.'],
             ].map(([title, body]) => (
