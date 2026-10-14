@@ -5,7 +5,6 @@ import { FirestoreService } from '../../common/firestore.service';
 import { RealtimeFirestoreService } from '../../common/realtime-firestore.service';
 import { SportmonksDataService } from '../sportmonks/sportmonks-data.service';
 import { OnchainContestService } from '../onchain/onchain-contest.service';
-import { SubscriptionService } from '../subscription/subscription.service';
 import { CreateContestDto, JoinContestDto, PrepareJoinContestDto, CRX_PRIZE_PER_PARTICIPANT } from './dto';
 import { T20_RULES, T10_RULES, ODI_RULES } from '../scoring/scoring.rules';
 import { PostgresContestError, PostgresService } from '../../common/postgres.service';
@@ -22,7 +21,6 @@ export class ContestService implements OnModuleInit {
     private readonly prisma: FirestoreService,
     private readonly sportmonks: SportmonksDataService,
     private readonly onchain: OnchainContestService,
-    private readonly subscriptions: SubscriptionService,
     private readonly postgres: PostgresService,
     private readonly realtime: RealtimeFirestoreService,
   ) {}
@@ -395,14 +393,6 @@ export class ContestService implements OnModuleInit {
     };
   }
 
-  private async assertActiveSubscription(userId: string) {
-    const subscription = await this.subscriptions.status(userId);
-    if (!subscription.active) {
-      throw new ForbiddenException('An active CrickX weekly subscription is required to join contests. Subscribe for $0.18 USD for 7 days.');
-    }
-    return subscription;
-  }
-
   private joinMessage(userId: string, contestId: string, fantasyTeamId: string, timestamp: number) {
     return [
       'CrickX Free Contest Join',
@@ -415,7 +405,6 @@ export class ContestService implements OnModuleInit {
   }
 
   async prepareJoin(userId: string, dto: PrepareJoinContestDto) {
-    await this.assertActiveSubscription(userId);
     let contest = await this.readContest(dto.contestId);
     if (!contest) throw new NotFoundException('Contest not found.');
 
@@ -465,7 +454,6 @@ export class ContestService implements OnModuleInit {
   }
 
   async confirmJoin(userId: string, dto: JoinContestDto) {
-    await this.assertActiveSubscription(userId);
     let contest = await this.readContest(dto.contestId);
     if (!contest) throw new NotFoundException('Contest not found.');
     if (contest.status === 'COMPLETED' || contest.status === 'CANCELLED') throw new ForbiddenException('Contest is already closed.');
@@ -599,7 +587,7 @@ export class ContestService implements OnModuleInit {
           entryFeePaid: 0,
           transactionHash: null,
           walletAddress: wallet,
-          paymentStatus: 'SUBSCRIPTION_ACTIVE',
+          paymentStatus: 'FREE_ENTRY',
         },
       });
 
