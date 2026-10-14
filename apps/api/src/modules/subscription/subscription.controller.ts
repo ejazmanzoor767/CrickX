@@ -1,7 +1,7 @@
-import { BadRequestException, Body, Controller, Get, Headers, Header, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { ApplyReferralDto, CreateSubscriptionCheckoutDto } from './dto';
+import { ApplyReferralDto } from './dto';
 import { SubscriptionService } from './subscription.service';
 import { OxaPayService } from './oxapay.service';
 
@@ -9,51 +9,26 @@ function uid(req: Request) {
   return (req as unknown as { user: { userId: string } }).user.userId;
 }
 
-@Controller('subscription')
+@Controller()
 export class SubscriptionController {
   constructor(
     private readonly subscriptions: SubscriptionService,
     private readonly oxapay: OxaPayService,
   ) {}
 
-  @Get()
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  @Header('Pragma', 'no-cache')
-  @Header('Expires', '0')
-  @UseGuards(JwtAuthGuard)
-  status(@Req() req: Request) {
-    return this.subscriptions.status(uid(req));
-  }
-
-  @Get('referral')
+  @Get('referrals')
   @UseGuards(JwtAuthGuard)
   referralInfo(@Req() req: Request) {
     return this.subscriptions.getReferralInfo(uid(req));
   }
 
-  @Post('referral/apply')
+  @Post('referrals/apply')
   @UseGuards(JwtAuthGuard)
   applyReferral(@Req() req: Request, @Body() dto: ApplyReferralDto) {
     return this.subscriptions.attachReferral(uid(req), dto.code, (req as any).user?.email);
   }
 
-  @Post('checkout')
-  @UseGuards(JwtAuthGuard)
-  checkout(@Req() req: Request, @Body() dto: CreateSubscriptionCheckoutDto) {
-    return this.subscriptions.checkout(uid(req), dto.plan);
-  }
-
-  @Get('status')
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  @Header('Pragma', 'no-cache')
-  @Header('Expires', '0')
-  @UseGuards(JwtAuthGuard)
-  paymentStatus(@Req() req: Request, @Query('basket') basket?: string) {
-    if (!basket) throw new BadRequestException('basket query parameter is required.');
-    return this.subscriptions.paymentStatus(uid(req), basket);
-  }
-
-  @Post('webhook')
+  @Post('subscription/webhook')
   async webhook(@Req() req: Request, @Headers('hmac') signature: string) {
     const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody;
     if (!rawBody) throw new BadRequestException('Raw webhook body is unavailable.');

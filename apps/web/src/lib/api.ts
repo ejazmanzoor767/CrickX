@@ -115,22 +115,6 @@ export const api = {
 
   sendVerificationCode: () => apiFetch('/auth/email-verification/send', { method: 'POST', body: JSON.stringify({}) }),
   verifyEmailCode: (code: string) => apiFetch('/auth/email-verification/verify', { method: 'POST', body: JSON.stringify({ code }) }),
-  activateTrial: () => apiFetch('/auth/trial/activate', { method: 'POST', body: JSON.stringify({}) }),
-
-  subscription: () => apiFetch(`/subscription?_=${Date.now()}`, { cache: 'no-store' }),
-  createSubscriptionCheckout: (plan: 'WEEKLY' | 'MONTHLY', customerMobile?: string) => apiFetch('/subscription/checkout', {
-    method: 'POST',
-    body: JSON.stringify({
-      plan,
-      ...(customerMobile ? { customerMobile } : {}),
-    }),
-  }),
-  subscriptionStatus: (basket: string) =>
-    apiFetch(
-      `/subscription/status?basket=${encodeURIComponent(basket)}&_=${Date.now()}`,
-      { cache: 'no-store' },
-    ),
-
   earlyBuyCheckout: (amountUsd: number, walletAddress: string) =>
     apiFetch('/wallet/early-buy/checkout', {
       method: 'POST',
@@ -139,8 +123,8 @@ export const api = {
   earlyBuyPaymentStatus: (orderId: string) =>
     apiFetch('/wallet/early-buy/status?order=' + encodeURIComponent(orderId) + '&_=' + Date.now(), { cache: 'no-store' }),
 
-  referralInfo: () => apiFetch('/subscription/referral'),
-  applyReferral: (code: string) => apiFetch('/subscription/referral/apply', { method: 'POST', body: JSON.stringify({ code }) }),
+  referralInfo: () => apiFetch('/referrals'),
+  applyReferral: (code: string) => apiFetch('/referrals/apply', { method: 'POST', body: JSON.stringify({ code }) }),
 
   profile: () => apiFetch('/profile'),
   updateProfile: (payload: unknown) => apiFetch('/profile', { method: 'PUT', body: JSON.stringify(payload) }),

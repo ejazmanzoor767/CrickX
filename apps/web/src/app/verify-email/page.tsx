@@ -84,7 +84,7 @@ export default function VerifyEmailPage() {
       <div className="auth-card">
         <p className="eyebrow">GMAIL VERIFICATION</p>
         <h1>CHECK YOUR<br /><span style={{ color: 'var(--accent)' }}>INBOX.</span></h1>
-        <p>We sent a 6-digit confirmation code to <strong>{email}</strong>. Enter it below to activate your account and start your 7-day free CrickX fantasy trial.</p>
+        <p>We sent a 6-digit confirmation code to <strong>{email}</strong>. Enter it below to verify your CrickX account.</p>
         <form onSubmit={submit}>
           <label className="form-label">6-digit confirmation code</label>
           <input
@@ -100,7 +100,7 @@ export default function VerifyEmailPage() {
           {error && <p className="error-text">{error}</p>}
           {notice && <p className="notice">{notice}</p>}
           <button className="primary-button" type="submit" disabled={loading || code.length !== 6} style={{ width: '100%', marginTop: 8 }}>
-            {loading ? 'Verifying…' : 'Verify and start free trial'}
+            {loading ? 'Verifying…' : 'Verify account and continue'}
           </button>
         </form>
         <button className="secondary-button" type="button" onClick={() => void resend()} disabled={resending} style={{ width: '100%', marginTop: 12 }}>
