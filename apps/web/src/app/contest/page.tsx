@@ -12,7 +12,6 @@ function ContestContent() {
   const fixtureId = Number(params.get('fixtureId'));
   const selectedTeamId = params.get('teamId') || '';
   const [contest, setContest] = useState<any>(null);
-  const [subscription, setSubscription] = useState<any>(null);
   const [teams, setTeams] = useState<any[]>([]);
   const [teamId, setTeamId] = useState(selectedTeamId);
   const [address, setAddress] = useState<Address | null>(null);
@@ -25,14 +24,12 @@ function ContestContent() {
     let active = true;
     (async () => {
       try {
-        const [contestResult, teamsResult, subscriptionResult] = await Promise.all([
+        const [contestResult, teamsResult] = await Promise.all([
           api.activeContest(fixtureId),
           api.myFantasyTeams(),
-          api.subscription(),
         ]);
         if (!active) return;
         setContest(contestResult);
-        setSubscription(subscriptionResult);
         const mine = Array.isArray(teamsResult) ? teamsResult.filter((t: any) => Number(t.sportmonksFixtureId) === fixtureId) : [];
         setTeams(mine);
         if (!teamId && mine[0]?.id) setTeamId(mine[0].id);
@@ -43,13 +40,9 @@ function ContestContent() {
 
     const refreshContestTimer = window.setInterval(async () => {
       try {
-        const [latestContest, latestSubscription] = await Promise.all([
-          api.activeContest(fixtureId),
-          api.subscription(),
-        ]);
+        const latestContest = await api.activeContest(fixtureId);
         if (active) {
           setContest(latestContest);
-          setSubscription(latestSubscription);
         }
       } catch {
         // Keep the current UI state when a background refresh temporarily fails.
@@ -82,15 +75,9 @@ function ContestContent() {
 
     setBusy(true);
     setError('');
-    setMessage('Checking your subscription…');
+    setMessage('Preparing your free contest entry…');
 
     try {
-      const latestSubscription: any = await api.subscription();
-      setSubscription(latestSubscription);
-      if (!latestSubscription?.active) {
-        throw new Error('An active CrickX subscription is required to join this contest.');
-      }
-
       setMessage('Connect your wallet to continue…');
       const restoredWallet = address || await getCurrentWallet();
       const connected: Address = restoredWallet || await connectWallet();
@@ -148,17 +135,15 @@ function ContestContent() {
   const open = contest.entriesOpen !== false && contest.status === 'UPCOMING';
   const participantCount = Number(contest.filledSpots || 0);
   const prizePool = Number(contest.prizePoolTotal ?? participantCount * 10);
-  const subscriptionActive = Boolean(subscription?.active);
   const statusLabel = contest.matchStarted ? 'LIVE' : open ? 'OPEN' : 'CLOSED';
   const statusClass = contest.matchStarted ? 'live' : open ? 'open' : 'closed';
-  const expires = subscription?.expiresAt ? new Date(subscription.expiresAt).toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' }) : null;
 
   return <section className="app-page contest-page" style={{ maxWidth: 980, paddingBottom: 96 }}>
     <div className="page-intro">
       <div>
         <p className="eyebrow">CRICKX FANTASY CONTEST</p>
         <h1 className="section-title">{contest.name}</h1>
-        <p className="section-subtitle">One contest for this match. Entry is free for subscribers and there is no participant spot limit.</p>
+        <p className="section-subtitle">One contest for this match. Entry is free and there is no participant spot limit.</p>
       </div>
       <Link className="secondary-button" href={`/matches/detail?fixtureId=${fixtureId}`}>Match</Link>
     </div>
@@ -186,18 +171,6 @@ function ContestContent() {
           <small>{open ? 'Entries are open' : contest.matchStarted ? 'Match is live' : 'Entries are closed'}</small>
         </div>
       </div>
-    </div>
-
-    <div className="card" style={{ padding: 18, marginBottom: 14 }}>
-      <p className="eyebrow">SUBSCRIBER ACCESS</p>
-      {subscriptionActive ? (
-        <p className="section-subtitle" style={{ margin: 0 }}>Subscription active until <strong>{expires}</strong>. Contest entry is free.</p>
-      ) : (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
-          <div><h2 style={{ margin: 0 }}>Subscription required</h2><p className="section-subtitle" style={{ margin: '5px 0 0' }}>Choose a subscription to access contest joining and other subscriber features.</p></div>
-          <Link className="primary-button" href="/subscription">View subscription plans</Link>
-        </div>
-      )}
     </div>
 
     <div className="panel-grid" style={{ alignItems: 'start' }}>
@@ -230,9 +203,9 @@ function ContestContent() {
           className="primary-button full"
           style={{ marginTop: 10 }}
           onClick={join}
-          disabled={busy || !open || !teams.length || !subscriptionActive}
+          disabled={busy || !open || !teams.length}
         >
-          {busy ? 'Processing…' : !subscriptionActive ? 'Subscription Required' : open ? 'Join Contest — FREE' : 'Entries Closed'}
+          {busy ? 'Processing…' : open ? 'Join Contest — FREE' : 'Entries Closed'}
         </button>
       </div>
     </div>
