@@ -137,7 +137,7 @@ describe('SubscriptionService payment recovery', () => {
     );
   });
 
-  it('allows a qualified referral code to be used once and rejects a second user', async () => {
+  it('allows a referral code to be used once without a paid subscription and rejects a second user', async () => {
     const referralSets: Array<Record<string, any>> = [];
     const referralCodeGet = jest.fn().mockResolvedValue({
       exists: true,
@@ -195,37 +195,49 @@ describe('SubscriptionService payment recovery', () => {
     });
 
     const first = await service.applyReferral('user-a', 'CRXABC12345', 'a@example.com');
-    expect(first).toEqual({ applied: true, status: 'PENDING', referrerId: 'referrer-1' });
+    expect(first).toEqual({ applied: true, status: 'VALID', referrerId: 'referrer-1' });
 
     await expect(service.applyReferral('user-b', 'CRXABC12345', 'b@example.com'))
       .rejects
       .toThrow('This code has already been added by another user.');
   });
 
-  it('rejects a referral code until the referrer has completed a subscription', async () => {
+  it('allows referral codes from referrers who have never purchased paid access', async () => {
     const referralCodeGet = jest.fn().mockResolvedValue({
       exists: true,
       data: () => ({ userId: 'referrer-new', code: 'CRXNEW12345' }),
     });
+    const referralSet = jest.fn().mockResolvedValue(undefined);
+    const referrals = {
+      doc: jest.fn(() => ({
+        get: jest.fn().mockResolvedValue({ exists: false }),
+        set: referralSet,
+      })),
+      where: jest.fn(() => ({
+        limit: jest.fn(() => ({
+          get: jest.fn().mockResolvedValue({ empty: true, docs: [] }),
+        })),
+      })),
+    };
 
     const { service, firestore } = buildService();
-    firestore.subscription.findMany.mockResolvedValue([]);
     firestore.db.collection.mockImplementation((name: string) => {
-      if (name === 'referralCodes') {
-        return { doc: jest.fn(() => ({ get: referralCodeGet })) };
-      }
-      if (name === 'referrals') {
-        return { doc: jest.fn(() => ({ get: jest.fn().mockResolvedValue({ exists: false }) })) };
-      }
+      if (name === 'referralCodes') return { doc: jest.fn(() => ({ get: referralCodeGet })) };
+      if (name === 'referrals') return referrals;
       throw new Error(`Unexpected collection: ${name}`);
     });
 
-    await expect(service.applyReferral('user-a', 'CRXNEW12345', 'a@example.com'))
-      .rejects
-      .toThrow('The referrer must complete a subscription first before this referral code can be used.');
+    const result = await service.applyReferral('user-a', 'CRXNEW12345', 'a@example.com');
+
+    expect(result).toEqual({ applied: true, status: 'VALID', referrerId: 'referrer-new' });
+    expect(firestore.subscription.findMany).not.toHaveBeenCalled();
+    expect(referralSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'VALID', subscriptionId: null, qualifiedAt: expect.any(Date) }),
+      { merge: false },
+    );
   });
 
-  it('keeps a referral pending until the referred user subscribes', async () => {
+  it('marks a referral valid as soon as the code is applied', async () => {
     const referralSet = jest.fn().mockResolvedValue(undefined);
     const referralCodeGet = jest.fn().mockResolvedValue({
       exists: true,
@@ -260,15 +272,15 @@ describe('SubscriptionService payment recovery', () => {
 
     const result = await service.applyReferral('referred-1', 'CRXABC12345', 'referred@example.com');
 
-    expect(result).toEqual({ applied: true, status: 'PENDING', referrerId: 'referrer-1' });
+    expect(result).toEqual({ applied: true, status: 'VALID', referrerId: 'referrer-1' });
     expect(referralSet).toHaveBeenCalledWith(
       expect.objectContaining({
         referrerId: 'referrer-1',
         referredUserId: 'referred-1',
         referralCode: 'CRXABC12345',
-        status: 'PENDING',
+        status: 'VALID',
         subscriptionId: null,
-        qualifiedAt: null,
+        qualifiedAt: expect.any(Date),
       }),
       { merge: false },
     );
