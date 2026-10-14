@@ -8,6 +8,8 @@ import Nav from '../components/nav';
 import Footer from '../components/footer';
 import Web3Provider from './web3-provider';
 
+const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID || 'ca-pub-2013241409545436';
+
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -26,15 +28,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        {process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID && (
-          <Script
-            id="google-adsense"
-            async
-            strategy="afterInteractive"
-            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID}`}
-            crossOrigin="anonymous"
-          />
-        )}
+        <Script
+          id="google-adsense"
+          async
+          strategy="beforeInteractive"
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
+          crossOrigin="anonymous"
+        />
         <Web3Provider>
           <AuthProvider>
             <Nav />
