@@ -52,7 +52,6 @@ export default function LoginPage() {
         router.push('/verify-email' + (sendFailed ? '?send=failed' : ''));
         return;
       }
-      await api.activateTrial();
       router.push('/matches');
     } catch (err) {
       setError(friendlyError(err));
@@ -77,14 +76,9 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-        <FirebaseAuthOptions onAuthenticated={async () => {
+        <FirebaseAuthOptions onAuthenticated={() => {
           setError('');
-          try {
-            await api.activateTrial();
-            router.push('/matches');
-          } catch (err) {
-            setError(err instanceof Error ? err.message : 'Unable to finish Google sign-in.');
-          }
+          router.push('/matches');
         }} />
         <p style={{ marginTop: 22 }}>New to CrickX? <Link href="/register" style={{ color: 'var(--accent)', fontWeight: 800 }}>Create your account</Link></p>
       </div>
