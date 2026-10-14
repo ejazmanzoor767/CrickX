@@ -160,46 +160,6 @@ export class EmailVerificationService {
     return { sent: true, expiresInSeconds: Math.floor(CODE_TTL_MS / 1000) };
   }
 
-  async activateTrial(authorization?: string) {
-    const identity = await this.identity(authorization);
-    const adminAuth = getAuth(this.firebaseApp());
-    const firebaseUser = await adminAuth.getUser(identity.uid);
-    if (identity.provider === 'password' && (!identity.emailVerified || !firebaseUser.emailVerified)) {
-      throw new UnauthorizedException('Verify your Gmail address using the 6-digit code before starting the free trial.');
-    }
-
-    const trialRef = this.firestore.db.collection('userTrials').doc(identity.uid);
-    let trialSnapshot = await trialRef.get();
-    if (!trialSnapshot.exists) {
-        // Use Firebase's original account creation time for both supported methods.
-      // This grants new signups seven days without resetting trials on later sign-ins.
-      const createdAt = this.date(firebaseUser.metadata.creationTime) ?? new Date();
-      const trialEndsAt = new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000);
-      await trialRef.set({
-        id: identity.uid,
-        userId: identity.uid,
-        email: identity.email,
-        provider: identity.provider,
-        trialStartedAt: createdAt,
-        trialEndsAt,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }, { merge: false });
-      trialSnapshot = await trialRef.get();
-    }
-
-    const data = trialSnapshot.data() as any;
-    const trialStartedAt = this.date(data?.trialStartedAt);
-    const trialEndsAt = this.date(data?.trialEndsAt);
-    return {
-      activated: true,
-      trialActive: !!trialEndsAt && trialEndsAt.getTime() > Date.now(),
-      trialStartedAt: trialStartedAt?.toISOString() ?? null,
-      trialEndsAt: trialEndsAt?.toISOString() ?? null,
-      trialDurationDays: 7,
-    };
-  }
-
   async verifyCode(authorization: string | undefined, inputCode: unknown) {
     const { uid, email, provider } = await this.identity(authorization);
     if (provider !== 'password' || !email) {
@@ -234,36 +194,10 @@ export class EmailVerificationService {
 
     // Firebase Auth's verified flag is authoritative for guarded API requests.
     const adminAuth = getAuth(this.firebaseApp());
-    const firebaseUser = await adminAuth.getUser(uid);
+    await adminAuth.getUser(uid);
     await adminAuth.updateUser(uid, { emailVerified: true });
 
-    // The record is keyed by Firebase UID and never resets on later sign-ins.
-    const trialRef = this.firestore.db.collection('userTrials').doc(uid);
-    const trialSnapshot = await trialRef.get();
-    if (!trialSnapshot.exists) {
-      const now = new Date();
-      const trialStartedAt = this.date(firebaseUser.metadata.creationTime) ?? now;
-      const trialEndsAt = new Date(trialStartedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
-      await trialRef.set({
-        id: uid,
-        userId: uid,
-        email,
-        provider: 'password',
-        trialStartedAt,
-        trialEndsAt,
-        createdAt: now,
-        updatedAt: now,
-      }, { merge: false });
-    }
-
     await ref.delete();
-    const trial = await trialRef.get();
-    const data = trial.data() as any;
-    return {
-      verified: true,
-      trialStartedAt: this.date(data?.trialStartedAt)?.toISOString() ?? null,
-      trialEndsAt: this.date(data?.trialEndsAt)?.toISOString() ?? null,
-      trialDurationDays: 7,
-    };
+    return { verified: true };
   }
 }

@@ -24,12 +24,6 @@ export class AuthController {
     return this.emailVerification.verifyCode(req.headers.authorization, body?.code);
   }
 
-  @Post('trial/activate')
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  activateTrial(@Req() req: Request) {
-    return this.emailVerification.activateTrial(req.headers.authorization);
-  }
-
   @Post('register')
   @Throttle({ default: { limit: 3, ttl: 60_000 } })
   register(@Body() dto: RegisterDto, @Req() req: Request) {

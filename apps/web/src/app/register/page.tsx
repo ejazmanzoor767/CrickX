@@ -68,7 +68,7 @@ export default function RegisterPage() {
       <div className="auth-card">
         <p className="eyebrow">Create your squad identity</p>
         <h1>JOIN<br /><span style={{ color: 'var(--accent)' }}>CRICKX.</span></h1>
-        <p>Use a valid Gmail inbox. Enter the 6-digit code we email you to activate your account and start your 7-day free fantasy trial.</p>
+        <p>Use a valid Gmail inbox. Enter the 6-digit code we email you to verify your account and start playing CrickX.</p>
         <form onSubmit={submit}>
           <label className="form-label">Display name</label>
           <input placeholder="Your cricket name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
@@ -93,7 +93,6 @@ export default function RegisterPage() {
                 console.warn('Referral code could not be applied:', referralError);
               }
             }
-            await api.activateTrial();
             router.push('/matches');
           } catch (err) {
             setError(err instanceof Error ? err.message : 'Unable to finish Google sign-in.');
