@@ -12,7 +12,7 @@ export default function GameRulesPage() {
     </div>
     <div className="panel-grid">
       <div className="card"><h2>1. Create your team</h2><p className="section-subtitle">Choose an eligible match, select exactly 11 players within the 100-credit budget, then choose one captain and one vice-captain. No more than 7 players can come from one real team.</p></div>
-      <div className="card"><h2>2. Subscription access</h2><p className="section-subtitle">Fantasy and prediction participation require an active CrickX subscription. Current plans are $0.18 for 7 days or $0.60 for 30 days.</p></div>
+      <div className="card"><h2>2. Free access</h2><p className="section-subtitle">Registered users can create fantasy teams, join eligible contests and submit predictions subject to match eligibility and lock rules.</p></div>
       <div className="card"><h2>3. One contest</h2><p className="section-subtitle">Each eligible match has one CrickX fantasy contest. There is no application-level spot limit while entries are open, and one wallet can enter the contest once.</p></div>
       <div className="card"><h2>4. Free contest entry</h2><p className="section-subtitle">Fantasy contest entry costs 0 CRX. A connected Polygon wallet signs a message confirming wallet ownership; the participant does not transfer CRX to join.</p></div>
       <div className="card"><h2>5. Contest lock</h2><p className="section-subtitle">When the cricket match starts, fantasy selection and contest entry lock. Saved teams become view-only and late edits are not accepted.</p></div>

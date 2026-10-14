@@ -1,28 +1,28 @@
 import Link from 'next/link';
 
 export default function PaymentAndCheckoutPage() {
-  return <section className="app-page">
-    <div className="page-intro">
-      <div><p className="eyebrow">CRICKX CHECKOUT</p><h1 className="section-title">Payment & Checkout</h1><p className="section-subtitle">How subscriptions and CRX purchases are handled through the current CrickX payment flow.</p></div>
-      <Link className="secondary-button" href="/profile">← Profile</Link>
-    </div>
-    <div className="card" style={{lineHeight:1.7}}>
-      <h2>Subscription payment</h2>
-      <p>CrickX currently offers a Weekly plan for $0.10 for 7 days and a Monthly plan for $0.30 for 30 days. These are digital access services and are separate from blockchain prize funding.</p>
-      <h2>Checkout provider</h2>
-      <p>Subscription payments are handled through OxaPay's hosted checkout. The customer is redirected to the provider's secure checkout to complete payment.</p>
-      <h2>Payment confirmation</h2>
-      <p>CrickX activates the subscription only after the backend receives and verifies the successful OxaPay <code>Paid</code> webhook. A browser redirect by itself does not activate access.</p>
-      <h2>Early Buy CRX</h2>
-      <p>The CrickX Wallet currently provides an Early Buy flow through OxaPay. The minimum purchase is $1 USD and the displayed rate is <strong>1 CRX = $0.002</strong>. After payment confirmation, the backend fulfills the purchased CRX directly to the connected Polygon wallet.</p>
-      <h2>Blockchain prizes are separate</h2>
-      <p>Fantasy contest joining does not require a blockchain payment. CrickX allocates 10 CRX per joined fantasy participant and 25 CRX per prediction participant. These pools are settled through the appropriate CrickX smart contracts.</p>
-      <h2>What customers should check</h2>
-      <p>Before confirming payment, review the plan, amount, service description and wallet address where applicable. For blockchain transfers or CRX fulfillment, verify the Polygon network and recipient wallet carefully.</p>
-      <h2>Payment records</h2>
-      <p>CrickX may retain payment references, payment status, customer account information and order/service details needed for reconciliation, support, fraud prevention, service activation and dispute handling.</p>
-      <h2>Support</h2>
-      <p>Payment questions can be sent to <a href="mailto:support@crickxfantasy.site">support@crickxfantasy.site</a>. You may also contact <a href="mailto:contact@crickxfantasy.site">contact@crickxfantasy.site</a>.</p>
-    </div>
-  </section>;
+  return (
+    <section className="app-page">
+      <div className="page-intro">
+        <div>
+          <p className="eyebrow">CRICKX CHECKOUT</p>
+          <h1 className="section-title">Payments & Checkout</h1>
+          <p className="section-subtitle">Fantasy teams, contest entry and predictions are available to registered users at no access charge.</p>
+        </div>
+        <Link className="secondary-button" href="/profile">← Profile</Link>
+      </div>
+      <div className="card" style={{ lineHeight: 1.7 }}>
+        <h2>Fantasy access</h2>
+        <p>Creating a fantasy team, joining an eligible contest and submitting match predictions do not require a payment. Contest and prediction prizes are funded and settled separately through CrickX prize-pool processes.</p>
+        <h2>Optional CRX purchases</h2>
+        <p>The Wallet may provide an Early Buy option for CRX through OxaPay. The minimum purchase is $1 USD at the displayed rate of <strong>1 CRX = $0.002</strong>. After payment confirmation, the backend fulfills the purchased CRX to the connected Polygon wallet.</p>
+        <h2>Blockchain transactions</h2>
+        <p>Before confirming a CRX purchase or transfer, verify the amount, Polygon network and destination wallet. On-chain transfers may be irreversible after confirmation.</p>
+        <h2>Payment records</h2>
+        <p>For optional CRX purchases, CrickX may retain order references, payment status and customer account information needed for reconciliation, support, fraud prevention and dispute handling.</p>
+        <h2>Support</h2>
+        <p>Payment questions can be sent to <a href="mailto:support@crickxfantasy.site">support@crickxfantasy.site</a> or <a href="mailto:contact@crickxfantasy.site">contact@crickxfantasy.site</a>.</p>
+      </div>
+    </section>
+  );
 }
