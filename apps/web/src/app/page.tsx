@@ -1,9 +1,9 @@
 import Link from 'next/link';
 
 const highlights = [
-  ['01', 'Subscribe for 7 days', 'Get CrickX fantasy access for $0.18 with a weekly subscription.'],
+  ['01', 'Create a free account', 'Get started with CrickX fantasy cricket at no cost.'],
   ['02', 'Build your fantasy XI', 'Choose 11 players, then set your captain and vice-captain for each match.'],
-  ['03', 'Join contests free', 'Active subscribers can join eligible contests without paying CRX to enter.'],
+  ['03', 'Join contests free', 'Join eligible contests without paying an entry fee in CRX.'],
   ['04', 'Track live points', 'Follow match data, fantasy points and leaderboard positions as the game progresses.'],
   ['05', 'Earn CRX prizes', 'CrickX funds 10 CRX per participant and the contest smart contract distributes the prize pool after final ranking.'],
   ['06', 'Receive on-chain', 'Prizes are sent directly to the verified payout wallet used for the contest entry.'],
@@ -22,11 +22,11 @@ export default function Home() {
               compete on the leaderboard and receive CRX prizes directly in your wallet.
             </p>
             <div className="hero-actions">
-              <Link className="primary-button" href="/subscription">Get weekly access →</Link>
+              <Link className="primary-button" href="/register">Start playing free →</Link>
               <Link className="secondary-button" href="/matches">Explore matches</Link>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 22 }}>
-              <span className="demo-pill">$0.18 / 7 DAYS</span>
+              <span className="demo-pill">FREE TO PLAY</span>
               <span className="demo-pill">CONTEST ENTRY: FREE</span>
               <span className="demo-pill">PRIZES: CRX ON-CHAIN</span>
             </div>
@@ -56,7 +56,7 @@ export default function Home() {
           <p className="eyebrow">HOW CRICKX WORKS</p>
           <h2>One simple journey from match to prize.</h2>
           <p className="section-subtitle">
-            Subscribe for $0.18, build your fantasy team, join an eligible contest for free,
+            Create your free account, build your fantasy team, join an eligible contest for free,
             follow the live leaderboard, then receive any earned CRX prize directly on Polygon.
           </p>
         </div>
@@ -86,7 +86,7 @@ export default function Home() {
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h2 style={{ margin: 0, fontFamily: 'Barlow Condensed', fontSize: 34, textTransform: 'uppercase' }}>Ready for the next match?</h2>
-            <p className="section-subtitle" style={{ marginTop: 8, marginBottom: 0 }}>Create an account, activate your weekly subscription and start building your fantasy XI.</p>
+            <p className="section-subtitle" style={{ marginTop: 8, marginBottom: 0 }}>Create a free account and start building your fantasy XI.</p>
           </div>
           <Link className="primary-button" href="/register">Create account</Link>
         </div>

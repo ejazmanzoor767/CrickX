@@ -8,7 +8,6 @@ const primaryItems = [
   { href: '/matches', label: 'Matches', icon: 'matches' },
   { href: '/fantasy-home', label: 'Fantasy', icon: 'fantasy' },
   { href: '/wallet', label: 'Wallet', icon: 'wallet' },
-  { href: '/subscription', label: 'Subscribe', icon: 'subscribe' },
   { href: '/profile', label: 'Profile', icon: 'profile' },
 ] as const;
 
