@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import { signContestJoinMessage } from '../../lib/web3';
+import AdBanner from '../../components/ad-banner';
 
 const unwrap=(v:any)=>v?.data??v;
 
@@ -41,6 +42,7 @@ function Content(){
  return <section className="app-page predictions-page" style={{paddingBottom:96}}>
   <div className="page-intro"><div><p className="eyebrow">CRICKX PREDICTIONS</p><h1 className="section-title">Match Predictions</h1><p className="section-subtitle">{fixture?.localteam?.name??'Home'} vs {fixture?.visitorteam?.name??'Away'} · 5 predictions per match · 25 CRX per participant.</p></div><Link className="secondary-button" href="/matches">Back to matches</Link></div>
   <div className="card" style={{padding:16}}><div style={{display:'flex',flexWrap:'wrap',justifyContent:'space-between',gap:12,alignItems:'center'}}><div><span className="eyebrow">PREDICTION POOL</span><strong style={{display:'block',fontSize:24,marginTop:4}}>{Number(prediction?.poolAmount??0)} CRX</strong><span className="section-subtitle">{Number(prediction?.participantCount??0)} participants · {Number(prediction?.predictionCount??0)} predictions</span></div><div style={{textAlign:'right'}}><span className={status==='OPEN'?'badge-live':'demo-pill'}>{status==='OPEN'?'● OPEN':status==='LOCKED'?'🔒 LOCKED':ready?'RESULTS READY':status==='VOID'?'VOID':'COMPLETED'}</span><span className="section-subtitle" style={{display:'block',marginTop:7}}>{status==='OPEN'?'Voting closes when the match goes LIVE.':status==='LOCKED'?'Voting is closed. Your selections cannot be changed.':ready?'Results are calculated. Prize settlement is being completed.':'Results are available below.'}</span></div></div></div>
+  <AdBanner />
   {!user&&<div className="card"><strong>Sign in to participate.</strong><span className="section-subtitle" style={{display:'block',marginTop:6}}>Sign in to submit predictions and become eligible for any CRX prizes.</span><Link className="primary-button" href="/login" style={{marginTop:14}}>Sign in</Link></div>}
   
   {error&&<div className="card"><p className="error-text">{error}</p></div>}

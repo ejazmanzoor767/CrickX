@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import { subscribeLiveMatches } from '../../lib/realtime';
+import AdBanner from '../../components/ad-banner';
 
 const list = (x:any) => Array.isArray(x) ? x : (x?.data ?? []);
 const fmtTime = (v:string) => new Date(v).toLocaleString('en-PK',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -141,6 +142,7 @@ export default function FantasyHomePage() {
         </div>
         <div className="page-actions"><Link className="secondary-button" href="/matches">Match centre</Link></div>
       </div>
+      <AdBanner />
       {error && <div className="card"><p className="error-text">{error}</p></div>}
       {loading ? <div className="card skeleton-card">Loading fantasy matches…</div> : matches.length === 0 ? <div className="card empty-state"><strong>No active fantasy matches found.</strong><span>Completed matches are not listed in Fantasy. Open Match Centre to view completed results.</span></div> : <div className="match-list">{matchCards}</div>}
     </section>

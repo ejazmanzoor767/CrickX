@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import AdBanner from '../components/ad-banner';
 
 const highlights = [
   ['01', 'Create a free account', 'Get started with CrickX fantasy cricket at no cost.'],
@@ -40,6 +41,8 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <AdBanner />
 
       <div className="feature-grid">
         {highlights.map(([num, title, text]) => (

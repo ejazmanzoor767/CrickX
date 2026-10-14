@@ -1,4 +1,6 @@
 import './globals.css';
+import '../components/ads.css';
+import Script from 'next/script';
 import './fantasy/player-readability.css';
 import '../components/structure.css';
 import { AuthProvider } from '../lib/auth-context';
@@ -24,6 +26,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        {process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID && (
+          <Script
+            id="google-adsense"
+            async
+            strategy="afterInteractive"
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID}`}
+            crossOrigin="anonymous"
+          />
+        )}
         <Web3Provider>
           <AuthProvider>
             <Nav />

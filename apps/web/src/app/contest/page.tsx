@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
 import { connectWallet, getCurrentWallet, signContestJoinMessage } from '../../lib/web3';
 import type { Address } from 'viem';
+import AdBanner from '../../components/ad-banner';
 
 function ContestContent() {
   const params = useSearchParams();
@@ -172,6 +173,8 @@ function ContestContent() {
         </div>
       </div>
     </div>
+
+    <AdBanner />
 
     <div className="panel-grid" style={{ alignItems: 'start' }}>
       <div className="card" style={{ padding: 24 }}>

@@ -1,0 +1,32 @@
+.ad-placement {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 18px auto 22px;
+  padding: 8px 0;
+  text-align: center;
+  overflow: hidden;
+}
+
+.ad-placement-label {
+  display: block;
+  margin: 0 0 6px;
+  color: var(--muted, #98a0b3);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.ad-placement .adsbygoogle {
+  display: block;
+  width: 100%;
+  min-height: 90px;
+}
+@media (min-width: 768px) {
+  .ad-placement {
+    margin-top: 22px;
+    margin-bottom: 26px;
+  }
+}
