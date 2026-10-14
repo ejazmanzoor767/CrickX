@@ -2,21 +2,15 @@
 
 CrickX uses one deployed CRXContestPool contract that manages one contest per Sportmonks fixture. The application allows unlimited participant capacity.
 
-## Subscription and entry flow
+## Free entry flow
 
-1. User logs in.
-2. User opens the Subscription page.
-3. User selects the currently published weekly ($0.10 / 7 days) or monthly ($0.30 / 30 days) plan.
-4. The configured payment provider hosts checkout and sends a signed completion webhook to the CrickX API.
-5. CrickX verifies the webhook signature and activates the subscription only after successful payment confirmation.
-6. User creates or saves a fantasy XI for a fixture.
-7. User selects the single contest for that fixture.
-8. The backend requires an active subscription and verifies the match has not started.
-9. The user connects MetaMask on Polygon and signs a short, contest-specific message proving control of the intended payout wallet.
-10. No CRX is deducted from the participant. MetaMask is used only to sign a wallet-ownership message.
-11. The backend records the participant accounting and wallet.
-12. When the fixture reaches the funding stage, the backend funds the complete required pool from the treasury/funding wallet at 10 CRX per participant.
-13. The on-chain pool target is participantCount × 10 CRX; no participant CRX transfer is required to join.
+1. User registers or logs in.
+2. User creates or saves a fantasy XI for an eligible fixture.
+3. User selects the single contest for that fixture while entries are open.
+4. The backend validates the saved team, contest status and match start time.
+5. The user connects a Polygon wallet and signs a short message confirming ownership of the intended prize wallet.
+6. The backend records the participant and payout wallet; joining does not charge the participant CRX.
+7. When the fixture reaches the funding stage, the backend funds the prize pool from the CrickX treasury/funding wallet at 10 CRX per participant.
 
 ## Prize settlement
 

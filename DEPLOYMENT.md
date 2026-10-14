@@ -14,28 +14,6 @@ The deployed pool contract owner is the deployer. Render CRX_CONTEST_OWNER_PRIVA
 
 The pool fundingWallet is the treasury wallet from which the contract pulls 10 CRX for each participant at join time. For the simplest deployment, make the funding wallet the same wallet as the contract owner. If you use a different funding wallet, that wallet must approve the pool contract to spend CRX before users can join.
 
-## RapidGateway subscription variables
-
-| Variable | Where it goes |
-|---|---|
-| RAPIDGATEWAY_BASE_URL | Render API |
-| RAPIDGATEWAY_ENVIRONMENT | Render API (LIVE) |
-| RAPIDGATEWAY_MERCHANT_ID | Render API secret |
-| RAPIDGATEWAY_MERCHANT_NAME | Render API (CrickX) |
-| RAPIDGATEWAY_CLIENT_SECRET | Render API secret |
-| RAPIDGATEWAY_WEBHOOK_SECRET | Render API secret |
-| CRICKX_WEB_URL | Render API (https://crickxfantasy.site) |
-
-Register the RapidGateway LIVE webhook as:
-
-    https://YOUR-CRICKX-API-DOMAIN/api/v1/subscription/webhook
-
-The frontend never receives the RapidGateway client secret, webhook secret or OAuth access token.
-
-## Subscription
-
-The current subscription plans are $0.10 for 7 days or $0.30 for 30 days. Contest joining is free while the subscription is active. The current integration uses a new RapidGateway checkout for each weekly renewal; the supplied RapidGateway documentation does not define an automatic recurring mandate flow, so CrickX does not assume that RECURRING_TXN creates an automatic weekly charge.
-
 ## Contest prize funding
 
 Joining a contest does not charge the participant's wallet. MetaMask only signs a wallet-ownership message.
@@ -82,4 +60,4 @@ After deployment, the funding wallet must hold enough CRX and approve the new po
 
 ## Security
 
-Never commit .env, private keys, Firebase Admin credentials, RapidGateway secrets, or Render secrets. The browser only receives variables prefixed with NEXT_PUBLIC_.
+Never commit .env, private keys, Firebase Admin credentials, OxaPay secrets, or Render secrets. The browser only receives variables prefixed with NEXT_PUBLIC_.
