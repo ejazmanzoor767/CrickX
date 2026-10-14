@@ -47,14 +47,6 @@ function NavIcon({ name }: { name: typeof primaryItems[number]['icon'] }) {
           <path d="M17 13h.01" />
         </svg>
       );
-    case 'subscribe':
-      return (
-        <svg {...common}>
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-          <path d="M3 9h18M7 14h3" />
-          <path d="M15 13v4M13 15h4" />
-        </svg>
-      );
     case 'profile':
       return (
         <svg {...common}>
