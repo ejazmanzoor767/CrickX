@@ -306,7 +306,7 @@ export default function ProfilePage() {
               </div>
               <h2 style={{ margin: '12px 0 7px', fontSize: 28 }}>Grow your CrickX network</h2>
               <p className="section-subtitle" style={{ margin: 0, lineHeight: 1.65 }}>
-                Invite friends with your referral code. A referral becomes <strong style={{ color: '#eef2f7' }}>valid</strong> after the referred user successfully completes a subscription.
+                Invite friends with your referral code. A referral becomes <strong style={{ color: '#eef2f7' }}>valid</strong> when the referred user successfully applies your code.
               </p>
             </div>
             <div className="referral-stat-card" style={{ minWidth: 170, padding: 16, borderRadius: 18, background: 'rgba(0,0,0,.18)', border: '1px solid rgba(255,255,255,.07)' }}>
@@ -339,7 +339,7 @@ export default function ProfilePage() {
               <div>
                 <strong style={{ display: 'block', fontSize: 14 }}>How valid referrals work</strong>
                 <p style={{ margin: '5px 0 0', color: '#9aa3b5', fontSize: 13, lineHeight: 1.6 }}>
-                  Your friend can register and apply your code. They are counted as a valid referral only after their subscription is successfully confirmed.
+                  Your friend can register and apply your code. They are counted as a valid referral once your code is applied.
                 </p>
               </div>
             </div>
@@ -351,7 +351,7 @@ export default function ProfilePage() {
                 <div style={{ minWidth: 0 }}>
                   <span className="eyebrow">YOUR REFERRAL</span>
                   <strong style={{ display: 'block', marginTop: 4, fontSize: 14 }}>
-                    {referral.incomingReferral.status === 'VALID' ? 'Subscription confirmed' : 'Waiting for subscription'}
+                    {referral.incomingReferral.status === 'VALID' ? 'Referral confirmed' : 'Referral pending'}
                   </strong>
                   <span className="section-subtitle" style={{ display: 'block', marginTop: 4 }}>
                     Code {referral.incomingReferral.referralCode}
@@ -382,7 +382,7 @@ export default function ProfilePage() {
                   <div className="referral-row-card" key={row.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.06)' }}>
                     <div style={{ minWidth: 0 }}>
                       <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{row.email || row.userId}</strong>
-                      <small style={{ display: 'block', marginTop: 3, color: '#8f98aa' }}>{row.status === 'VALID' ? 'Subscription confirmed' : 'Waiting for subscription'}</small>
+                      <small style={{ display: 'block', marginTop: 3, color: '#8f98aa' }}>{row.status === 'VALID' ? 'Referral confirmed' : 'Referral pending'}</small>
                     </div>
                     <span className={row.status === 'VALID' ? 'badge-live' : 'demo-pill'} style={{ flexShrink: 0 }}>{row.status === 'VALID' ? 'VALID' : 'PENDING'}</span>
                   </div>

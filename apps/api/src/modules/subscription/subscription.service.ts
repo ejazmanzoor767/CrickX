@@ -106,11 +106,27 @@ export class SubscriptionService {
       this.firestore.db.collection('referrals').where('referrerId', '==', userId).get(),
       this.firestore.db.collection('referrals').doc(userId).get(),
     ]);
+    const now = new Date();
+    // Subscription removal means referral qualification is based on applying a
+    // referral code, not on buying paid access. Qualify existing pending records too.
+    await Promise.all(networkSnapshot.docs
+      .filter((doc) => String(doc.data()?.status ?? 'PENDING') === 'PENDING')
+      .map((doc) => doc.ref.set({ status: 'VALID', qualifiedAt: doc.data()?.qualifiedAt ?? now, updatedAt: now }, { merge: true })));
+
     const referrals = networkSnapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }) as any)
+      .map((doc) => {
+        const data = doc.data() as any;
+        return { id: doc.id, ...data, status: data.status === 'PENDING' ? 'VALID' : data.status, qualifiedAt: data.status === 'PENDING' ? (data.qualifiedAt ?? now) : data.qualifiedAt } as any;
+      })
       .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
 
     const incoming = incomingSnapshot.exists ? (incomingSnapshot.data() as any) : null;
+    if (incoming && String(incoming.status ?? 'PENDING') === 'PENDING') {
+      incoming.status = 'VALID';
+      incoming.qualifiedAt = incoming.qualifiedAt ?? now;
+      incoming.updatedAt = now;
+      await incomingSnapshot.ref.set({ status: 'VALID', qualifiedAt: incoming.qualifiedAt, updatedAt: now }, { merge: true });
+    }
     const incomingReferral = incoming && String(incoming.referrerId ?? '') !== userId
       ? {
           id: incomingSnapshot.id,
@@ -135,7 +151,7 @@ export class SubscriptionService {
         qualifiedAt: this.isoDate(row.qualifiedAt),
       })),
       incomingReferral,
-      rewardText: 'At launch, rewards will be distributed according to the number of valid referrals.',
+      rewardText: 'A referral counts as valid once the referred user successfully applies the referral code.',
     };
   }
 
@@ -159,12 +175,6 @@ export class SubscriptionService {
       throw new ConflictException('A referral is already attached to this account.');
     }
 
-    // A referral code becomes usable only after its owner has successfully
-    // subscribed at least once, and each code can be used by only one user.
-    if (!await this.hasSuccessfulSubscription(referrerId)) {
-      throw new ConflictException('The referrer must complete a subscription first before this referral code can be used.');
-    }
-
     const codeUsage = await this.firestore.db
       .collection('referrals')
       .where('referralCode', '==', code)
@@ -175,24 +185,11 @@ export class SubscriptionService {
       if (usedBy && usedBy !== userId) {
         throw new ConflictException('This code has already been added by another user.');
       }
-      return { applied: true, status: codeUsage.docs[0].data()?.status ?? 'PENDING', referrerId };
+      return { applied: true, status: 'VALID', referrerId };
     }
 
-    const priorSubscriptions = await this.subscriptionsForUser(userId);
-    const successfulSubscriptions = priorSubscriptions
-      .filter((row: any) =>
-        row.status === 'ACTIVE' ||
-        row.status === 'EXPIRED' ||
-        (row.status === 'PAYMENT_FAILED' && row.startedAt),
-      )
-      .sort((a: any, b: any) =>
-        (this.asDate(b.startedAt)?.getTime() ?? this.asDate(b.createdAt)?.getTime() ?? 0) -
-        (this.asDate(a.startedAt)?.getTime() ?? this.asDate(a.createdAt)?.getTime() ?? 0),
-      );
-    const successfulSubscription = successfulSubscriptions[0] ?? null;
-
     const now = new Date();
-    const status = successfulSubscription ? 'VALID' : 'PENDING';
+    const status = 'VALID';
     await this.firestore.db.collection('referrals').doc(userId).set({
       id: userId,
       referrerId,
@@ -200,10 +197,10 @@ export class SubscriptionService {
       referredEmail: email ?? null,
       referralCode: code,
       status,
-      subscriptionId: successfulSubscription?.id ?? null,
+      subscriptionId: null,
       createdAt: now,
       updatedAt: now,
-      qualifiedAt: successfulSubscription ? now : null,
+      qualifiedAt: now,
     }, { merge: false });
 
     return { applied: true, status, referrerId };
