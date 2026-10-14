@@ -24,7 +24,6 @@ export default function Footer() {
           <div className="footer-link-group">
             <div className="footer-heading">Explore</div>
             <Link href="/whitepaper">Whitepaper</Link>
-            <Link href="/subscription">Subscription Plans</Link>
             <Link href="/profile/game-rules">Game Rules</Link>
             <Link href="/profile/scoring">Fantasy Point Calculation</Link>
             <Link href="/profile/metamask">CRX in MetaMask</Link>
