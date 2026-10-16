@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useAccount, useSwitchChain, useWalletClient } from 'wagmi';
 import { appKit } from '../../lib/appkit';
-import { getClobCredentials, getMarketTradingInfo, submitLimitOrder, type ClobCredentials, type TradeSide } from '../../lib/polymarket-trading';
+import { checkPolymarketGeoblock, getClobCredentials, getMarketTradingInfo, submitLimitOrder, type ClobCredentials, type TradeSide } from '../../lib/polymarket-trading';
 
 type Market = {
   id?: string; question?: string; slug?: string; description?: string;
@@ -108,6 +108,26 @@ export default function PredictionMarketsPage() {
     if (!walletClient) {
       setStatus({ kind: 'error', message: 'Your wallet signer is not ready. Reconnect your wallet and retry.' }); return;
     }
+    // Check the current browser IP against Polymarket's own geoblock endpoint.
+    // Fail closed if the check cannot be completed; never suggest bypassing restrictions.
+    try {
+      const geo = await checkPolymarketGeoblock();
+      if (geo.blocked) {
+        setStatus({
+          kind: 'error',
+          message: 'Polymarket trading is unavailable from your current location.',
+          details: 'Detected location: ' + [geo.country, geo.region].filter(Boolean).join('-') + '. Market browsing remains available, but CrickX will not submit an order.',
+        });
+        return;
+      }
+    } catch (cause) {
+      setStatus({
+        kind: 'error',
+        message: 'Could not verify Polymarket geographic eligibility. Trading is paused for safety.',
+        details: cause instanceof Error ? cause.message : 'Retry when Polymarket eligibility can be checked.',
+      });
+      return;
+    }
     const estimate = numericPrice * numericShares;
     if (!window.confirm(side + ' ' + numericShares.toFixed(2) + ' shares of "' + selectedTrade.outcome +
       '" at a limit price of ' + (numericPrice * 100).toFixed(2) + '¢. Estimated order value: $' +
@@ -124,11 +144,12 @@ export default function PredictionMarketsPage() {
         price: numericPrice, shares: numericShares, side, negRisk: info.negRisk, tickSize: info.tickSize,
       });
       const orderId = result.orderID ?? result.orderId ?? result.id;
-      const accepted = result.success === true || Boolean(orderId) || result.status === 'live' || result.status === 'matched';
-      if (!accepted) throw new Error(result.error ?? result.message ?? 'Polymarket did not confirm that the order was accepted.');
-      setStatus({ kind: 'success', message: 'Order accepted by Polymarket.', details:
-        (orderId ? 'Order ID: ' + orderId + '. ' : '') + (result.status ? 'Status: ' + result.status + '. ' : '') +
-        'A live limit order may remain open until matched or cancelled.' });
+      if (result.success !== true || result.error) {
+        throw new Error(result.error ?? result.message ?? 'Polymarket did not explicitly confirm acceptance of this order.');
+      }
+      setStatus({ kind: 'success', message: 'Polymarket accepted the order submission.', details:
+        (orderId ? 'Order ID: ' + orderId + '. ' : '') + (result.status ? 'Reported status: ' + result.status + '. ' : '') +
+        'Acceptance is not a fill guarantee. Check Polymarket order status; an open limit order may remain unfilled until matched or cancelled.' });
     } catch (cause) {
       setStatus({ kind: 'error', message: cause instanceof Error ? cause.message : 'Order could not be submitted. No success was reported.' });
     } finally { setBusy(false); }
