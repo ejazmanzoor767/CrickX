@@ -537,15 +537,8 @@ async function openWalletPicker() {
     throw new Error('Reown AppKit is not configured. Set NEXT_PUBLIC_REOWN_PROJECT_ID in the CrickX web build environment.');
   }
 
-  try {
-    const adapter = wagmiAdapter as unknown as { syncConnectors?: () => Promise<void> };
-    await adapter.syncConnectors?.();
-  } catch {
-    // Reown will continue with the connectors already available.
-  }
-
-  await new Promise(resolve => setTimeout(resolve, 150));
-
+  // Open AppKit immediately from the user's click handler. Delayed connector
+  // preflight can lose Android's transient user activation and break wallet handoff.
   try {
     await appKit.open({ view: 'Connect' });
   } catch (error) {
