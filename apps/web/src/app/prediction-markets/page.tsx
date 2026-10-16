@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useAccount, useSwitchChain, useWalletClient } from 'wagmi';
-import { appKit } from '@/lib/appkit';
-import { getClobCredentials, getMarketTradingInfo, submitLimitOrder, type ClobCredentials, type TradeSide } from '@/lib/polymarket-trading';
+import { appKit } from '../../lib/appkit';
+import { getClobCredentials, getMarketTradingInfo, submitLimitOrder, type ClobCredentials, type TradeSide } from '../../lib/polymarket-trading';
 
 type Market = {
   id?: string; question?: string; slug?: string; description?: string;
