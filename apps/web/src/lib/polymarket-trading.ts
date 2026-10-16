@@ -10,6 +10,29 @@ const NEG_RISK_EXCHANGE_V2 = '0xe2222d279d744050d28e00520010520000310F59' as Add
 export type ClobCredentials = { key: string; secret: string; passphrase: string };
 export type TradeSide = 'BUY' | 'SELL';
 
+export type PolymarketGeoblock = {
+  blocked: boolean;
+  country?: string;
+  region?: string;
+};
+
+export async function checkPolymarketGeoblock(): Promise<PolymarketGeoblock> {
+  const response = await fetch('https://polymarket.com/api/geoblock', {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  });
+  const result = await responseJson(response);
+  if (typeof result.blocked !== 'boolean') {
+    throw new Error('Polymarket did not return a valid geographic eligibility response. Trading is paused for safety.');
+  }
+  return {
+    blocked: result.blocked,
+    country: typeof result.country === 'string' ? result.country : undefined,
+    region: typeof result.region === 'string' ? result.region : undefined,
+  };
+}
+
 type Signer = {
   account?: { address: Address } | Address;
   signTypedData(args: any): Promise<`0x${string}`>;
