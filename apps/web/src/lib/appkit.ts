@@ -42,6 +42,10 @@ export const appKit =
           description: 'Fantasy cricket powered by CrickX.',
           url: 'https://crickxfantasy.site',
           icons: ['https://crickxfantasy.site/crickx-app-logo.svg'],
+          // Give supported mobile wallets one shared destination when returning to CrickX.
+          redirect: {
+            universal: 'https://crickxfantasy.site/wallet/',
+          },
         },
         enableEIP6963: true,
         enableInjected: true,
