@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useAccount, useSwitchChain, useWalletClient } from 'wagmi';
 import { appKit } from '@/lib/appkit';
 import { getClobCredentials, getMarketTradingInfo, submitLimitOrder, type ClobCredentials, type TradeSide } from '@/lib/polymarket-trading';
@@ -33,7 +33,7 @@ const tradeUrl = (market: Market) => market.slug
 
 type SelectedTrade = { market: Market; outcome: string; tokenId: string; marketPrice: number };
 type OrderStatus = { message: string; kind: 'success' | 'error' | 'info'; details?: string };
-const fieldStyle: React.CSSProperties = {
+const fieldStyle: CSSProperties = {
   display: 'block', width: '100%', marginTop: 6, padding: '12px 13px', borderRadius: 12,
   border: '1px solid var(--line)', color: 'var(--text)', background: 'rgba(255,255,255,.04)', outline: 'none',
 };
