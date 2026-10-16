@@ -48,7 +48,7 @@ export default function Nav() {
           </Link>
           <nav className="nav-links">
             {primaryItems.map(({ href, label, icon }) => (
-              <Link key={href} className={\`nav-link \${pathname === href || pathname.startsWith(\`\${href}/\`) ? 'active' : ''}\`} href={href}>
+              <Link key={href} className={'nav-link ' + (pathname === href || pathname.startsWith(href + '/') ? 'active' : '')} href={href}>
                 <span className="nav-icon"><NavIcon name={icon} /></span>{label}
               </Link>
             ))}
@@ -58,7 +58,7 @@ export default function Nav() {
       </header>
       <nav className="mobile-bottom-nav" aria-label="Primary navigation">
         {primaryItems.map(({ href, label, icon }) => (
-          <Link key={href} className={pathname === href || pathname.startsWith(\`\${href}/\`) ? 'active' : ''} href={href} aria-label={label}>
+          <Link key={href} className={(pathname === href || pathname.startsWith(href + '/')) ? 'active' : ''} href={href} aria-label={label}>
             <span className="nav-item-icon"><NavIcon name={icon} /></span><small>{label}</small>
           </Link>
         ))}
