@@ -38,6 +38,9 @@ const fieldStyle: CSSProperties = {
 export default function PredictionMarketsPage() {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [hasMoreMarkets, setHasMoreMarkets] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
@@ -61,12 +64,42 @@ export default function PredictionMarketsPage() {
       const payload: unknown = await response.json();
       const rows = Array.isArray(payload) ? payload : (payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown }).data) ? (payload as { data: unknown[] }).data : []);
       setMarkets((rows as Market[]).filter((market) => market && market.question && market.active !== false && market.closed !== true && market.archived !== true));
+      setNextOffset(rows.length);
+      setHasMoreMarkets(rows.length === 500);
     } catch {
       setError('We could not load the live market feed right now. You can still browse markets directly on Polymarket.');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const loadMoreMarkets = useCallback(async () => {
+    if (loadingMore || !hasMoreMarkets) return;
+    setLoadingMore(true);
+    try {
+      const response = await fetch(GAMMA_MARKETS + '&offset=' + nextOffset, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+      if (!response.ok) throw new Error('Market feed returned ' + response.status + '.');
+      const payload: unknown = await response.json();
+      const rows = Array.isArray(payload) ? payload : (payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown }).data) ? (payload as { data: unknown[] }).data : []);
+      const newMarkets = (rows as Market[]).filter((market) => market && market.question && market.active !== false && market.closed !== true && market.archived !== true);
+      setMarkets((current) => {
+        const seen = new Set(current.map((market) => market.id ?? market.slug ?? market.question ?? ''));
+        return [...current, ...newMarkets.filter((market) => {
+          const key = market.id ?? market.slug ?? market.question ?? '';
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })];
+      });
+      setNextOffset(nextOffset + rows.length);
+      setHasMoreMarkets(rows.length === 500);
+      setError('');
+    } catch {
+      setError('Could not load more prediction markets right now. Please retry.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMoreMarkets, loadingMore, nextOffset]);
 
   useEffect(() => { void loadMarkets(); }, [loadMarkets]);
   useEffect(() => {
@@ -279,6 +312,7 @@ export default function PredictionMarketsPage() {
           );
         })}
       </div>
+      {hasMoreMarkets && !loading && <div style={{ display: 'flex', justifyContent: 'center', marginTop: 18 }}><button type="button" className="secondary-button" onClick={() => void loadMoreMarkets()} disabled={loadingMore}>{loadingMore ? 'Loading more predictions…' : 'Load more predictions'}</button></div>}
 
       <div className="card" style={{ marginTop: 18 }}>
         <p className="section-subtitle" style={{ margin: 0, fontSize: 12 }}>
