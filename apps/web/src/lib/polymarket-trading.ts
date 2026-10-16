@@ -170,9 +170,11 @@ export async function submitLimitOrder(args: {
   if (cashUnits <= 0n || shareUnits <= 0n) throw new Error('Order size is too small after market precision rules are applied.');
   const makerUnits = side === 'BUY' ? cashUnits : shareUnits;
   const takerUnits = side === 'BUY' ? shareUnits : cashUnits;
+  // Use a cryptographically secure random salt, bounded to the JSON-safe integer range.
+  const saltWords = crypto.getRandomValues(new Uint32Array(2));
+  const salt = ((BigInt(saltWords[0] & 0x1fffff) << 32n) | BigInt(saltWords[1])).toString();
   const order = {
-    // Keep salt within JavaScript's safe integer range because the wire payload is JSON.
-    salt: String(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)),
+    salt,
     maker: address,
     signer: address,
     taker: zeroAddress,

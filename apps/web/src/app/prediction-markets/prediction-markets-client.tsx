@@ -196,7 +196,7 @@ export default function PredictionMarketsPage() {
           <div>
             <strong style={{ display: 'block', marginBottom: 5 }}>Trade from CrickX</strong>
             <p className="section-subtitle" style={{ margin: 0 }}>
-              Choose an outcome to open the order ticket. Orders require wallet signatures and are sent to Polymarket’s CLOB. CrickX never asks for your private key or seed phrase. Trading access, funds, account type, and geographic eligibility are controlled by Polymarket; a connected wallet does not guarantee eligibility.
+              Choose an outcome to open the order ticket. Orders require wallet signatures and are sent to Polymarket’s CLOB. This initial in-site flow signs direct EOA orders (for example, a standard MetaMask or TokenPocket account); Polymarket Proxy, Safe, and Deposit Wallet accounts are not supported by this signing path. CrickX never asks for your private key or seed phrase. Trading access, funds, account type, and geographic eligibility are controlled by Polymarket; a connected wallet does not guarantee eligibility.
             </p>
           </div>
         </div>
