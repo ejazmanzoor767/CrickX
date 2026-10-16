@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useAccount, useSwitchChain, useWalletClient } from 'wagmi';
 import { appKit } from '../../lib/appkit';
+import BtcFiveMinutePanel from './btc-five-minute-panel';
 import { checkPolymarketGeoblock, getClobCredentials, getMarketTradingInfo, submitLimitOrder, type ClobCredentials, type TradeSide } from '../../lib/polymarket-trading';
 
 type Market = {
@@ -14,7 +15,7 @@ type Market = {
   tags?: Array<{ label?: string; slug?: string }>;
 };
 
-const GAMMA_MARKETS = 'https://gamma-api.polymarket.com/markets?active=true&closed=false&archived=false&limit=100&order=volume24hr&ascending=false';
+const GAMMA_MARKETS = 'https://gamma-api.polymarket.com/markets?active=true&closed=false&archived=false&limit=500&order=volume24hr&ascending=false';
 const money = (value: unknown) => {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return '—';
@@ -27,10 +28,6 @@ const asArray = (value: unknown): string[] => {
   }
   return [];
 };
-const tradeUrl = (market: Market) => market.slug
-  ? 'https://polymarket.com/event/' + encodeURIComponent(market.slug)
-  : 'https://polymarket.com/markets';
-
 type SelectedTrade = { market: Market; outcome: string; tokenId: string; marketPrice: number };
 type OrderStatus = { message: string; kind: 'success' | 'error' | 'info'; details?: string };
 const fieldStyle: CSSProperties = {
@@ -202,6 +199,8 @@ export default function PredictionMarketsPage() {
         </div>
       </div>
 
+      <BtcFiveMinutePanel onTrade={openTrade} />
+
       <div className="card" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 12 }}>
         <label htmlFor="market-search" className="eyebrow" style={{ marginBottom: 0 }}>Find a market</label>
         <input id="market-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sports, crypto, politics, and more…" style={{ width: '100%', padding: '14px 15px', borderRadius: 12, border: '1px solid var(--line)', color: 'var(--text)', background: 'rgba(255,255,255,.04)', outline: 'none' }} />
@@ -243,7 +242,7 @@ export default function PredictionMarketsPage() {
         </div>
       )}
 
-      {error && <div className="card" role="status"><p className="section-subtitle" style={{ margin: '0 0 12px' }}>{error}</p><a className="primary-button" href="https://polymarket.com/markets" target="_blank" rel="noopener noreferrer">Browse Polymarket markets ↗</a></div>}
+      {error && <div className="card" role="status"><p className="section-subtitle" style={{ margin: 0 }}>{error}</p></div>}
       {loading && <div className="card skeleton-card">Loading live prediction markets…</div>}
       {!loading && !error && visibleMarkets.length === 0 && <div className="card empty-state"><strong>No markets match your search.</strong><p className="section-subtitle">Try another search or category.</p></div>}
 
@@ -276,7 +275,6 @@ export default function PredictionMarketsPage() {
                 })}
               </div>}
               {market.endDate && <p style={{ color: 'var(--muted)', fontSize: 12, margin: 0 }}>Ends {new Date(market.endDate).toLocaleDateString()}</p>}
-              <a className="primary-button" href={tradeUrl(market)} target="_blank" rel="noopener noreferrer" style={{ marginTop: 'auto' }}>Open on Polymarket ↗</a>
             </article>
           );
         })}
