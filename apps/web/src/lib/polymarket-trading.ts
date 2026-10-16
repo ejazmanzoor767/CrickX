@@ -1,6 +1,6 @@
 'use client';
 
-import { parseUnits, zeroAddress, type Address } from 'viem';
+import { zeroAddress, type Address } from 'viem';
 
 const CLOB = 'https://clob.polymarket.com';
 const ZERO32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as const;
@@ -142,28 +142,43 @@ export async function submitLimitOrder(args: {
 }) {
   const { signer, creds, tokenId, side, tickSize } = args;
   const address = signerAddress(signer);
-  const priceDecimals = Math.max(0, (tickSize.split('.')[1] ?? '').length);
-  const normalizedPrice = Number(args.price.toFixed(priceDecimals));
+  const priceScaledNumber = Math.round(args.price * 1_000_000);
+  const priceCanonical = priceScaledNumber / 1_000_000;
+  const tickScaledNumber = Math.round(Number(tickSize) * 1_000_000);
   const shares = Math.floor(args.shares * 100) / 100;
-  if (!Number.isFinite(normalizedPrice) || normalizedPrice <= 0 || normalizedPrice >= 1) throw new Error('Price must be greater than 0 and less than 1.');
+  if (!Number.isFinite(args.price) || !Number.isSafeInteger(priceScaledNumber) ||
+      Math.abs(args.price - priceCanonical) > 8 * Number.EPSILON ||
+      priceScaledNumber <= 0 || priceScaledNumber >= 1_000_000) {
+    throw new Error('Price must be between 0 and 1 with at most six decimal places.');
+  }
   if (!Number.isFinite(shares) || shares < 5) throw new Error('Enter at least 5 shares. Polymarket market minimums may be higher.');
-  if (Math.abs(normalizedPrice / Number(tickSize) - Math.round(normalizedPrice / Number(tickSize))) > 1e-7) {
+  if (!Number.isSafeInteger(tickScaledNumber) || tickScaledNumber <= 0 ||
+      priceScaledNumber < tickScaledNumber || priceScaledNumber > 1_000_000 - tickScaledNumber ||
+      priceScaledNumber % tickScaledNumber !== 0) {
     throw new Error('Price must follow this market’s tick size of ' + tickSize + '.');
   }
 
-  // Polymarket CLOB V2 order amounts use six-decimal collateral/share units.
+  // Match Polymarket's six-decimal fixed-point rounding: shares are quantized
+  // down to 2 decimals and collateral is rounded down to the tick's amount precision.
   const amountDecimals: Record<string, number> = { '0.1': 3, '0.01': 4, '0.005': 5, '0.0025': 6, '0.001': 5, '0.0001': 6 };
-  const cashAmount = Number((shares * normalizedPrice).toFixed(amountDecimals[tickSize] ?? 4));
-  const makerHuman = side === 'BUY' ? cashAmount : shares;
-  const takerHuman = side === 'BUY' ? shares : cashAmount;
+  const amountPrecision = amountDecimals[tickSize];
+  if (amountPrecision === undefined) throw new Error('Unsupported market tick size: ' + tickSize + '.');
+  const shareUnits = BigInt(Math.round(shares * 1_000_000));
+  const priceUnits = BigInt(priceScaledNumber);
+  const quantum = 10n ** BigInt(6 - amountPrecision);
+  const cashUnits = ((shareUnits * priceUnits) / (1_000_000n * quantum)) * quantum;
+  if (cashUnits <= 0n || shareUnits <= 0n) throw new Error('Order size is too small after market precision rules are applied.');
+  const makerUnits = side === 'BUY' ? cashUnits : shareUnits;
+  const takerUnits = side === 'BUY' ? shareUnits : cashUnits;
   const order = {
-    salt: String(Math.round(Math.random() * Date.now())),
+    // Keep salt within JavaScript's safe integer range because the wire payload is JSON.
+    salt: String(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)),
     maker: address,
     signer: address,
     taker: zeroAddress,
     tokenId,
-    makerAmount: parseUnits(makerHuman.toFixed(6), 6).toString(),
-    takerAmount: parseUnits(takerHuman.toFixed(6), 6).toString(),
+    makerAmount: makerUnits.toString(),
+    takerAmount: takerUnits.toString(),
     side,
     signatureType: 0,
     timestamp: String(Date.now()),
