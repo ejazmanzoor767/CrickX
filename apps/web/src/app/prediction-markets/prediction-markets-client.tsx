@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useAccount, useSwitchChain, useWalletClient } from 'wagmi';
 import { appKit } from '../../lib/appkit';
+import BtcFiveMinutePanel from './btc-five-minute-panel';
 import { checkPolymarketGeoblock, getClobCredentials, getMarketTradingInfo, submitLimitOrder, type ClobCredentials, type TradeSide } from '../../lib/polymarket-trading';
 
 type Market = {
@@ -14,7 +15,7 @@ type Market = {
   tags?: Array<{ label?: string; slug?: string }>;
 };
 
-const GAMMA_MARKETS = 'https://gamma-api.polymarket.com/markets?active=true&closed=false&archived=false&limit=100&order=volume24hr&ascending=false';
+const GAMMA_MARKETS = 'https://gamma-api.polymarket.com/markets?active=true&closed=false&archived=false&limit=500&order=volume24hr&ascending=false';
 const money = (value: unknown) => {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return '—';
@@ -27,10 +28,6 @@ const asArray = (value: unknown): string[] => {
   }
   return [];
 };
-const tradeUrl = (market: Market) => market.slug
-  ? 'https://polymarket.com/event/' + encodeURIComponent(market.slug)
-  : 'https://polymarket.com/markets';
-
 type SelectedTrade = { market: Market; outcome: string; tokenId: string; marketPrice: number };
 type OrderStatus = { message: string; kind: 'success' | 'error' | 'info'; details?: string };
 const fieldStyle: CSSProperties = {
@@ -41,6 +38,9 @@ const fieldStyle: CSSProperties = {
 export default function PredictionMarketsPage() {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [hasMoreMarkets, setHasMoreMarkets] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
@@ -64,12 +64,42 @@ export default function PredictionMarketsPage() {
       const payload: unknown = await response.json();
       const rows = Array.isArray(payload) ? payload : (payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown }).data) ? (payload as { data: unknown[] }).data : []);
       setMarkets((rows as Market[]).filter((market) => market && market.question && market.active !== false && market.closed !== true && market.archived !== true));
+      setNextOffset(rows.length);
+      setHasMoreMarkets(rows.length === 500);
     } catch {
       setError('We could not load the live market feed right now. You can still browse markets directly on Polymarket.');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const loadMoreMarkets = useCallback(async () => {
+    if (loadingMore || !hasMoreMarkets) return;
+    setLoadingMore(true);
+    try {
+      const response = await fetch(GAMMA_MARKETS + '&offset=' + nextOffset, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+      if (!response.ok) throw new Error('Market feed returned ' + response.status + '.');
+      const payload: unknown = await response.json();
+      const rows = Array.isArray(payload) ? payload : (payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown }).data) ? (payload as { data: unknown[] }).data : []);
+      const newMarkets = (rows as Market[]).filter((market) => market && market.question && market.active !== false && market.closed !== true && market.archived !== true);
+      setMarkets((current) => {
+        const seen = new Set(current.map((market) => market.id ?? market.slug ?? market.question ?? ''));
+        return [...current, ...newMarkets.filter((market) => {
+          const key = market.id ?? market.slug ?? market.question ?? '';
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })];
+      });
+      setNextOffset(nextOffset + rows.length);
+      setHasMoreMarkets(rows.length === 500);
+      setError('');
+    } catch {
+      setError('Could not load more prediction markets right now. Please retry.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMoreMarkets, loadingMore, nextOffset]);
 
   useEffect(() => { void loadMarkets(); }, [loadMarkets]);
   useEffect(() => {
@@ -202,6 +232,8 @@ export default function PredictionMarketsPage() {
         </div>
       </div>
 
+      <BtcFiveMinutePanel onTrade={openTrade} />
+
       <div className="card" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 12 }}>
         <label htmlFor="market-search" className="eyebrow" style={{ marginBottom: 0 }}>Find a market</label>
         <input id="market-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sports, crypto, politics, and more…" style={{ width: '100%', padding: '14px 15px', borderRadius: 12, border: '1px solid var(--line)', color: 'var(--text)', background: 'rgba(255,255,255,.04)', outline: 'none' }} />
@@ -243,7 +275,7 @@ export default function PredictionMarketsPage() {
         </div>
       )}
 
-      {error && <div className="card" role="status"><p className="section-subtitle" style={{ margin: '0 0 12px' }}>{error}</p><a className="primary-button" href="https://polymarket.com/markets" target="_blank" rel="noopener noreferrer">Browse Polymarket markets ↗</a></div>}
+      {error && <div className="card" role="status"><p className="section-subtitle" style={{ margin: 0 }}>{error}</p></div>}
       {loading && <div className="card skeleton-card">Loading live prediction markets…</div>}
       {!loading && !error && visibleMarkets.length === 0 && <div className="card empty-state"><strong>No markets match your search.</strong><p className="section-subtitle">Try another search or category.</p></div>}
 
@@ -276,11 +308,11 @@ export default function PredictionMarketsPage() {
                 })}
               </div>}
               {market.endDate && <p style={{ color: 'var(--muted)', fontSize: 12, margin: 0 }}>Ends {new Date(market.endDate).toLocaleDateString()}</p>}
-              <a className="primary-button" href={tradeUrl(market)} target="_blank" rel="noopener noreferrer" style={{ marginTop: 'auto' }}>Open on Polymarket ↗</a>
             </article>
           );
         })}
       </div>
+      {hasMoreMarkets && !loading && <div style={{ display: 'flex', justifyContent: 'center', marginTop: 18 }}><button type="button" className="secondary-button" onClick={() => void loadMoreMarkets()} disabled={loadingMore}>{loadingMore ? 'Loading more predictions…' : 'Load more predictions'}</button></div>}
 
       <div className="card" style={{ marginTop: 18 }}>
         <p className="section-subtitle" style={{ margin: 0, fontSize: 12 }}>
