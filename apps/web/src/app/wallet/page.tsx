@@ -224,6 +224,16 @@ export default function WalletPage() {
         <button className="primary-button" onClick={connect} disabled={busy}>
           {busy ? 'Connecting…' : 'Connect wallet'}
         </button>
+        <a
+          className="secondary-button"
+          href="https://link.metamask.io/dapp/crickxfantasy.site"
+          style={{ display: 'block', width: '100%', textAlign: 'center', textDecoration: 'none', marginTop: 10, padding: '14px 18px' }}
+        >
+          Open CrickX in MetaMask
+        </a>
+        <p className="section-subtitle" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
+          If the wallet connection window cannot open MetaMask from Chrome, open CrickX directly in MetaMask’s mobile browser and connect there.
+        </p>
         <p className="section-subtitle" style={{ marginTop: 10, marginBottom: 0, fontSize: 12 }}>
           The Reown wallet selector is the single wallet connection UI, and the selected session is restored after refresh when the wallet remains available.
         </p>
