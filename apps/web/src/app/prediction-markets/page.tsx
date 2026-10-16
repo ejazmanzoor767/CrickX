@@ -110,7 +110,29 @@ export default function PredictionMarketsPage() {
     }
     const estimate = numericPrice * numericShares;
     if (!window.confirm(side + ' ' + numericShares.toFixed(2) + ' shares of "' + selectedTrade.outcome +
-      '" at a limit price of ' + (numericPrice * 100).toFixed(2) + '¢. Estimated order value: 
+      '" at a limit price of ' + (numericPrice * 100).toFixed(2) + '¢. Estimated order value: $' +
+      estimate.toFixed(2) + '. This submits a real Polymarket order. Continue?')) return;
+    setBusy(true);
+    setStatus({ kind: 'info', message: 'Preparing your order. Your wallet may ask you to sign authentication and order messages.' });
+    try {
+      const activeCreds = credentials?.address.toLowerCase() === address.toLowerCase()
+        ? credentials.creds : await getClobCredentials(walletClient as any);
+      setCredentials({ address, creds: activeCreds });
+      const info = await getMarketTradingInfo(selectedTrade.tokenId);
+      const result = await submitLimitOrder({
+        signer: walletClient as any, creds: activeCreds, tokenId: selectedTrade.tokenId,
+        price: numericPrice, shares: numericShares, side, negRisk: info.negRisk, tickSize: info.tickSize,
+      });
+      const orderId = result.orderID ?? result.orderId ?? result.id;
+      const accepted = result.success === true || Boolean(orderId) || result.status === 'live' || result.status === 'matched';
+      if (!accepted) throw new Error(result.error ?? result.message ?? 'Polymarket did not confirm that the order was accepted.');
+      setStatus({ kind: 'success', message: 'Order accepted by Polymarket.', details:
+        (orderId ? 'Order ID: ' + orderId + '. ' : '') + (result.status ? 'Status: ' + result.status + '. ' : '') +
+        'A live limit order may remain open until matched or cancelled.' });
+    } catch (cause) {
+      setStatus({ kind: 'error', message: cause instanceof Error ? cause.message : 'Order could not be submitted. No success was reported.' });
+    } finally { setBusy(false); }
+  };
 
   const categories = useMemo(() => {
     const found = new Set<string>();
@@ -191,7 +213,16 @@ export default function PredictionMarketsPage() {
               <input id="trade-shares" inputMode="decimal" value={shares} onChange={(event) => setShares(event.target.value)} style={fieldStyle} />
             </div>
           </div>
-          <p className="section-subtitle" style={{ margin: '12px 0' }}>Estimated order value: <strong>{'<p className="section-subtitle" style={{ margin: '0 0 12px' }}>{error}</p><a className="primary-button" href="https://polymarket.com/markets" target="_blank" rel="noopener noreferrer">Browse Polymarket markets ↗</a></div>}
+          <p className="section-subtitle" style={{ margin: '12px 0' }}>Estimated order value: <strong>{'$' + (Math.max(0, Number(price) || 0) * Math.max(0, Number(shares) || 0)).toFixed(2)}</strong>. This is a limit order (GTC), not a guarantee of immediate execution.</p>
+          <button type="button" className="primary-button" onClick={() => void submitTrade()} disabled={busy} style={{ width: '100%' }}>{busy ? 'Submitting order…' : 'Review and submit order'}</button>
+          {status && <div role="status" aria-live="polite" style={{ marginTop: 12, borderRadius: 12, padding: 12, border: '1px solid ' + (status.kind === 'error' ? 'rgba(255,90,90,.4)' : status.kind === 'success' ? 'rgba(155,255,71,.4)' : 'var(--line)'), background: 'rgba(255,255,255,.035)' }}>
+            <strong>{status.message}</strong>{status.details && <p style={{ margin: '6px 0 0', color: 'var(--muted)', overflowWrap: 'anywhere' }}>{status.details}</p>}
+          </div>}
+          {isConnected && chainId !== 137 && <p className="section-subtitle" style={{ marginBottom: 0 }}>Connected chain ID: {chainId ?? 'unknown'}. The wallet must be on Polygon Mainnet (137).</p>}
+        </div>
+      )}
+
+      {error && <div className="card" role="status"><p className="section-subtitle" style={{ margin: '0 0 12px' }}>{error}</p><a className="primary-button" href="https://polymarket.com/markets" target="_blank" rel="noopener noreferrer">Browse Polymarket markets ↗</a></div>}
       {loading && <div className="card skeleton-card">Loading live prediction markets…</div>}
       {!loading && !error && visibleMarkets.length === 0 && <div className="card empty-state"><strong>No markets match your search.</strong><p className="section-subtitle">Try another search or category.</p></div>}
 
@@ -233,296 +264,6 @@ export default function PredictionMarketsPage() {
       <div className="card" style={{ marginTop: 18 }}>
         <p className="section-subtitle" style={{ margin: 0, fontSize: 12 }}>
           Orders are submitted to Polymarket and may remain open until matched or cancelled. Ensure your account is eligible and funded with required collateral. CrickX does not custody funds or guarantee execution.
-        </p>
-        <p style={{ margin: '12px 0 0', fontSize: 12 }}><Link href="/profile/terms">CrickX terms</Link> · <a href="https://docs.polymarket.com/" target="_blank" rel="noopener noreferrer">Polymarket developer docs ↗</a></p>
-      </div>
-    </section>
-  );
-}
- +
-      estimate.toFixed(2) + '. This submits a real Polymarket order. Continue?')) return;
-    setBusy(true);
-    setStatus({ kind: 'info', message: 'Preparing your order. Your wallet may ask you to sign authentication and order messages.' });
-    try {
-      const activeCreds = credentials?.address.toLowerCase() === address.toLowerCase()
-        ? credentials.creds : await getClobCredentials(walletClient as any);
-      setCredentials({ address, creds: activeCreds });
-      const info = await getMarketTradingInfo(selectedTrade.tokenId);
-      const result = await submitLimitOrder({
-        signer: walletClient as any, creds: activeCreds, tokenId: selectedTrade.tokenId,
-        price: numericPrice, shares: numericShares, side, negRisk: info.negRisk, tickSize: info.tickSize,
-      });
-      const orderId = result.orderID ?? result.orderId ?? result.id;
-      const accepted = result.success === true || Boolean(orderId) || result.status === 'live' || result.status === 'matched';
-      if (!accepted) throw new Error(result.error ?? result.message ?? 'Polymarket did not confirm that the order was accepted.');
-      setStatus({ kind: 'success', message: 'Order accepted by Polymarket.', details:
-        (orderId ? 'Order ID: ' + orderId + '. ' : '') + (result.status ? 'Status: ' + result.status + '. ' : '') +
-        'A live limit order may remain open until matched or cancelled.' });
-    } catch (cause) {
-      setStatus({ kind: 'error', message: cause instanceof Error ? cause.message : 'Order could not be submitted. No success was reported.' });
-    } finally { setBusy(false); }
-  };
-
-  const categories = useMemo(() => {
-    const found = new Set<string>();
-    markets.forEach((market) => (market.tags ?? []).forEach((tag) => { if (tag.label) found.add(tag.label); }));
-    return ['All', ...Array.from(found).sort().slice(0, 12)];
-  }, [markets]);
-
-  const visibleMarkets = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return markets.filter((market) => {
-      const matchesText = !needle || (market.question + ' ' + (market.description ?? '') + ' ' + (market.tags ?? []).map((tag) => tag.label ?? '').join(' ')).toLowerCase().includes(needle);
-      const matchesCategory = category === 'All' || (market.tags ?? []).some((tag) => tag.label === category);
-      return matchesText && matchesCategory;
-    });
-  }, [markets, query, category]);
-
-  return (
-    <section className="app-page" style={{ paddingBottom: 40 }}>
-      <div className="page-intro" style={{ display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'center', flexWrap: 'wrap', marginBottom: 22 }}>
-        <div>
-          <p className="eyebrow">CRICKX · PREDICTION MARKETS</p>
-          <h1 className="section-title">Predict the outcome.</h1>
-          <p className="section-subtitle" style={{ maxWidth: 700, marginBottom: 0 }}>
-            Explore live event markets from Polymarket. Open a market to review its details and, where eligible, place your trade on Polymarket.
-          </p>
-        </div>
-        <button type="button" className="secondary-button" onClick={() => void loadMarkets()} disabled={loading}>
-          {loading ? 'Refreshing…' : '↻ Refresh markets'}
-        </button>
-      </div>
-
-      <div className="card" style={{ borderColor: 'rgba(155,255,71,.22)', background: 'linear-gradient(120deg,rgba(155,255,71,.08),rgba(14,18,28,.9))' }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <span aria-hidden="true" style={{ fontSize: 25 }}>↗</span>
-          <div>
-            <strong style={{ display: 'block', marginBottom: 5 }}>Trading happens on Polymarket</strong>
-            <p className="section-subtitle" style={{ margin: 0 }}>
-              CrickX displays public market information and sends you to Polymarket to trade. Polymarket controls account access, deposits, orders, and settlement. Trading availability depends on your location and its current rules.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="card" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 12 }}>
-        <label htmlFor="market-search" className="eyebrow" style={{ marginBottom: 0 }}>Find a market</label>
-        <input id="market-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sports, crypto, politics, and more…" style={{ width: '100%', padding: '14px 15px', borderRadius: 12, border: '1px solid var(--line)', color: 'var(--text)', background: 'rgba(255,255,255,.04)', outline: 'none' }} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {categories.map((item) => (
-            <button key={item} type="button" className={category === item ? 'primary-button' : 'secondary-button'} style={{ padding: '9px 12px', fontSize: 12 }} onClick={() => setCategory(item)}>{item}</button>
-          ))}
-        </div>
-      </div>
-
-      {error && <div className="card" role="status"><p className="section-subtitle" style={{ margin: '0 0 12px' }}>{error}</p><a className="primary-button" href="https://polymarket.com/markets" target="_blank" rel="noopener noreferrer">Browse Polymarket markets ↗</a></div>}
-      {loading && <div className="card skeleton-card">Loading live prediction markets…</div>}
-      {!loading && !error && visibleMarkets.length === 0 && <div className="card empty-state"><strong>No markets match your search.</strong><p className="section-subtitle">Try another search or category.</p></div>}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,300px),1fr))', gap: 14 }}>
-        {visibleMarkets.map((market) => {
-          const outcomes = asArray(market.outcomes);
-          const prices = asArray(market.outcomePrices);
-          const volume = money(market.volume);
-          const categoryLabel = market.tags?.find((tag) => tag.label)?.label ?? 'Event market';
-          return (
-            <article className="card" key={market.id ?? market.slug ?? market.question} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 13, padding: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span className="demo-pill">{categoryLabel}</span>
-                <span style={{ color: 'var(--muted)', fontSize: 11 }}>Vol. {volume}</span>
-              </div>
-              <h2 style={{ fontSize: 17, lineHeight: 1.45, margin: 0 }}>{market.question}</h2>
-              {outcomes.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + Math.min(outcomes.length, 2) + ',minmax(0,1fr))', gap: 8 }}>
-                {outcomes.slice(0, 2).map((outcome, index) => {
-                  const price = Number(prices[index]);
-                  const probability = Number.isFinite(price) ? Math.round(price * 100) + '%' : '—';
-                  return <div key={outcome + '-' + index} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 11, background: 'rgba(255,255,255,.025)' }}>
-                    <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12 }}>{outcome}</span>
-                    <strong style={{ display: 'block', fontSize: 20, marginTop: 4 }}>{probability}</strong>
-                  </div>;
-                })}
-              </div>}
-              {market.endDate && <p style={{ color: 'var(--muted)', fontSize: 12, margin: 0 }}>Ends {new Date(market.endDate).toLocaleDateString()}</p>}
-              <a className="primary-button" href={tradeUrl(market)} target="_blank" rel="noopener noreferrer" style={{ marginTop: 'auto' }}>View market &amp; trade on Polymarket ↗</a>
-            </article>
-          );
-        })}
-      </div>
-
-      <div className="card" style={{ marginTop: 18 }}>
-        <p className="section-subtitle" style={{ margin: 0, fontSize: 12 }}>
-          Market data is provided by Polymarket and may change. Prices imply market probabilities; they are not guarantees. Trading involves risk. Check local laws and Polymarket eligibility before placing any trade.
-        </p>
-        <p style={{ margin: '12px 0 0', fontSize: 12 }}><Link href="/profile/terms">CrickX terms</Link> · <a href="https://docs.polymarket.com/" target="_blank" rel="noopener noreferrer">Polymarket developer docs ↗</a></p>
-      </div>
-    </section>
-  );
-}
- + (Math.max(0, Number(price) || 0) * Math.max(0, Number(shares) || 0)).toFixed(2)}</strong>. This is a limit order (GTC), not a guarantee of immediate execution.</p>
-          <button type="button" className="primary-button" onClick={() => void submitTrade()} disabled={busy} style={{ width: '100%' }}>{busy ? 'Submitting order…' : 'Review and submit order'}</button>
-          {status && <div role="status" aria-live="polite" style={{ marginTop: 12, borderRadius: 12, padding: 12, border: '1px solid ' + (status.kind === 'error' ? 'rgba(255,90,90,.4)' : status.kind === 'success' ? 'rgba(155,255,71,.4)' : 'var(--line)'), background: 'rgba(255,255,255,.035)' }}>
-            <strong>{status.message}</strong>{status.details && <p style={{ margin: '6px 0 0', color: 'var(--muted)', overflowWrap: 'anywhere' }}>{status.details}</p>}
-          </div>}
-          {isConnected && chainId !== 137 && <p className="section-subtitle" style={{ marginBottom: 0 }}>Connected chain ID: {chainId ?? 'unknown'}. The wallet must be on Polygon Mainnet (137).</p>}
-        </div>
-      )}
-
-      {error && <div className="card" role="status"><p className="section-subtitle" style={{ margin: '0 0 12px' }}>{error}</p><a className="primary-button" href="https://polymarket.com/markets" target="_blank" rel="noopener noreferrer">Browse Polymarket markets ↗</a></div>}
-      {loading && <div className="card skeleton-card">Loading live prediction markets…</div>}
-      {!loading && !error && visibleMarkets.length === 0 && <div className="card empty-state"><strong>No markets match your search.</strong><p className="section-subtitle">Try another search or category.</p></div>}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,300px),1fr))', gap: 14 }}>
-        {visibleMarkets.map((market) => {
-          const outcomes = asArray(market.outcomes);
-          const prices = asArray(market.outcomePrices);
-          const volume = money(market.volume);
-          const categoryLabel = market.tags?.find((tag) => tag.label)?.label ?? 'Event market';
-          return (
-            <article className="card" key={market.id ?? market.slug ?? market.question} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 13, padding: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span className="demo-pill">{categoryLabel}</span>
-                <span style={{ color: 'var(--muted)', fontSize: 11 }}>Vol. {volume}</span>
-              </div>
-              <h2 style={{ fontSize: 17, lineHeight: 1.45, margin: 0 }}>{market.question}</h2>
-              {outcomes.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + Math.min(outcomes.length, 2) + ',minmax(0,1fr))', gap: 8 }}>
-                {outcomes.slice(0, 2).map((outcome, index) => {
-                  const price = Number(prices[index]);
-                  const probability = Number.isFinite(price) ? Math.round(price * 100) + '%' : '—';
-                  return <div key={outcome + '-' + index} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 11, background: 'rgba(255,255,255,.025)' }}>
-                    <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12 }}>{outcome}</span>
-                    <strong style={{ display: 'block', fontSize: 20, marginTop: 4 }}>{probability}</strong>
-                  </div>;
-                })}
-              </div>}
-              {market.endDate && <p style={{ color: 'var(--muted)', fontSize: 12, margin: 0 }}>Ends {new Date(market.endDate).toLocaleDateString()}</p>}
-              <a className="primary-button" href={tradeUrl(market)} target="_blank" rel="noopener noreferrer" style={{ marginTop: 'auto' }}>View market &amp; trade on Polymarket ↗</a>
-            </article>
-          );
-        })}
-      </div>
-
-      <div className="card" style={{ marginTop: 18 }}>
-        <p className="section-subtitle" style={{ margin: 0, fontSize: 12 }}>
-          Market data is provided by Polymarket and may change. Prices imply market probabilities; they are not guarantees. Trading involves risk. Check local laws and Polymarket eligibility before placing any trade.
-        </p>
-        <p style={{ margin: '12px 0 0', fontSize: 12 }}><Link href="/profile/terms">CrickX terms</Link> · <a href="https://docs.polymarket.com/" target="_blank" rel="noopener noreferrer">Polymarket developer docs ↗</a></p>
-      </div>
-    </section>
-  );
-}
- +
-      estimate.toFixed(2) + '. This submits a real Polymarket order. Continue?')) return;
-    setBusy(true);
-    setStatus({ kind: 'info', message: 'Preparing your order. Your wallet may ask you to sign authentication and order messages.' });
-    try {
-      const activeCreds = credentials?.address.toLowerCase() === address.toLowerCase()
-        ? credentials.creds : await getClobCredentials(walletClient as any);
-      setCredentials({ address, creds: activeCreds });
-      const info = await getMarketTradingInfo(selectedTrade.tokenId);
-      const result = await submitLimitOrder({
-        signer: walletClient as any, creds: activeCreds, tokenId: selectedTrade.tokenId,
-        price: numericPrice, shares: numericShares, side, negRisk: info.negRisk, tickSize: info.tickSize,
-      });
-      const orderId = result.orderID ?? result.orderId ?? result.id;
-      const accepted = result.success === true || Boolean(orderId) || result.status === 'live' || result.status === 'matched';
-      if (!accepted) throw new Error(result.error ?? result.message ?? 'Polymarket did not confirm that the order was accepted.');
-      setStatus({ kind: 'success', message: 'Order accepted by Polymarket.', details:
-        (orderId ? 'Order ID: ' + orderId + '. ' : '') + (result.status ? 'Status: ' + result.status + '. ' : '') +
-        'A live limit order may remain open until matched or cancelled.' });
-    } catch (cause) {
-      setStatus({ kind: 'error', message: cause instanceof Error ? cause.message : 'Order could not be submitted. No success was reported.' });
-    } finally { setBusy(false); }
-  };
-
-  const categories = useMemo(() => {
-    const found = new Set<string>();
-    markets.forEach((market) => (market.tags ?? []).forEach((tag) => { if (tag.label) found.add(tag.label); }));
-    return ['All', ...Array.from(found).sort().slice(0, 12)];
-  }, [markets]);
-
-  const visibleMarkets = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return markets.filter((market) => {
-      const matchesText = !needle || (market.question + ' ' + (market.description ?? '') + ' ' + (market.tags ?? []).map((tag) => tag.label ?? '').join(' ')).toLowerCase().includes(needle);
-      const matchesCategory = category === 'All' || (market.tags ?? []).some((tag) => tag.label === category);
-      return matchesText && matchesCategory;
-    });
-  }, [markets, query, category]);
-
-  return (
-    <section className="app-page" style={{ paddingBottom: 40 }}>
-      <div className="page-intro" style={{ display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'center', flexWrap: 'wrap', marginBottom: 22 }}>
-        <div>
-          <p className="eyebrow">CRICKX · PREDICTION MARKETS</p>
-          <h1 className="section-title">Predict the outcome.</h1>
-          <p className="section-subtitle" style={{ maxWidth: 700, marginBottom: 0 }}>
-            Explore live event markets from Polymarket. Open a market to review its details and, where eligible, place your trade on Polymarket.
-          </p>
-        </div>
-        <button type="button" className="secondary-button" onClick={() => void loadMarkets()} disabled={loading}>
-          {loading ? 'Refreshing…' : '↻ Refresh markets'}
-        </button>
-      </div>
-
-      <div className="card" style={{ borderColor: 'rgba(155,255,71,.22)', background: 'linear-gradient(120deg,rgba(155,255,71,.08),rgba(14,18,28,.9))' }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <span aria-hidden="true" style={{ fontSize: 25 }}>↗</span>
-          <div>
-            <strong style={{ display: 'block', marginBottom: 5 }}>Trading happens on Polymarket</strong>
-            <p className="section-subtitle" style={{ margin: 0 }}>
-              CrickX displays public market information and sends you to Polymarket to trade. Polymarket controls account access, deposits, orders, and settlement. Trading availability depends on your location and its current rules.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="card" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 12 }}>
-        <label htmlFor="market-search" className="eyebrow" style={{ marginBottom: 0 }}>Find a market</label>
-        <input id="market-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sports, crypto, politics, and more…" style={{ width: '100%', padding: '14px 15px', borderRadius: 12, border: '1px solid var(--line)', color: 'var(--text)', background: 'rgba(255,255,255,.04)', outline: 'none' }} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {categories.map((item) => (
-            <button key={item} type="button" className={category === item ? 'primary-button' : 'secondary-button'} style={{ padding: '9px 12px', fontSize: 12 }} onClick={() => setCategory(item)}>{item}</button>
-          ))}
-        </div>
-      </div>
-
-      {error && <div className="card" role="status"><p className="section-subtitle" style={{ margin: '0 0 12px' }}>{error}</p><a className="primary-button" href="https://polymarket.com/markets" target="_blank" rel="noopener noreferrer">Browse Polymarket markets ↗</a></div>}
-      {loading && <div className="card skeleton-card">Loading live prediction markets…</div>}
-      {!loading && !error && visibleMarkets.length === 0 && <div className="card empty-state"><strong>No markets match your search.</strong><p className="section-subtitle">Try another search or category.</p></div>}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,300px),1fr))', gap: 14 }}>
-        {visibleMarkets.map((market) => {
-          const outcomes = asArray(market.outcomes);
-          const prices = asArray(market.outcomePrices);
-          const volume = money(market.volume);
-          const categoryLabel = market.tags?.find((tag) => tag.label)?.label ?? 'Event market';
-          return (
-            <article className="card" key={market.id ?? market.slug ?? market.question} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 13, padding: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span className="demo-pill">{categoryLabel}</span>
-                <span style={{ color: 'var(--muted)', fontSize: 11 }}>Vol. {volume}</span>
-              </div>
-              <h2 style={{ fontSize: 17, lineHeight: 1.45, margin: 0 }}>{market.question}</h2>
-              {outcomes.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + Math.min(outcomes.length, 2) + ',minmax(0,1fr))', gap: 8 }}>
-                {outcomes.slice(0, 2).map((outcome, index) => {
-                  const price = Number(prices[index]);
-                  const probability = Number.isFinite(price) ? Math.round(price * 100) + '%' : '—';
-                  return <div key={outcome + '-' + index} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 11, background: 'rgba(255,255,255,.025)' }}>
-                    <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12 }}>{outcome}</span>
-                    <strong style={{ display: 'block', fontSize: 20, marginTop: 4 }}>{probability}</strong>
-                  </div>;
-                })}
-              </div>}
-              {market.endDate && <p style={{ color: 'var(--muted)', fontSize: 12, margin: 0 }}>Ends {new Date(market.endDate).toLocaleDateString()}</p>}
-              <a className="primary-button" href={tradeUrl(market)} target="_blank" rel="noopener noreferrer" style={{ marginTop: 'auto' }}>View market &amp; trade on Polymarket ↗</a>
-            </article>
-          );
-        })}
-      </div>
-
-      <div className="card" style={{ marginTop: 18 }}>
-        <p className="section-subtitle" style={{ margin: 0, fontSize: 12 }}>
-          Market data is provided by Polymarket and may change. Prices imply market probabilities; they are not guarantees. Trading involves risk. Check local laws and Polymarket eligibility before placing any trade.
         </p>
         <p style={{ margin: '12px 0 0', fontSize: 12 }}><Link href="/profile/terms">CrickX terms</Link> · <a href="https://docs.polymarket.com/" target="_blank" rel="noopener noreferrer">Polymarket developer docs ↗</a></p>
       </div>
