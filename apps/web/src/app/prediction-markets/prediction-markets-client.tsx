@@ -261,8 +261,8 @@ export default function PredictionMarketsPage() {
                 <span style={{ color: 'var(--muted)', fontSize: 11 }}>Vol. {volume}</span>
               </div>
               <h2 style={{ fontSize: 17, lineHeight: 1.45, margin: 0 }}>{market.question}</h2>
-              {outcomes.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + Math.min(outcomes.length, 2) + ',minmax(0,1fr))', gap: 8 }}>
-                {outcomes.slice(0, 2).map((outcome, index) => {
+              {outcomes.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,110px),1fr))', gap: 8 }}>
+                {outcomes.map((outcome, index) => {
                   const marketPrice = Number(prices[index]);
                   const probability = Number.isFinite(marketPrice) ? Math.round(marketPrice * 100) + '%' : '—';
                   const tokenId = tokenIds[index];
