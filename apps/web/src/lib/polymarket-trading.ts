@@ -129,8 +129,10 @@ export async function submitLimitOrder(args: {
   }
 
   // Polymarket CLOB V2 order amounts use six-decimal collateral/share units.
-  const makerHuman = side === 'BUY' ? Number((shares * normalizedPrice).toFixed(4)) : shares;
-  const takerHuman = side === 'BUY' ? shares : Number((shares * normalizedPrice).toFixed(4));
+  const amountDecimals: Record<string, number> = { '0.1': 3, '0.01': 4, '0.005': 5, '0.0025': 6, '0.001': 5, '0.0001': 6 };
+  const cashAmount = Number((shares * normalizedPrice).toFixed(amountDecimals[tickSize] ?? 4));
+  const makerHuman = side === 'BUY' ? cashAmount : shares;
+  const takerHuman = side === 'BUY' ? shares : cashAmount;
   const order = {
     salt: String(Math.round(Math.random() * Date.now())),
     maker: address,
@@ -172,7 +174,19 @@ export async function submitLimitOrder(args: {
     domain,
     types,
     primaryType: 'Order',
-    message: { ...order, side: side === 'BUY' ? 0 : 1 },
+    message: {
+      salt: order.salt,
+      maker: order.maker,
+      signer: order.signer,
+      tokenId: order.tokenId,
+      makerAmount: order.makerAmount,
+      takerAmount: order.takerAmount,
+      side: side === 'BUY' ? 0 : 1,
+      signatureType: order.signatureType,
+      timestamp: order.timestamp,
+      metadata: order.metadata,
+      builder: order.builder,
+    },
   });
   const payload = JSON.stringify({
     deferExec: false,
