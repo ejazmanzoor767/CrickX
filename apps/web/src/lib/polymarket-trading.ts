@@ -89,7 +89,7 @@ async function hmacSignature(secret: string, timestamp: string, method: string, 
   const signed = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message)));
   let binary = '';
   signed.forEach((byte) => { binary += String.fromCharCode(byte); });
-  return btoa(binary).replace(/\\+/g, '-').replace(/\\//g, '_');
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_');
 }
 
 async function clobRequest(path: string, method: string, address: Address, creds: ClobCredentials, body?: string) {
