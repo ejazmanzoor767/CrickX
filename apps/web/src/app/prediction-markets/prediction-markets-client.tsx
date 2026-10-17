@@ -157,7 +157,6 @@ export default function PredictionMarketsPage() {
       });
       return;
     }
-    const estimate = numericPrice * numericShares;
     setBusy(true);
     setStatus({ kind: 'info', message: 'Preparing your order. Your wallet may ask you to sign authentication and order messages.' });
     try {
