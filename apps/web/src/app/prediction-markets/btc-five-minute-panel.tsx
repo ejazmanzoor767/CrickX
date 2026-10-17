@@ -205,10 +205,10 @@ export default function BtcFiveMinutePanel({ onTrade }: { onTrade: (market: BtcM
  + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const outcomeTone = (outcome: string) => {
   const label = outcome.trim().toLowerCase();
-  if (/\\b(up|yes|higher|above|over|bullish)\\b/.test(label)) {
+  if (/\b(up|yes|higher|above|over|bullish)\b/.test(label)) {
     return { color: '#07110a', background: 'rgba(155,255,71,.96)', border: 'rgba(155,255,71,.95)', meaning: 'Positive outcome' };
   }
-  if (/\\b(down|no|lower|below|under|bearish)\\b/.test(label)) {
+  if (/\b(down|no|lower|below|under|bearish)\b/.test(label)) {
     return { color: '#fff', background: 'rgba(220,53,69,.96)', border: 'rgba(255,112,122,.95)', meaning: 'Negative outcome' };
   }
   return { color: 'var(--text)', background: 'rgba(255,255,255,.045)', border: 'var(--line)', meaning: 'Select outcome' };
