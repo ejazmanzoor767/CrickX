@@ -61,7 +61,7 @@ export default function BtcFiveMinutePanel({ onTrade }: { onTrade: (market: BtcM
               topic?: string; type?: string; payload?: Record<string, unknown>;
               symbol?: string; value?: unknown; timestamp?: unknown; timestamp_ms?: unknown;
             };
-            const payload = message.payload ?? message;
+            const payload: Record<string, unknown> = message.payload ?? (message as Record<string, unknown>);
             const symbol = String(payload.symbol ?? message.symbol ?? '').toLowerCase();
             const topic = String(message.topic ?? '').toLowerCase();
             if (symbol && symbol !== 'btc/usd' && symbol !== 'btcusd') return;
