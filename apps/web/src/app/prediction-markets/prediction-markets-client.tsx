@@ -8,10 +8,10 @@ import BtcFiveMinutePanel from './btc-five-minute-panel';
 import { checkPolymarketGeoblock, getClobCredentials, getMarketTradingInfo, submitLimitOrder, type ClobCredentials, type TradeSide } from '../../lib/polymarket-trading';
 
 type Market = {
-  id?: string; question?: string; slug?: string; description?: string;
+  id?: string; question?: string; slug?: string; description?: string; image?: string; icon?: string;
   outcomes?: string[] | string; outcomePrices?: string[] | string;
   clobTokenIds?: string[] | string; negRisk?: boolean;
-  volume?: string | number; endDate?: string; active?: boolean; closed?: boolean; archived?: boolean;
+  volume?: string | number; endDate?: string; active?: boolean; closed?: boolean; archived?: boolean; feesEnabled?: boolean;
   tags?: Array<{ label?: string; slug?: string }>;
 };
 
@@ -50,6 +50,8 @@ export default function PredictionMarketsPage() {
   const [shares, setShares] = useState('5');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<OrderStatus | null>(null);
+  const [tradingInfo, setTradingInfo] = useState<Awaited<ReturnType<typeof getMarketTradingInfo>> | null>(null);
+  const [tradingInfoLoading, setTradingInfoLoading] = useState(false);
   const [credentials, setCredentials] = useState<{ address: string; creds: ClobCredentials } | null>(null);
   const { address, isConnected, chainId } = useAccount();
   const { data: walletClient } = useWalletClient();
@@ -106,11 +108,22 @@ export default function PredictionMarketsPage() {
     if (!address || credentials?.address?.toLowerCase() !== address.toLowerCase()) setCredentials(null);
   }, [address, credentials?.address]);
 
+  useEffect(() => {
+    if (!selectedTrade) { setTradingInfo(null); return; }
+    let cancelled = false;
+    setTradingInfo(null);
+    setTradingInfoLoading(true);
+    void getMarketTradingInfo(selectedTrade.tokenId, selectedTrade.market.feesEnabled === true)
+      .then((info) => { if (!cancelled) setTradingInfo(info); })
+      .catch(() => { if (!cancelled) setTradingInfo(null); })
+      .finally(() => { if (!cancelled) setTradingInfoLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedTrade]);
+
   const openTrade = (market: Market, outcome: string, tokenId: string, marketPrice: number) => {
     setSelectedTrade({ market, outcome, tokenId, marketPrice });
     setPrice(Number.isFinite(marketPrice) && marketPrice > 0 && marketPrice < 1 ? marketPrice.toFixed(2) : '0.50');
     setShares('5'); setSide('BUY'); setStatus(null);
-    if (!isConnected) void appKit?.open();
   };
 
   const submitTrade = async () => {
@@ -121,8 +134,11 @@ export default function PredictionMarketsPage() {
     if (!Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice >= 1) {
       setStatus({ kind: 'error', message: 'Enter a limit price between 0 and 1 (exclusive).' }); return;
     }
-    if (!Number.isFinite(numericShares) || numericShares < 5) {
-      setStatus({ kind: 'error', message: 'Enter at least 5 shares. The market may require more.' }); return;
+    if (!tradingInfo) { setStatus({ kind: 'error', message: 'Market minimum and fee information is not available yet. Please wait and retry.' }); return; }
+    if (tradingInfo.minimumOrderSize === null) { setStatus({ kind: 'error', message: 'Polymarket did not provide this market’s minimum order size. Trading is paused until it can be verified.' }); return; }
+    const minimumShares = tradingInfo.minimumOrderSize;
+    if (!Number.isFinite(numericShares) || numericShares < minimumShares) {
+      setStatus({ kind: 'error', message: 'This market requires at least ' + minimumShares + ' shares.' }); return;
     }
     if (!isConnected || !address) {
       setStatus({ kind: 'info', message: 'Connect your wallet first to review and sign your order.' });
@@ -158,17 +174,14 @@ export default function PredictionMarketsPage() {
       });
       return;
     }
-    const estimate = numericPrice * numericShares;
-    if (!window.confirm(side + ' ' + numericShares.toFixed(2) + ' shares of "' + selectedTrade.outcome +
-      '" at a limit price of ' + (numericPrice * 100).toFixed(2) + '¢. Estimated order value: $' +
-      estimate.toFixed(2) + '. This submits a real Polymarket order. Continue?')) return;
     setBusy(true);
     setStatus({ kind: 'info', message: 'Preparing your order. Your wallet may ask you to sign authentication and order messages.' });
     try {
       const activeCreds = credentials?.address.toLowerCase() === address.toLowerCase()
         ? credentials.creds : await getClobCredentials(walletClient as any);
       setCredentials({ address, creds: activeCreds });
-      const info = await getMarketTradingInfo(selectedTrade.tokenId);
+      const info = await getMarketTradingInfo(selectedTrade.tokenId, selectedTrade.market.feesEnabled === true);
+      if (info.minimumOrderSize !== null && numericShares < info.minimumOrderSize) throw new Error('This market requires at least ' + info.minimumOrderSize + ' shares. Update your order size and retry.');
       const result = await submitLimitOrder({
         signer: walletClient as any, creds: activeCreds, tokenId: selectedTrade.tokenId,
         price: numericPrice, shares: numericShares, side, negRisk: info.negRisk, tickSize: info.tickSize,
@@ -245,33 +258,62 @@ export default function PredictionMarketsPage() {
       </div>
 
       {selectedTrade && (
-        <div className="card" id="trade-ticket" style={{ border: '1px solid rgba(155,255,71,.4)', marginBottom: 18 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-            <div><p className="eyebrow" style={{ marginBottom: 6 }}>ORDER TICKET · POLYGON</p>
-              <h2 style={{ margin: 0, fontSize: 19 }}>{selectedTrade.market.question}</h2>
-              <p className="section-subtitle" style={{ margin: '6px 0 0' }}>Outcome: <strong>{selectedTrade.outcome}</strong> · Market price {(selectedTrade.marketPrice * 100).toFixed(1)}¢</p>
+        <div onClick={() => { if (!busy) { setSelectedTrade(null); setStatus(null); } }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(3,6,12,.78)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14 }}>
+          <section id="trade-ticket" role="dialog" aria-modal="true" aria-labelledby="checkout-title" onClick={(event) => event.stopPropagation()} style={{ width: 'min(100%, 520px)', maxHeight: 'min(92dvh, 820px)', overflowY: 'auto', background: 'var(--panel, #111722)', border: '1px solid var(--line)', borderRadius: 22, padding: 20, boxShadow: '0 24px 80px rgba(0,0,0,.5)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}>
+              <div><p className="eyebrow" style={{ margin: '0 0 5px' }}>CRICKX CHECKOUT</p><h2 id="checkout-title" style={{ margin: 0, fontSize: 23 }}>Review your order</h2></div>
+              <button type="button" className="secondary-button" aria-label="Close checkout" disabled={busy} onClick={() => { setSelectedTrade(null); setStatus(null); }}>✕</button>
             </div>
-            <button type="button" className="secondary-button" onClick={() => { setSelectedTrade(null); setStatus(null); }}>Close</button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,170px),1fr))', gap: 12, marginTop: 16 }}>
-            <div><label className="eyebrow" htmlFor="trade-side">Side</label>
-              <select id="trade-side" value={side} onChange={(event) => setSide(event.target.value as TradeSide)} style={fieldStyle}>
-                <option value="BUY">Buy outcome</option><option value="SELL">Sell outcome</option>
-              </select>
+            <div style={{ border: '1px solid var(--line)', borderRadius: 16, padding: 15, background: 'rgba(255,255,255,.035)' }}>
+              <p style={{ color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', margin: '0 0 7px' }}>Prediction market</p>
+              <h3 style={{ fontSize: 17, lineHeight: 1.4, margin: '0 0 12px' }}>{selectedTrade.market.question}</h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ borderRadius: 10, padding: '8px 12px', fontWeight: 700, background: 'rgba(155,255,71,.12)', color: '#b9ff79' }}>{selectedTrade.outcome}</span>
+                <span style={{ color: 'var(--muted)', fontSize: 13 }}>Current market price: {(selectedTrade.marketPrice * 100).toFixed(1)}¢</span>
+              </div>
             </div>
-            <div><label className="eyebrow" htmlFor="trade-price">Limit price (0–1)</label>
-              <input id="trade-price" inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} style={fieldStyle} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 12, marginTop: 16 }}>
+              <div><label className="eyebrow" htmlFor="trade-side">Order type</label><select id="trade-side" value={side} onChange={(event) => setSide(event.target.value as TradeSide)} style={fieldStyle}><option value="BUY">Buy outcome</option><option value="SELL">Sell outcome</option></select></div>
+              <div><label className="eyebrow" htmlFor="trade-price">Your limit price ($)</label><input id="trade-price" inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} style={fieldStyle} /></div>
+              <div><label className="eyebrow" htmlFor="trade-shares">Shares (min. 5)</label><input id="trade-shares" inputMode="decimal" value={shares} onChange={(event) => setShares(event.target.value)} style={fieldStyle} /></div>
+              <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: '10px 12px', marginTop: 21 }}><span style={{ display: 'block', color: 'var(--muted)', fontSize: 11 }}>Estimated order value</span><strong style={{ display: 'block', fontSize: 21, marginTop: 4 }}>$ {(Math.max(0, Number(price) || 0) * Math.max(0, Number(shares) || 0)).toFixed(2)}</strong></div>
             </div>
-            <div><label className="eyebrow" htmlFor="trade-shares">Shares (minimum 5)</label>
-              <input id="trade-shares" inputMode="decimal" value={shares} onChange={(event) => setShares(event.target.value)} style={fieldStyle} />
+            <div style={{ marginTop: 12, padding: 14, borderRadius: 14, border: '1px solid var(--line)', background: 'rgba(255,255,255,.025)' }}>
+              <strong style={{ display: 'block', marginBottom: 10 }}>Estimated fees & total</strong>
+              {(() => {
+                const p = Number(price), qty = Number(shares);
+                const valid = Number.isFinite(p) && p > 0 && p < 1 && Number.isFinite(qty) && qty > 0;
+                const value = valid ? p * qty : 0;
+                const polyFee = valid && tradingInfo?.feesEnabled && side === 'BUY' && tradingInfo.feeRate !== null
+                  ? Math.round(qty * tradingInfo.feeRate * p * (1 - p) * 100000) / 100000 : 0;
+                const crickxFee = Math.round(value * 0.01 * 100) / 100;
+                return <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>Order value (estimate)</span><strong>$ {value.toFixed(2)}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>Polymarket taker fee</span><strong>{tradingInfoLoading || !tradingInfo ? 'Loading…' : !tradingInfo.feesEnabled ? 'Not enabled for this market' : side === 'SELL' ? 'Varies by execution' : '$ ' + polyFee.toFixed(5)}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>CrickX fee (1% of filled value)</span><strong>$ {crickxFee.toFixed(2)} estimated</strong></div>
+                  <div style={{ borderTop: '1px solid var(--line)', paddingTop: 9, display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong>Estimated total</strong><strong>$ {(value + polyFee + crickxFee).toFixed(2)}</strong></div>
+                  <p style={{ color: 'var(--muted)', fontSize: 11, lineHeight: 1.5, margin: '2px 0 0' }}>{tradingInfo?.minimumOrderSize ? 'Market minimum: ' + tradingInfo.minimumOrderSize + ' shares.' : 'Market minimum size unavailable until market metadata loads.'} CrickX fee is shown for transparency only and is not currently collected. Collection must be implemented and tested separately.</p>
+                </div>;
+              })()}
             </div>
-          </div>
-          <p className="section-subtitle" style={{ margin: '12px 0' }}>Estimated order value: <strong>{'$' + (Math.max(0, Number(price) || 0) * Math.max(0, Number(shares) || 0)).toFixed(2)}</strong>. This is a limit order (GTC), not a guarantee of immediate execution.</p>
-          <button type="button" className="primary-button" onClick={() => void submitTrade()} disabled={busy} style={{ width: '100%' }}>{busy ? 'Submitting order…' : 'Review and submit order'}</button>
-          {status && <div role="status" aria-live="polite" style={{ marginTop: 12, borderRadius: 12, padding: 12, border: '1px solid ' + (status.kind === 'error' ? 'rgba(255,90,90,.4)' : status.kind === 'success' ? 'rgba(155,255,71,.4)' : 'var(--line)'), background: 'rgba(255,255,255,.035)' }}>
-            <strong>{status.message}</strong>{status.details && <p style={{ margin: '6px 0 0', color: 'var(--muted)', overflowWrap: 'anywhere' }}>{status.details}</p>}
-          </div>}
-          {isConnected && chainId !== 137 && <p className="section-subtitle" style={{ marginBottom: 0 }}>Connected chain ID: {chainId ?? 'unknown'}. The wallet must be on Polygon Mainnet (137).</p>}
+            <div style={{ marginTop: 16, padding: 13, borderRadius: 13, background: 'rgba(255,255,255,.035)', border: '1px solid var(--line)' }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <span style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 99, background: isConnected ? 'rgba(155,255,71,.16)' : 'rgba(255,255,255,.08)', color: isConnected ? '#b9ff79' : 'var(--muted)', fontWeight: 700 }}>{isConnected ? '✓' : '1'}</span>
+                <div style={{ flex: 1 }}><strong style={{ display: 'block', fontSize: 13 }}>{isConnected && address ? 'Wallet connected' : 'Connect your wallet'}</strong><span style={{ color: 'var(--muted)', fontSize: 12 }}>{isConnected && address ? address.slice(0, 6) + '…' + address.slice(-4) : 'MetaMask, TokenPocket, or another supported Reown wallet'}</span></div>
+                {!isConnected && <button type="button" className="secondary-button" onClick={() => void appKit?.open()}>Connect</button>}
+              </div>
+              <div style={{ height: 1, background: 'var(--line)', margin: '12px 0' }} />
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <span style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 99, background: isConnected && chainId === 137 ? 'rgba(155,255,71,.16)' : 'rgba(255,255,255,.08)', color: isConnected && chainId === 137 ? '#b9ff79' : 'var(--muted)', fontWeight: 700 }}>{isConnected && chainId === 137 ? '✓' : '2'}</span>
+                <div style={{ flex: 1 }}><strong style={{ display: 'block', fontSize: 13 }}>Network</strong><span style={{ color: 'var(--muted)', fontSize: 12 }}>{chainId === 137 ? 'Polygon Mainnet ready' : 'Polygon Mainnet required'}</span></div>
+                {isConnected && chainId !== 137 && <button type="button" className="secondary-button" onClick={async () => { try { await switchChainAsync({ chainId: 137 }); setStatus({ kind: 'info', message: 'Polygon selected. Review your order and continue.' }); } catch { setStatus({ kind: 'error', message: 'Switch your wallet to Polygon Mainnet to trade.' }); } }}>Switch</button>}
+              </div>
+            </div>
+            <p className="section-subtitle" style={{ fontSize: 12, lineHeight: 1.5, margin: '14px 0' }}>Next, your wallet will show the Polymarket authentication/order signature request. Review the details in your wallet and approve only if they match this checkout. No seed phrase or private key is requested by CrickX.</p>
+            <button type="button" className="primary-button" onClick={() => { if (!isConnected) { void appKit?.open(); return; } if (chainId !== 137) { setStatus({ kind: 'info', message: 'Switch to Polygon Mainnet before submitting.' }); return; } void submitTrade(); }} disabled={busy} style={{ width: '100%', minHeight: 48, fontSize: 15 }}>{busy ? 'Waiting for wallet signature…' : !isConnected ? 'Connect wallet to continue' : chainId !== 137 ? 'Switch to Polygon to continue' : 'Sign & submit order'}</button>
+            {status && <div role="status" aria-live="polite" style={{ marginTop: 12, borderRadius: 12, padding: 12, border: '1px solid ' + (status.kind === 'error' ? 'rgba(255,90,90,.4)' : status.kind === 'success' ? 'rgba(155,255,71,.4)' : 'var(--line)'), background: 'rgba(255,255,255,.035)' }}><strong>{status.message}</strong>{status.details && <p style={{ margin: '6px 0 0', color: 'var(--muted)', overflowWrap: 'anywhere' }}>{status.details}</p>}</div>}
+            <button type="button" disabled={busy} onClick={() => { setSelectedTrade(null); setStatus(null); }} style={{ width: '100%', marginTop: 10, background: 'transparent', color: 'var(--muted)', border: 0, padding: 10, cursor: busy ? 'not-allowed' : 'pointer' }}>Cancel checkout</button>
+          </section>
         </div>
       )}
 
@@ -287,27 +329,28 @@ export default function PredictionMarketsPage() {
           const volume = money(market.volume);
           const categoryLabel = market.tags?.find((tag) => tag.label)?.label ?? 'Event market';
           return (
-            <article className="card" key={market.id ?? market.slug ?? market.question} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 13, padding: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span className="demo-pill">{categoryLabel}</span>
-                <span style={{ color: 'var(--muted)', fontSize: 11 }}>Vol. {volume}</span>
+            <article className="card" key={market.id ?? market.slug ?? market.question} style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 14, padding: 16, borderRadius: 18 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                {(market.image || market.icon) ? <img src={market.image || market.icon} alt="" loading="lazy" style={{ width: 52, height: 52, flex: '0 0 52px', objectFit: 'cover', borderRadius: 13, background: 'rgba(255,255,255,.06)' }} /> : <div aria-hidden="true" style={{ width: 52, height: 52, flex: '0 0 52px', display: 'grid', placeItems: 'center', borderRadius: 13, fontSize: 22, fontWeight: 700, background: 'rgba(155,255,71,.1)', color: '#b9ff79' }}>{(categoryLabel[0] || 'P').toUpperCase()}</div>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 5 }}><span style={{ color: 'var(--muted)', fontSize: 11 }}>{categoryLabel}</span><span style={{ color: 'var(--muted)', fontSize: 11 }}>Vol. {volume}</span></div>
+                  <h2 style={{ fontSize: 16, lineHeight: 1.4, margin: 0 }}>{market.question}</h2>
+                </div>
               </div>
-              <h2 style={{ fontSize: 17, lineHeight: 1.45, margin: 0 }}>{market.question}</h2>
-              {outcomes.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,110px),1fr))', gap: 8 }}>
+              {outcomes.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,120px),1fr))', gap: 8 }}>
                 {outcomes.map((outcome, index) => {
                   const marketPrice = Number(prices[index]);
                   const probability = Number.isFinite(marketPrice) ? Math.round(marketPrice * 100) + '%' : '—';
                   const tokenId = tokenIds[index];
                   return <button key={outcome + '-' + index} type="button" disabled={!tokenId}
                     onClick={() => tokenId && openTrade(market, outcome, tokenId, marketPrice)}
-                    style={{ textAlign: 'left', cursor: tokenId ? 'pointer' : 'not-allowed', border: '1px solid var(--line)', borderRadius: 12, padding: 11, color: 'var(--text)', background: 'rgba(255,255,255,.025)' }}>
+                    style={{ textAlign: 'left', cursor: tokenId ? 'pointer' : 'not-allowed', border: '1px solid ' + (index === 0 ? 'rgba(155,255,71,.3)' : 'var(--line)'), borderRadius: 12, padding: '11px 12px', color: 'var(--text)', background: index === 0 ? 'rgba(155,255,71,.07)' : 'rgba(255,255,255,.025)' }}>
                     <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12 }}>{outcome}</span>
-                    <strong style={{ display: 'block', fontSize: 20, marginTop: 4 }}>{probability}</strong>
-                    <span style={{ display: 'block', fontSize: 11, marginTop: 6, color: 'var(--muted)' }}>Trade ↗</span>
+                    <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6, marginTop: 5 }}><strong style={{ fontSize: 19 }}>{probability}</strong><span style={{ color: 'var(--muted)', fontSize: 11 }}>Buy ↗</span></span>
                   </button>;
                 })}
               </div>}
-              {market.endDate && <p style={{ color: 'var(--muted)', fontSize: 12, margin: 0 }}>Ends {new Date(market.endDate).toLocaleDateString()}</p>}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--line)', paddingTop: 10, gap: 8 }}><span style={{ color: 'var(--muted)', fontSize: 11 }}>{market.endDate ? 'Ends ' + new Date(market.endDate).toLocaleDateString() : 'Live market'}</span><span style={{ color: 'var(--muted)', fontSize: 11 }}>Trade on CrickX →</span></div>
             </article>
           );
         })}
