@@ -47,6 +47,8 @@ export default function PredictionMarketsPage() {
   const [selectedTrade, setSelectedTrade] = useState<SelectedTrade | null>(null);
   const [side, setSide] = useState<TradeSide>('BUY');
   const [price, setPrice] = useState('0.50');
+  const [priceEdited, setPriceEdited] = useState(false);
+  const [stakeAmount, setStakeAmount] = useState('5');
   const [shares, setShares] = useState('5');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<OrderStatus | null>(null);
@@ -111,18 +113,37 @@ export default function PredictionMarketsPage() {
   useEffect(() => {
     if (!selectedTrade) { setTradingInfo(null); return; }
     let cancelled = false;
+    const refreshQuote = async () => {
+      try {
+        const info = await getMarketTradingInfo(selectedTrade.tokenId, selectedTrade.market.feesEnabled === true);
+        if (cancelled) return;
+        setTradingInfo(info);
+        setTradingInfoLoading(false);
+        // Follow the live best ask until the user deliberately edits their limit price.
+        if (!priceEdited && side === 'BUY' && info.bestAsk !== null) {
+          setPrice(info.bestAsk.toFixed(Math.max(2, (info.tickSize.split('.')[1] ?? '').length)));
+        }
+      } catch {
+        if (!cancelled) { setTradingInfo(null); setTradingInfoLoading(false); }
+      }
+    };
     setTradingInfo(null);
     setTradingInfoLoading(true);
-    void getMarketTradingInfo(selectedTrade.tokenId, selectedTrade.market.feesEnabled === true)
-      .then((info) => { if (!cancelled) setTradingInfo(info); })
-      .catch(() => { if (!cancelled) setTradingInfo(null); })
-      .finally(() => { if (!cancelled) setTradingInfoLoading(false); });
-    return () => { cancelled = true; };
-  }, [selectedTrade]);
+    void refreshQuote();
+    const interval = window.setInterval(() => { void refreshQuote(); }, 5000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [selectedTrade, priceEdited, side]);
 
   const openTrade = (market: Market, outcome: string, tokenId: string, marketPrice: number) => {
-    setSelectedTrade({ market, outcome, tokenId, marketPrice });
+    // The dedicated BTC 5-minute feed omits Gamma's feesEnabled field; identify its fee-bearing market family.
+    const marketWithFeeMetadata = {
+      ...market,
+      feesEnabled: market.feesEnabled ?? /^btc-updown-5m-/.test(market.slug ?? ''),
+    };
+    setSelectedTrade({ market: marketWithFeeMetadata, outcome, tokenId, marketPrice });
     setPrice(Number.isFinite(marketPrice) && marketPrice > 0 && marketPrice < 1 ? marketPrice.toFixed(2) : '0.50');
+    setPriceEdited(false);
+    setStakeAmount('5');
     setShares('5'); setSide('BUY'); setStatus(null);
   };
 
@@ -130,7 +151,11 @@ export default function PredictionMarketsPage() {
     if (!selectedTrade) return;
     setStatus(null);
     const numericPrice = Number(price);
-    const numericShares = Number(shares);
+    const enteredAmount = Number(stakeAmount);
+    const numericShares = side === 'BUY'
+      ? (Number.isFinite(enteredAmount) && Number.isFinite(numericPrice) && numericPrice > 0
+        ? Math.floor((enteredAmount / numericPrice) * 100) / 100 : 0)
+      : Number(shares);
     if (!Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice >= 1) {
       setStatus({ kind: 'error', message: 'Enter a limit price between 0 and 1 (exclusive).' }); return;
     }
@@ -138,7 +163,9 @@ export default function PredictionMarketsPage() {
     if (tradingInfo.minimumOrderSize === null) { setStatus({ kind: 'error', message: 'Polymarket did not provide this market’s minimum order size. Trading is paused until it can be verified.' }); return; }
     const minimumShares = tradingInfo.minimumOrderSize;
     if (!Number.isFinite(numericShares) || numericShares < minimumShares) {
-      setStatus({ kind: 'error', message: 'This market requires at least ' + minimumShares + ' shares.' }); return;
+      setStatus({ kind: 'error', message: side === 'BUY'
+        ? 'Your stake is below this market’s minimum for the current live price (' + minimumShares + ' shares minimum). Increase the amount or review the limit price.'
+        : 'This market requires at least ' + minimumShares + ' shares.' }); return;
     }
     if (!isConnected || !address) {
       setStatus({ kind: 'info', message: 'Connect your wallet first to review and sign your order.' });
@@ -273,26 +300,36 @@ export default function PredictionMarketsPage() {
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 12, marginTop: 16 }}>
-              <div><label className="eyebrow" htmlFor="trade-side">Order type</label><select id="trade-side" value={side} onChange={(event) => setSide(event.target.value as TradeSide)} style={fieldStyle}><option value="BUY">Buy outcome</option><option value="SELL">Sell outcome</option></select></div>
-              <div><label className="eyebrow" htmlFor="trade-price">Your limit price ($)</label><input id="trade-price" inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} style={fieldStyle} /></div>
-              <div><label className="eyebrow" htmlFor="trade-shares">Shares (min. 5)</label><input id="trade-shares" inputMode="decimal" value={shares} onChange={(event) => setShares(event.target.value)} style={fieldStyle} /></div>
-              <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: '10px 12px', marginTop: 21 }}><span style={{ display: 'block', color: 'var(--muted)', fontSize: 11 }}>Estimated order value</span><strong style={{ display: 'block', fontSize: 21, marginTop: 4 }}>$ {(Math.max(0, Number(price) || 0) * Math.max(0, Number(shares) || 0)).toFixed(2)}</strong></div>
+              <div><label className="eyebrow" htmlFor="trade-side">Order type</label><select id="trade-side" value={side} onChange={(event) => { setSide(event.target.value as TradeSide); setPriceEdited(false); }} style={fieldStyle}><option value="BUY">Buy outcome</option><option value="SELL">Sell outcome</option></select></div>
+              <div><label className="eyebrow" htmlFor="trade-price">Limit price ($)</label><input id="trade-price" inputMode="decimal" value={price} onChange={(event) => { setPrice(event.target.value); setPriceEdited(true); }} style={fieldStyle} /><span style={{ display: 'block', color: 'var(--muted)', fontSize: 11, marginTop: 4 }}>{tradingInfo?.bestAsk !== null && tradingInfo?.bestAsk !== undefined ? `Live best ask: $${tradingInfo.bestAsk.toFixed(3)}` : 'Live quote unavailable'}{!priceEdited && tradingInfo?.bestAsk != null ? ' · following live quote' : ' · manual limit price'}</span></div>
             </div>
             <div style={{ marginTop: 12, padding: 14, borderRadius: 14, border: '1px solid var(--line)', background: 'rgba(255,255,255,.025)' }}>
               <strong style={{ display: 'block', marginBottom: 10 }}>Estimated fees & total</strong>
               {(() => {
-                const p = Number(price), qty = Number(shares);
+                const p = Number(price);
+                const enteredAmount = Number(stakeAmount);
+                const qty = side === 'BUY'
+                  ? (Number.isFinite(enteredAmount) && enteredAmount > 0 && Number.isFinite(p) && p > 0 && p < 1 ? Math.floor((enteredAmount / p) * 100) / 100 : 0)
+                  : Number(shares);
                 const valid = Number.isFinite(p) && p > 0 && p < 1 && Number.isFinite(qty) && qty > 0;
-                const value = valid ? p * qty : 0;
-                const polyFee = valid && tradingInfo?.feesEnabled && side === 'BUY' && tradingInfo.feeRate !== null
+                const value = valid ? Math.round(p * qty * 100) / 100 : 0;
+                const polyFee = valid && tradingInfo?.feesEnabled && tradingInfo.feeRate !== null
                   ? Math.round(qty * tradingInfo.feeRate * p * (1 - p) * 100000) / 100000 : 0;
                 const crickxFee = Math.round(value * 0.01 * 100) / 100;
+                const total = value + polyFee + crickxFee;
+                const potentialPayout = side === 'BUY' && valid ? qty : 0;
+                const netProfit = potentialPayout - total;
                 return <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>Order value (estimate)</span><strong>$ {value.toFixed(2)}</strong></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>Polymarket taker fee</span><strong>{tradingInfoLoading || !tradingInfo ? 'Loading…' : !tradingInfo.feesEnabled ? 'Not enabled for this market' : side === 'SELL' ? 'Varies by execution' : '$ ' + polyFee.toFixed(5)}</strong></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>CrickX fee (1% of filled value)</span><strong>$ {crickxFee.toFixed(2)} estimated</strong></div>
-                  <div style={{ borderTop: '1px solid var(--line)', paddingTop: 9, display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong>Estimated total</strong><strong>$ {(value + polyFee + crickxFee).toFixed(2)}</strong></div>
-                  <p style={{ color: 'var(--muted)', fontSize: 11, lineHeight: 1.5, margin: '2px 0 0' }}>{tradingInfo?.minimumOrderSize ? 'Market minimum: ' + tradingInfo.minimumOrderSize + ' shares.' : 'Market minimum size unavailable until market metadata loads.'} CrickX fee is shown for transparency only and is not currently collected. Collection must be implemented and tested separately.</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>{side === 'BUY' ? 'Amount to stake (estimate)' : 'Sale value (estimate)'}</span><strong>$ {value.toFixed(2)}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>Estimated shares</span><strong>{qty.toFixed(2)}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>Polymarket taker fee</span><strong>{tradingInfoLoading || !tradingInfo ? 'Loading…' : !tradingInfo.feesEnabled ? '$ 0.00 · no provider fee for this market' : '$ ' + polyFee.toFixed(5)}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>CrickX platform fee (1%)</span><strong>$ {crickxFee.toFixed(2)} estimated</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>Total cost incl. estimated fees</span><strong>$ {total.toFixed(2)}</strong></div>
+                  {side === 'BUY' && <div style={{ borderTop: '1px solid var(--line)', paddingTop: 10, marginTop: 2 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}><strong>To win if correct</strong><strong style={{ color: '#b9ff79', fontSize: 22 }}>$ {potentialPayout.toFixed(2)}</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 7 }}><span style={{ color: 'var(--muted)' }}>Potential profit after fees</span><strong style={{ color: netProfit >= 0 ? '#b9ff79' : '#ff9c9c' }}>$ {netProfit.toFixed(2)}</strong></div>
+                  </div>}
+                  <p style={{ color: 'var(--muted)', fontSize: 11, lineHeight: 1.5, margin: '2px 0 0' }}>{tradingInfo?.minimumOrderSize ? 'Market minimum: ' + tradingInfo.minimumOrderSize + ' shares.' : 'Market minimum size unavailable until market metadata loads.'} Live best bid/ask and provider fee metadata refresh every 5 seconds. Quotes, fees, fills, and payout are estimates; actual fees apply at fill time. CrickX’s 1% fee is displayed transparently but is not collected until its collection mechanism is implemented and tested. This ticket submits a limit order, so a fill and the quoted payout are not guaranteed.</p>
                 </div>;
               })()}
             </div>
