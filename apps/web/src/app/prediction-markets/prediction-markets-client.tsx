@@ -11,7 +11,7 @@ type Market = {
   id?: string; question?: string; slug?: string; description?: string; image?: string; icon?: string;
   outcomes?: string[] | string; outcomePrices?: string[] | string;
   clobTokenIds?: string[] | string; negRisk?: boolean;
-  volume?: string | number; endDate?: string; active?: boolean; closed?: boolean; archived?: boolean;
+  volume?: string | number; endDate?: string; active?: boolean; closed?: boolean; archived?: boolean; feesEnabled?: boolean;
   tags?: Array<{ label?: string; slug?: string }>;
 };
 
@@ -50,6 +50,8 @@ export default function PredictionMarketsPage() {
   const [shares, setShares] = useState('5');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<OrderStatus | null>(null);
+  const [tradingInfo, setTradingInfo] = useState<Awaited<ReturnType<typeof getMarketTradingInfo>> | null>(null);
+  const [tradingInfoLoading, setTradingInfoLoading] = useState(false);
   const [credentials, setCredentials] = useState<{ address: string; creds: ClobCredentials } | null>(null);
   const { address, isConnected, chainId } = useAccount();
   const { data: walletClient } = useWalletClient();
@@ -106,6 +108,18 @@ export default function PredictionMarketsPage() {
     if (!address || credentials?.address?.toLowerCase() !== address.toLowerCase()) setCredentials(null);
   }, [address, credentials?.address]);
 
+  useEffect(() => {
+    if (!selectedTrade) { setTradingInfo(null); return; }
+    let cancelled = false;
+    setTradingInfo(null);
+    setTradingInfoLoading(true);
+    void getMarketTradingInfo(selectedTrade.tokenId, selectedTrade.market.feesEnabled === true)
+      .then((info) => { if (!cancelled) setTradingInfo(info); })
+      .catch(() => { if (!cancelled) setTradingInfo(null); })
+      .finally(() => { if (!cancelled) setTradingInfoLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedTrade]);
+
   const openTrade = (market: Market, outcome: string, tokenId: string, marketPrice: number) => {
     setSelectedTrade({ market, outcome, tokenId, marketPrice });
     setPrice(Number.isFinite(marketPrice) && marketPrice > 0 && marketPrice < 1 ? marketPrice.toFixed(2) : '0.50');
@@ -120,8 +134,10 @@ export default function PredictionMarketsPage() {
     if (!Number.isFinite(numericPrice) || numericPrice <= 0 || numericPrice >= 1) {
       setStatus({ kind: 'error', message: 'Enter a limit price between 0 and 1 (exclusive).' }); return;
     }
-    if (!Number.isFinite(numericShares) || numericShares < 5) {
-      setStatus({ kind: 'error', message: 'Enter at least 5 shares. The market may require more.' }); return;
+    if (!tradingInfo) { setStatus({ kind: 'error', message: 'Market minimum and fee information is not available yet. Please wait and retry.' }); return; }
+    const minimumShares = tradingInfo.minimumOrderSize ?? 5;
+    if (!Number.isFinite(numericShares) || numericShares < minimumShares) {
+      setStatus({ kind: 'error', message: 'This market requires at least ' + minimumShares + ' shares.' }); return;
     }
     if (!isConnected || !address) {
       setStatus({ kind: 'info', message: 'Connect your wallet first to review and sign your order.' });
@@ -163,7 +179,8 @@ export default function PredictionMarketsPage() {
       const activeCreds = credentials?.address.toLowerCase() === address.toLowerCase()
         ? credentials.creds : await getClobCredentials(walletClient as any);
       setCredentials({ address, creds: activeCreds });
-      const info = await getMarketTradingInfo(selectedTrade.tokenId);
+      const info = await getMarketTradingInfo(selectedTrade.tokenId, selectedTrade.market.feesEnabled === true);
+      if (info.minimumOrderSize !== null && numericShares < info.minimumOrderSize) throw new Error('This market requires at least ' + info.minimumOrderSize + ' shares. Update your order size and retry.');
       const result = await submitLimitOrder({
         signer: walletClient as any, creds: activeCreds, tokenId: selectedTrade.tokenId,
         price: numericPrice, shares: numericShares, side, negRisk: info.negRisk, tickSize: info.tickSize,
@@ -259,6 +276,24 @@ export default function PredictionMarketsPage() {
               <div><label className="eyebrow" htmlFor="trade-price">Your limit price ($)</label><input id="trade-price" inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} style={fieldStyle} /></div>
               <div><label className="eyebrow" htmlFor="trade-shares">Shares (min. 5)</label><input id="trade-shares" inputMode="decimal" value={shares} onChange={(event) => setShares(event.target.value)} style={fieldStyle} /></div>
               <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: '10px 12px', marginTop: 21 }}><span style={{ display: 'block', color: 'var(--muted)', fontSize: 11 }}>Estimated order value</span><strong style={{ display: 'block', fontSize: 21, marginTop: 4 }}>$ {(Math.max(0, Number(price) || 0) * Math.max(0, Number(shares) || 0)).toFixed(2)}</strong></div>
+            </div>
+            <div style={{ marginTop: 12, padding: 14, borderRadius: 14, border: '1px solid var(--line)', background: 'rgba(255,255,255,.025)' }}>
+              <strong style={{ display: 'block', marginBottom: 10 }}>Estimated fees & total</strong>
+              {(() => {
+                const p = Number(price), qty = Number(shares);
+                const valid = Number.isFinite(p) && p > 0 && p < 1 && Number.isFinite(qty) && qty > 0;
+                const value = valid ? p * qty : 0;
+                const polyFee = valid && tradingInfo?.feesEnabled && side === 'BUY' && tradingInfo.feeRate !== null
+                  ? Math.round(qty * tradingInfo.feeRate * p * (1 - p) * 100000) / 100000 : 0;
+                const crickxFee = Math.round(value * 0.01 * 100) / 100;
+                return <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>Order value (estimate)</span><strong>$ {value.toFixed(2)}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>Polymarket taker fee</span><strong>{tradingInfoLoading || !tradingInfo ? 'Loading…' : !tradingInfo.feesEnabled ? 'Not enabled for this market' : side === 'SELL' ? 'Varies by execution' : '$ ' + polyFee.toFixed(5)}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>CrickX fee (1% of filled value)</span><strong>$ {crickxFee.toFixed(2)} estimated</strong></div>
+                  <div style={{ borderTop: '1px solid var(--line)', paddingTop: 9, display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong>Estimated total</strong><strong>$ {(value + polyFee + crickxFee).toFixed(2)}</strong></div>
+                  <p style={{ color: 'var(--muted)', fontSize: 11, lineHeight: 1.5, margin: '2px 0 0' }}>{tradingInfo?.minimumOrderSize ? 'Market minimum: ' + tradingInfo.minimumOrderSize + ' shares.' : 'Market minimum size unavailable until market metadata loads.'} CrickX fee is shown for transparency only and is not currently collected. Collection must be implemented and tested separately.</p>
+                </div>;
+              })()}
             </div>
             <div style={{ marginTop: 16, padding: 13, borderRadius: 13, background: 'rgba(255,255,255,.035)', border: '1px solid var(--line)' }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
