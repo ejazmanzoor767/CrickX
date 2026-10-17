@@ -32,10 +32,10 @@ type SelectedTrade = { market: Market; outcome: string; tokenId: string; marketP
 type OrderStatus = { message: string; kind: 'success' | 'error' | 'info'; details?: string };
 const outcomeTone = (outcome: string) => {
   const label = outcome.trim().toLowerCase();
-  if (/\\b(up|yes|higher|above|over|bullish)\\b/.test(label)) {
+  if (/\b(up|yes|higher|above|over|bullish)\b/.test(label)) {
     return { color: '#07110a', background: 'rgba(155,255,71,.96)', border: 'rgba(155,255,71,.95)', meaning: 'Positive outcome' };
   }
-  if (/\\b(down|no|lower|below|under|bearish)\\b/.test(label)) {
+  if (/\b(down|no|lower|below|under|bearish)\b/.test(label)) {
     return { color: '#fff', background: 'rgba(220,53,69,.96)', border: 'rgba(255,112,122,.95)', meaning: 'Negative outcome' };
   }
   return { color: 'var(--text)', background: 'rgba(255,255,255,.045)', border: 'var(--line)', meaning: 'Select outcome' };
@@ -394,7 +394,7 @@ export default function PredictionMarketsPage() {
                   return <button key={outcome + '-' + index} type="button" disabled={!tokenId}
                     aria-label={outcome + ', ' + probability + ', ' + tone.meaning + '. Select to trade.'}
                     onClick={() => tokenId && openTrade(market, outcome, tokenId, marketPrice)}
-                    style={{ textAlign: 'left', cursor: tokenId ? 'pointer' : 'not-allowed', border: '1px solid ' + tone.border, borderRadius: 12, padding: '11px 12px', color: tone.color, background: tone.background, opacity: tokenId ? 1 : .55, boxShadow: /\\b(up|yes|higher|above|over|bullish|down|no|lower|below|under|bearish)\\b/i.test(outcome) ? '0 0 0 1px rgba(255,255,255,.04) inset' : 'none' }}>
+                    style={{ textAlign: 'left', cursor: tokenId ? 'pointer' : 'not-allowed', border: '1px solid ' + tone.border, borderRadius: 12, padding: '11px 12px', color: tone.color, background: tone.background, opacity: tokenId ? 1 : .55, boxShadow: /\b(up|yes|higher|above|over|bullish|down|no|lower|below|under|bearish)\b/i.test(outcome) ? '0 0 0 1px rgba(255,255,255,.04) inset' : 'none' }}>
                     <span style={{ display: 'block', fontSize: 14, fontWeight: 800, letterSpacing: '.01em' }}>{outcome}</span>
                     <span style={{ display: 'block', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 3, opacity: .9 }}>{tone.meaning}</span>
                     <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6, marginTop: 7 }}><strong style={{ fontSize: 19 }}>{probability}</strong><span style={{ fontSize: 11, fontWeight: 700 }}>Buy ↗</span></span>
