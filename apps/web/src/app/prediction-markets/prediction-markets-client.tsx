@@ -41,6 +41,43 @@ const outcomeTone = (outcome: string) => {
   return { color: 'var(--text)', background: 'rgba(255,255,255,.045)', border: 'var(--line)', meaning: 'Select outcome' };
 };
 
+const MARKET_CATEGORIES = [
+  'All', 'Live & Short-Term', 'Crypto', '5-Minute Crypto', 'Sports', 'Football', 'Cricket',
+  'Basketball', 'Tennis', 'Baseball', 'Esports & Gaming', 'Politics', 'Technology & AI',
+  'Economics', 'Finance', 'Business', 'World News', 'Science', 'Climate', 'Entertainment', 'Other',
+] as const;
+
+const categoryMatches = (market: Market, category: string): boolean => {
+  if (category === 'All') return true;
+  const text = [market.question, market.description, market.slug, ...(market.tags ?? []).flatMap((tag) => [tag.label, tag.slug])]
+    .filter(Boolean).join(' ').toLowerCase();
+  const patterns: Record<string, RegExp> = {
+    'Live & Short-Term': /\b(live|in[- ]play|5[- ]?min(?:ute)?|15[- ]?min(?:ute)?|hourly|next 5 minutes)\b/i,
+    'Crypto': /\b(crypto|bitcoin|\bbtc\b|ethereum|\beth\b|solana|\bsol\b|xrp|dogecoin|token|blockchain|defi|cryptocurrency)\b/i,
+    '5-Minute Crypto': /\b(5[- ]?min(?:ute)?|five minutes|up or down|updown)\b/i,
+    'Sports': /\b(sport|match|game|league|tournament|football|soccer|cricket|basketball|tennis|baseball|hockey|golf|rugby|ufc|mma|formula 1|f1)\b/i,
+    'Football': /\b(football|soccer|premier league|champions league|la liga|bundesliga|serie a|mls|uefa|fifa)\b/i,
+    'Cricket': /\b(cricket|ipl|psl|t20|odi|test match|ashes|big bash)\b/i,
+    'Basketball': /\b(basketball|nba|wnba|ncaa)\b/i,
+    'Tennis': /\b(tennis|atp|wta|grand slam|wimbledon|roland garros)\b/i,
+    'Baseball': /\b(baseball|mlb|world series)\b/i,
+    'Esports & Gaming': /\b(esports|e-sports|gaming|video game|league of legends|counter-strike|\bcs2\b|dota|valorant|fortnite|call of duty|minecraft|twitch)\b/i,
+    'Politics': /\b(politic|election|president|presidential|congress|senate|parliament|government|vote|democrat|republican|prime minister|white house|referendum)\b/i,
+    'Technology & AI': /\b(technology|tech company|artificial intelligence|\bai\b|openai|chatgpt|google|apple|microsoft|nvidia|robot|semiconductor|software|smartphone)\b/i,
+    'Economics': /\b(econom|inflation|gdp|unemployment|interest rate|federal reserve|fed rate|central bank|recession|jobs report|cpi)\b/i,
+    'Finance': /\b(stock|stocks|market cap|s\&p|nasdaq|dow jones|forex|bond|treasury|etf|ipo|earnings|price target)\b/i,
+    'Business': /\b(company|business|ceo|merger|acquisition|revenue|profit|amazon|tesla|meta platforms|netflix|disney)\b/i,
+    'World News': /\b(world|international|war|conflict|ukraine|russia|china|taiwan|israel|gaza|iran|nato|united nations|geopolit)\b/i,
+    'Science': /\b(science|space|nasa|spacex|astronomy|research|discovery|clinical trial|physics|biology)\b/i,
+    'Climate': /\b(climate|weather|temperature|hurricane|wildfire|carbon|emissions|global warming|renewable energy)\b/i,
+    'Entertainment': /\b(entertainment|movie|film|box office|tv show|television|award|oscars|grammy|emmy|celebrity|music|album|concert)\b/i,
+  };
+  if (category === 'Other') {
+    return !Object.entries(patterns).some(([key, pattern]) => key !== 'Live & Short-Term' && key !== '5-Minute Crypto' && pattern.test(text));
+  }
+  return patterns[category]?.test(text) ?? (market.tags ?? []).some((tag) => tag.label?.toLowerCase() === category.toLowerCase() || tag.slug?.toLowerCase() === category.toLowerCase());
+};
+
 const fieldStyle: CSSProperties = {
   display: 'block', width: '100%', marginTop: 6, padding: '12px 13px', borderRadius: 12,
   border: '1px solid var(--line)', color: 'var(--text)', background: 'rgba(255,255,255,.04)', outline: 'none',
@@ -236,18 +273,15 @@ export default function PredictionMarketsPage() {
     } finally { setBusy(false); }
   };
 
-  const categories = useMemo(() => {
-    const found = new Set<string>();
-    markets.forEach((market) => (market.tags ?? []).forEach((tag) => { if (tag.label) found.add(tag.label); }));
-    return ['All', ...Array.from(found).sort().slice(0, 12)];
-  }, [markets]);
+  const categories = MARKET_CATEGORIES;
 
   const visibleMarkets = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return markets.filter((market) => {
-      const matchesText = !needle || (market.question + ' ' + (market.description ?? '') + ' ' + (market.tags ?? []).map((tag) => tag.label ?? '').join(' ')).toLowerCase().includes(needle);
-      const matchesCategory = category === 'All' || (market.tags ?? []).some((tag) => tag.label === category);
-      return matchesText && matchesCategory;
+      const searchText = [market.question, market.description, market.slug, ...(market.tags ?? []).flatMap((tag) => [tag.label, tag.slug])]
+        .filter(Boolean).join(' ').toLowerCase();
+      const matchesText = !needle || searchText.includes(needle);
+      return matchesText && categoryMatches(market, category);
     });
   }, [markets, query, category]);
 
@@ -258,7 +292,7 @@ export default function PredictionMarketsPage() {
           <p className="eyebrow">CRICKX · PREDICTION MARKETS</p>
           <h1 className="section-title">Predict the outcome.</h1>
           <p className="section-subtitle" style={{ maxWidth: 700, marginBottom: 0 }}>
-            Browse Polymarket markets and place limit orders from CrickX using your connected wallet. Polymarket handles execution and settlement.
+            Browse active Polymarket predictions across sports, crypto, politics, technology, gaming, economics, and more. Place supported limit orders from CrickX using your connected wallet; Polymarket handles execution and settlement.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -287,7 +321,7 @@ export default function PredictionMarketsPage() {
 
       <div className="card" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 12 }}>
         <label htmlFor="market-search" className="eyebrow" style={{ marginBottom: 0 }}>Find a market</label>
-        <input id="market-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sports, crypto, politics, and more…" style={{ width: '100%', padding: '14px 15px', borderRadius: 12, border: '1px solid var(--line)', color: 'var(--text)', background: 'rgba(255,255,255,.04)', outline: 'none' }} />
+        <input id="market-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search football, cricket, crypto, politics, gaming, tech, and more…" style={{ width: '100%', padding: '14px 15px', borderRadius: 12, border: '1px solid var(--line)', color: 'var(--text)', background: 'rgba(255,255,255,.04)', outline: 'none' }} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {categories.map((item) => (
             <button key={item} type="button" className={category === item ? 'primary-button' : 'secondary-button'} style={{ padding: '9px 12px', fontSize: 12 }} onClick={() => setCategory(item)}>{item}</button>
