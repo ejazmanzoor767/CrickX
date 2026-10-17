@@ -28,6 +28,7 @@ export default function BtcFiveMinutePanel({ onTrade }: { onTrade: (market: BtcM
     let retryTimer: number | undefined;
     let strikeTimer: number | undefined;
     const getWindowStart = () => Math.floor(Date.now() / 300000) * 300;
+    let strikeWindow = getWindowStart();
     const loadPriceToBeat = async () => {
       const slug = 'btc-updown-5m-' + getWindowStart();
       try {
@@ -69,6 +70,14 @@ export default function BtcFiveMinutePanel({ onTrade }: { onTrade: (market: BtcM
             const time = Number(payload.timestamp_ms ?? payload.timestamp ?? Date.now());
             const timestamp = time < 1e12 ? time * 1000 : time;
             if (!Number.isFinite(price) || price <= 0) return;
+            const tickWindow = Math.floor(timestamp / 300000) * 300;
+            if (tickWindow !== strikeWindow) {
+              strikeWindow = tickWindow;
+              setPriceToBeat(null);
+              void loadPriceToBeat();
+            }
+            // If connected right at the boundary, capture the first Chainlink tick as the strike.
+            if (timestamp - tickWindow * 1000 <= 5000) setPriceToBeat((current) => current ?? price);
             setBtcPrice(price);
             setNow(Date.now());
             setPoints((current) => [...current.filter((p) => p.time >= timestamp - 5 * 60 * 1000), { time: timestamp, price }].slice(-240));
