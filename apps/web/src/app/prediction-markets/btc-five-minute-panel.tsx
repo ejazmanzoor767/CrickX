@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-type BtcMarket = { id?: string; question?: string; slug?: string; outcomes?: string[] | string; outcomePrices?: string[] | string; clobTokenIds?: string[] | string; negRisk?: boolean; active?: boolean; closed?: boolean; archived?: boolean };
+type BtcMarket = { id?: string; question?: string; slug?: string; outcomes?: string[] | string; outcomePrices?: string[] | string; clobTokenIds?: string[] | string; negRisk?: boolean; active?: boolean; closed?: boolean; archived?: boolean; eventMetadata?: string | Record<string, unknown> };
 type BtcEvent = { title?: string; slug?: string; markets?: BtcMarket[]; eventMetadata?: string | Record<string, unknown> };
 type Point = { time: number; price: number };
 const asArray = (value: unknown): string[] => {
@@ -105,7 +105,18 @@ export default function BtcFiveMinutePanel({ onTrade }: { onTrade: (market: BtcM
           const payload: unknown = await response.json();
           const event = Array.isArray(payload) ? (payload as BtcEvent[])[0] : undefined;
           const market = event?.markets?.find((item) => item && item.question && item.active !== false && item.closed !== true && item.archived !== true && asArray(item.clobTokenIds).length > 0);
-          if (market) { if (alive) { setBtcMarket(market); setMarketError(''); } return; }
+          if (market) {
+            if (alive) {
+              setBtcMarket({ ...market, eventMetadata: event.eventMetadata });
+              const metadata = typeof event.eventMetadata === 'string'
+                ? (() => { try { return JSON.parse(event.eventMetadata) as Record<string, unknown>; } catch { return {}; } })()
+                : event.eventMetadata ?? {};
+              const target = [metadata.priceToBeat, metadata.price_to_beat, metadata.targetPrice, metadata.target].map(Number).find((n) => Number.isFinite(n) && n > 0);
+              if (target !== undefined) setPriceToBeat(target);
+              setMarketError('');
+            }
+            return;
+          }
         }
         if (alive) { setBtcMarket(null); setMarketError('The current BTC 5-minute Polymarket market is not available right now.'); }
       } catch { if (alive) { setBtcMarket(null); setMarketError('Could not load the BTC 5-minute prediction market.'); } }
