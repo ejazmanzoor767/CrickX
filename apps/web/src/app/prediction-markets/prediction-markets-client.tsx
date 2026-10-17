@@ -135,7 +135,12 @@ export default function PredictionMarketsPage() {
   }, [selectedTrade, priceEdited, side]);
 
   const openTrade = (market: Market, outcome: string, tokenId: string, marketPrice: number) => {
-    setSelectedTrade({ market, outcome, tokenId, marketPrice });
+    // The dedicated BTC 5-minute feed omits Gamma's feesEnabled field; identify its fee-bearing market family.
+    const marketWithFeeMetadata = {
+      ...market,
+      feesEnabled: market.feesEnabled ?? /^btc-updown-5m-/.test(market.slug ?? ''),
+    };
+    setSelectedTrade({ market: marketWithFeeMetadata, outcome, tokenId, marketPrice });
     setPrice(Number.isFinite(marketPrice) && marketPrice > 0 && marketPrice < 1 ? marketPrice.toFixed(2) : '0.50');
     setPriceEdited(false);
     setStakeAmount('5');
