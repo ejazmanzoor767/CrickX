@@ -135,7 +135,8 @@ export default function PredictionMarketsPage() {
       setStatus({ kind: 'error', message: 'Enter a limit price between 0 and 1 (exclusive).' }); return;
     }
     if (!tradingInfo) { setStatus({ kind: 'error', message: 'Market minimum and fee information is not available yet. Please wait and retry.' }); return; }
-    const minimumShares = tradingInfo.minimumOrderSize ?? 5;
+    if (tradingInfo.minimumOrderSize === null) { setStatus({ kind: 'error', message: 'Polymarket did not provide this market’s minimum order size. Trading is paused until it can be verified.' }); return; }
+    const minimumShares = tradingInfo.minimumOrderSize;
     if (!Number.isFinite(numericShares) || numericShares < minimumShares) {
       setStatus({ kind: 'error', message: 'This market requires at least ' + minimumShares + ' shares.' }); return;
     }
