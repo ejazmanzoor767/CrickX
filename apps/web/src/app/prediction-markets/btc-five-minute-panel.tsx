@@ -185,8 +185,12 @@ export default function BtcFiveMinutePanel({ onTrade }: { onTrade: (market: BtcM
         {outcomes.map((outcome, index) => {
           const tokenId = tokenIds[index];
           const marketPrice = Number(prices[index]);
-          return <button key={outcome + index} type="button" disabled={!tokenId} onClick={() => tokenId && onTrade(btcMarket, outcome, tokenId, marketPrice)} style={{ textAlign: 'left', cursor: tokenId ? 'pointer' : 'not-allowed', border: '1px solid var(--line)', borderRadius: 12, padding: 14, color: 'var(--text)', background: 'rgba(255,255,255,.035)' }}>
-            <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12 }}>{outcome}</span><strong style={{ display: 'block', fontSize: 23, marginTop: 4 }}>{Number.isFinite(marketPrice) ? (marketPrice * 100).toFixed(1) + '¢' : '—'}</strong><span style={{ display: 'block', marginTop: 6, fontSize: 12 }}>Choose and trade →</span>
+          const positive = /^(up|yes|higher|above|over|bullish)\\b/i.test(outcome.trim());
+          const negative = /^(down|no|lower|below|under|bearish)\\b/i.test(outcome.trim());
+          const outcomeColor = positive ? '#9BFF47' : negative ? '#DC3545' : 'var(--line)';
+          const outcomeText = positive ? '#DFFFBE' : negative ? '#FFC7CD' : 'var(--text)';
+          return <button key={outcome + index} type="button" disabled={!tokenId} aria-label={outcome + (positive ? ', positive outcome' : negative ? ', negative outcome' : '') + ', choose and trade'} onClick={() => tokenId && onTrade(btcMarket, outcome, tokenId, marketPrice)} style={{ textAlign: 'left', cursor: tokenId ? 'pointer' : 'not-allowed', border: '1px solid ' + outcomeColor, borderRadius: 12, padding: 14, color: outcomeText, background: positive ? 'rgba(155,255,71,.10)' : negative ? 'rgba(220,53,69,.10)' : 'rgba(255,255,255,.035)', opacity: tokenId ? 1 : .55 }}>
+            <span style={{ display: 'block', color: outcomeText, fontSize: 12, fontWeight: 700 }}>{outcome}</span><strong style={{ display: 'block', fontSize: 23, marginTop: 4 }}>{Number.isFinite(marketPrice) ? (marketPrice * 100).toFixed(1) + '¢' : '—'}</strong><span style={{ display: 'block', marginTop: 6, fontSize: 12 }}>Choose and trade →</span>
           </button>;
         })}
       </div> : <p className="section-subtitle" style={{ marginBottom: 0 }}>{marketError || 'Waiting for the current 5-minute market…'}</p>}
