@@ -338,9 +338,7 @@ export default function PredictionMarketsPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--muted)' }}>Total cost incl. estimated fees</span><strong>$ {total.toFixed(2)}</strong></div>
                   {side === 'BUY' && <div style={{ borderTop: '1px solid var(--line)', paddingTop: 10, marginTop: 2 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}><strong>To win if correct</strong><strong style={{ color: '#b9ff79', fontSize: 22 }}>$ {potentialPayout.toFixed(2)}</strong></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 7 }}><span style={{ color: 'var(--muted)' }}>Potential profit after fees</span><strong style={{ color: netProfit >= 0 ? '#b9ff79' : '#ff9c9c' }}>$ {netProfit.toFixed(2)}</strong></div>
                   </div>}
-                  <p style={{ color: 'var(--muted)', fontSize: 11, lineHeight: 1.5, margin: '2px 0 0' }}>{tradingInfo?.minimumOrderSize ? 'Market minimum: ' + tradingInfo.minimumOrderSize + ' shares.' : 'Market minimum size unavailable until market metadata loads.'} Live best bid/ask and provider fee metadata refresh every 5 seconds. Quotes, fees, fills, and payout are estimates; actual fees apply at fill time. CrickX’s 1% fee is displayed transparently but is not collected until its collection mechanism is implemented and tested. This ticket submits a limit order, so a fill and the quoted payout are not guaranteed.</p>
                 </div>;
               })()}
             </div>
