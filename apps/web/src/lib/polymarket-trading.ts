@@ -239,11 +239,35 @@ export async function submitLimitOrder(args: {
   return clobRequest('/order', 'POST', address, creds, payload);
 }
 
-export async function getMarketTradingInfo(tokenId: string) {
-  const [tickResponse, riskResponse] = await Promise.all([
-    fetch(CLOB + '/tick-size?token_id=' + encodeURIComponent(tokenId)),
-    fetch(CLOB + '/neg-risk?token_id=' + encodeURIComponent(tokenId)),
+export type MarketTradingInfo = {
+  tickSize: string;
+  negRisk: boolean;
+  minimumOrderSize: number | null;
+  feeRate: number | null;
+  feesEnabled: boolean;
+};
+
+export async function getMarketTradingInfo(tokenId: string, feesEnabled = false): Promise<MarketTradingInfo> {
+  const encoded = encodeURIComponent(tokenId);
+  const [tickResponse, riskResponse, bookResponse, feeResponse] = await Promise.all([
+    fetch(CLOB + '/tick-size?token_id=' + encoded),
+    fetch(CLOB + '/neg-risk?token_id=' + encoded),
+    fetch(CLOB + '/book?token_id=' + encoded),
+    fetch(CLOB + '/fee-rate?token_id=' + encoded),
   ]);
-  const [tick, risk] = await Promise.all([responseJson(tickResponse), responseJson(riskResponse)]);
-  return { tickSize: String(tick.minimum_tick_size ?? '0.01'), negRisk: Boolean(risk.neg_risk) };
+  const [tick, risk, book, fee] = await Promise.all([
+    responseJson(tickResponse), responseJson(riskResponse), responseJson(bookResponse), responseJson(feeResponse),
+  ]);
+  const minimumOrderSize = Number(book.min_order_size);
+  const baseFee = Number(fee.base_fee);
+  // Polymarket's CLOB fee-rate endpoint expresses base_fee in basis points.
+  // Gamma's per-market feesEnabled flag is authoritative for whether fees apply.
+  const feeRate = Number.isFinite(baseFee) && baseFee >= 0 ? baseFee / 10_000 : null;
+  return {
+    tickSize: String(tick.minimum_tick_size ?? book.tick_size ?? '0.01'),
+    negRisk: Boolean(risk.neg_risk),
+    minimumOrderSize: Number.isFinite(minimumOrderSize) && minimumOrderSize > 0 ? minimumOrderSize : null,
+    feeRate,
+    feesEnabled: feesEnabled && feeRate !== null && feeRate > 0,
+  };
 }
