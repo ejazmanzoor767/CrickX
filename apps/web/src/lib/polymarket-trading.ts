@@ -245,6 +245,8 @@ export type MarketTradingInfo = {
   minimumOrderSize: number | null;
   feeRate: number | null;
   feesEnabled: boolean;
+  bestAsk: number | null;
+  bestBid: number | null;
 };
 
 export async function getMarketTradingInfo(tokenId: string, feesEnabled = false): Promise<MarketTradingInfo> {
@@ -263,11 +265,17 @@ export async function getMarketTradingInfo(tokenId: string, feesEnabled = false)
   // Polymarket's CLOB fee-rate endpoint expresses base_fee in basis points.
   // Gamma's per-market feesEnabled flag is authoritative for whether fees apply.
   const feeRate = Number.isFinite(baseFee) && baseFee >= 0 ? baseFee / 10_000 : null;
+  const asks = Array.isArray(book.asks) ? book.asks : [];
+  const bids = Array.isArray(book.bids) ? book.bids : [];
+  const askPrices = asks.map((level: any) => Number(level.price)).filter((value: number) => Number.isFinite(value) && value > 0 && value < 1);
+  const bidPrices = bids.map((level: any) => Number(level.price)).filter((value: number) => Number.isFinite(value) && value > 0 && value < 1);
   return {
     tickSize: String(tick.minimum_tick_size ?? book.tick_size ?? '0.01'),
     negRisk: Boolean(risk.neg_risk),
     minimumOrderSize: Number.isFinite(minimumOrderSize) && minimumOrderSize > 0 ? minimumOrderSize : null,
     feeRate,
     feesEnabled: feesEnabled && feeRate !== null && feeRate > 0,
+    bestAsk: askPrices.length ? Math.min(...askPrices) : null,
+    bestBid: bidPrices.length ? Math.max(...bidPrices) : null,
   };
 }
