@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 type BtcMarket = { id?: string; question?: string; slug?: string; outcomes?: string[] | string; outcomePrices?: string[] | string; clobTokenIds?: string[] | string; negRisk?: boolean; active?: boolean; closed?: boolean; archived?: boolean };
-type BtcEvent = { title?: string; slug?: string; markets?: BtcMarket[] };
+type BtcEvent = { title?: string; slug?: string; markets?: BtcMarket[]; eventMetadata?: string | Record<string, unknown> };
 type Point = { time: number; price: number };
 const asArray = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.map(String);
@@ -26,52 +26,55 @@ export default function BtcFiveMinutePanel({ onTrade }: { onTrade: (market: BtcM
     let alive = true;
     let socket: WebSocket | null = null;
     let retryTimer: number | undefined;
-    let historyTimer: number | undefined;
-    const windowStart = () => Math.floor(Date.now() / 300000) * 300;
-    const loadHistory = async () => {
+    let strikeTimer: number | undefined;
+    const getWindowStart = () => Math.floor(Date.now() / 300000) * 300;
+    const loadPriceToBeat = async () => {
+      const slug = 'btc-updown-5m-' + getWindowStart();
       try {
-        const start = windowStart();
-        const response = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=6', { cache: 'no-store' });
-        if (!response.ok) throw new Error('BTC price history returned HTTP ' + response.status + '.');
-        const rows: unknown = await response.json();
-        if (!Array.isArray(rows)) throw new Error('BTC price history is unavailable.');
-        const history = (rows as unknown[][]).map((row) => ({ time: Number(row[0]), price: Number(row[4]) }))
-          .filter((p) => Number.isFinite(p.time) && Number.isFinite(p.price));
-        if (!alive || !history.length) return;
-        setPoints((current) => {
-          const live = current.filter((p) => p.time >= start * 1000);
-          const combined = [...history, ...live].filter((p) => p.time >= (Date.now() - 5 * 60 * 1000));
-          return combined.filter((p, i) => i === 0 || p.time > combined[i - 1].time).slice(-240);
-        });
-        // The current 5-minute window's opening minute is used as a clearly labelled
-        // reference estimate. Polymarket may settle from a different oracle/source.
-        const openingMinute = history.find((p) => p.time <= start * 1000 && p.time + 60000 > start * 1000)
-          ?? history.find((p) => p.time >= start * 1000);
-        if (openingMinute) setPriceToBeat(openingMinute.price);
-        setChartError('');
-      } catch (cause) {
-        if (alive) setChartError(cause instanceof Error ? cause.message : 'BTC price history is temporarily unavailable.');
-      }
+        // Polymarket's own strike endpoint is preferred; never substitute an exchange price.
+        const response = await fetch('https://polymarket.com/api/crypto/price-to-beat/' + slug, { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json() as Record<string, unknown>;
+        const candidates = [payload.priceToBeat, payload.price_to_beat, payload.target, payload.price, payload.value];
+        const value = candidates.map(Number).find((n) => Number.isFinite(n) && n > 0);
+        if (alive && value !== undefined) setPriceToBeat(value);
+      } catch { /* Strike remains unavailable rather than showing a proxy price. */ }
     };
     const connect = () => {
       if (!alive) return;
       try {
-        socket = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-        socket.onopen = () => { if (alive) { setFeedConnected(true); setChartError(''); } };
+        socket = new WebSocket('wss://ws-live-data.polymarket.com');
+        socket.onopen = () => {
+          if (!alive || !socket) return;
+          setFeedConnected(true);
+          setChartError('');
+          socket.send(JSON.stringify({
+            action: 'subscribe',
+            subscriptions: [{ topic: 'crypto_prices_chainlink', type: '*', filters: JSON.stringify({ symbol: 'btc/usd' }) }],
+          }));
+        };
         socket.onmessage = (event) => {
           if (!alive) return;
           try {
-            const trade = JSON.parse(String(event.data)) as { p?: string; T?: number };
-            const price = Number(trade.p);
-            const time = Number(trade.T) || Date.now();
+            const message = JSON.parse(String(event.data)) as {
+              topic?: string; type?: string; payload?: Record<string, unknown>;
+              symbol?: string; value?: unknown; timestamp?: unknown; timestamp_ms?: unknown;
+            };
+            const payload = message.payload ?? message;
+            const symbol = String(payload.symbol ?? message.symbol ?? '').toLowerCase();
+            const topic = String(message.topic ?? '').toLowerCase();
+            if (symbol && symbol !== 'btc/usd' && symbol !== 'btcusd') return;
+            if (topic && topic !== 'crypto_prices_chainlink' && !topic.includes('chainlink')) return;
+            const price = Number(payload.value ?? payload.price ?? payload.p);
+            const time = Number(payload.timestamp_ms ?? payload.timestamp ?? Date.now());
+            const timestamp = time < 1e12 ? time * 1000 : time;
             if (!Number.isFinite(price) || price <= 0) return;
             setBtcPrice(price);
             setNow(Date.now());
-            setPoints((current) => [...current.filter((p) => p.time >= time - 5 * 60 * 1000), { time, price }].slice(-240));
-            setPriceToBeat((current) => current ?? price);
-          } catch { /* Ignore malformed individual ticks; the stream remains active. */ }
+            setPoints((current) => [...current.filter((p) => p.time >= timestamp - 5 * 60 * 1000), { time: timestamp, price }].slice(-240));
+          } catch { /* Ignore malformed individual ticks. */ }
         };
-        socket.onerror = () => { if (alive) setChartError('Live price stream reconnecting…'); };
+        socket.onerror = () => { if (alive) setChartError('Polymarket Chainlink stream reconnecting…'); };
         socket.onclose = () => {
           if (!alive) return;
           setFeedConnected(false);
@@ -81,17 +84,16 @@ export default function BtcFiveMinutePanel({ onTrade }: { onTrade: (market: BtcM
         if (alive) { setFeedConnected(false); retryTimer = window.setTimeout(connect, 3000); }
       }
     };
-    void loadHistory();
+    void loadPriceToBeat();
     connect();
-    historyTimer = window.setInterval(() => { void loadHistory(); }, 60000);
+    strikeTimer = window.setInterval(() => { void loadPriceToBeat(); }, 15000);
     return () => {
       alive = false;
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
-      if (historyTimer !== undefined) window.clearInterval(historyTimer);
+      if (strikeTimer !== undefined) window.clearInterval(strikeTimer);
       socket?.close();
     };
   }, []);
-
   useEffect(() => {
     let alive = true;
     const refreshMarket = async () => {
@@ -134,18 +136,18 @@ export default function BtcFiveMinutePanel({ onTrade }: { onTrade: (market: BtcM
   return (
     <section className="card" style={{ marginBottom: 18, borderColor: 'rgba(155,255,71,.32)', background: 'linear-gradient(145deg,rgba(155,255,71,.06),rgba(14,18,28,.94))' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-        <div><p className="eyebrow" style={{ marginBottom: 5 }}>LIVE CRYPTO PREDICTION</p><h2 style={{ margin: 0, fontSize: 22 }}>Bitcoin Up or Down · 5 minutes</h2><p className="section-subtitle" style={{ margin: '6px 0 0' }}>BTC/USDT · streaming live trade prices</p></div>
+        <div><p className="eyebrow" style={{ marginBottom: 5 }}>LIVE CRYPTO PREDICTION</p><h2 style={{ margin: 0, fontSize: 22 }}>Bitcoin Up or Down · 5 minutes</h2><p className="section-subtitle" style={{ margin: '6px 0 0' }}>Chainlink BTC/USD · Polymarket live oracle stream</p></div>
         <span className="demo-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 99, background: feedConnected ? '#9bff47' : '#f5b942', display: 'inline-block' }} />{feedConnected ? 'LIVE' : 'CONNECTING'}</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,190px),1fr))', gap: 10, marginTop: 16 }}>
         <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 13, background: 'rgba(0,0,0,.15)' }}>
-          <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12 }}>Price to beat <span style={{ fontSize: 10 }}>(window reference)</span></span>
+          <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12 }}>Price to beat <span style={{ fontSize: 10 }}>(Polymarket strike)</span></span>
           <strong style={{ display: 'block', fontSize: 23, marginTop: 5 }}>{formatPrice(priceToBeat)}</strong>
         </div>
         <div style={{ border: '1px solid ' + (difference === null ? 'var(--line)' : difference >= 0 ? 'rgba(155,255,71,.35)' : 'rgba(255,105,105,.35)'), borderRadius: 12, padding: 13, background: 'rgba(0,0,0,.15)' }}>
           <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12 }}>Current BTC price</span>
           <strong style={{ display: 'block', fontSize: 23, marginTop: 5, color: difference === null ? 'var(--text)' : difference >= 0 ? '#b9ff79' : '#ff8585' }}>{formatPrice(btcPrice)}</strong>
-          <span style={{ display: 'block', marginTop: 3, fontSize: 11, color: difference === null ? 'var(--muted)' : difference >= 0 ? '#b9ff79' : '#ff8585' }}>{difference === null ? 'Waiting for live ticks' : (difference >= 0 ? '+' : '−') + '$' + Math.abs(difference).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' vs. reference'}</span>
+          <span style={{ display: 'block', marginTop: 3, fontSize: 11, color: difference === null ? 'var(--muted)' : difference >= 0 ? '#b9ff79' : '#ff8585' }}>{difference === null ? 'Waiting for Chainlink ticks' : (difference >= 0 ? '+' : '−') + '$' + Math.abs(difference).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' vs. reference'}</span>
         </div>
       </div>
       <div style={{ marginTop: 10, border: '1px solid var(--line)', borderRadius: 12, padding: '12px 8px 8px', overflow: 'hidden', background: 'rgba(0,0,0,.15)' }}>
@@ -168,7 +170,7 @@ export default function BtcFiveMinutePanel({ onTrade }: { onTrade: (market: BtcM
           </button>;
         })}
       </div> : <p className="section-subtitle" style={{ marginBottom: 0 }}>{marketError || 'Waiting for the current 5-minute market…'}</p>}
-      <p className="section-subtitle" style={{ margin: '12px 0 0', fontSize: 11 }}>BTC price and chart stream from Binance and update as trades arrive. The displayed beat is an approximate Binance window reference, not Polymarket’s Chainlink settlement price; market outcomes follow Polymarket’s published resolution rules.</p>
+      <p className="section-subtitle" style={{ margin: '12px 0 0', fontSize: 11 }}>Current BTC price streams from Polymarket’s Chainlink BTC/USD feed. Price to Beat is read from Polymarket’s own strike endpoint when available; it is left blank rather than replaced with a Binance or other exchange estimate. Final settlement follows the market’s configured Chainlink resolution rules.</p>
     </section>
   );
 }
